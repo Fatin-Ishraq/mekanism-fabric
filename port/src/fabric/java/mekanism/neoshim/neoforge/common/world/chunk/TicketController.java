@@ -1,6 +1,8 @@
 package mekanism.neoshim.neoforge.common.world.chunk;
 
 import java.util.Comparator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -9,12 +11,17 @@ import net.minecraft.world.level.ChunkPos;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Forced-chunk controller. Tickets are added through a vanilla {@link TicketType}; re-validation of persisted tickets on world load is driven
- * by Mekanism itself (its chunk loaders re-request their chunks when their block entities load). TODO(phase 5): persist tickets like NeoForge.
+ * Forced-chunk controller. Tickets are added through a vanilla {@link TicketType} and persisted per level by {@link ForcedChunkStore}, which reinstates them on
+ * server start and runs the controller's {@link LoadingValidationCallback} like NeoForge does.
  */
 public record TicketController(ResourceLocation id, @Nullable LoadingValidationCallback callback) {
 
+    static final Map<ResourceLocation, TicketController> CONTROLLERS = new ConcurrentHashMap<>();
     private static final TicketType<BlockPos> BLOCK_TICKET = TicketType.create("mekanism_fabric:forced_block", Comparator.comparingLong(BlockPos::asLong));
+
+    public TicketController {
+        CONTROLLERS.put(id, this);
+    }
 
     public TicketController(ResourceLocation id) {
         this(id, null);
@@ -29,6 +36,7 @@ public record TicketController(ResourceLocation id, @Nullable LoadingValidationC
         } else {
             level.getChunkSource().removeRegionTicket(BLOCK_TICKET, chunkPos, distance, owner.immutable());
         }
+        ForcedChunkStore.get(level).update(id, owner, chunkPos.toLong(), add, ticking);
         return true;
     }
 

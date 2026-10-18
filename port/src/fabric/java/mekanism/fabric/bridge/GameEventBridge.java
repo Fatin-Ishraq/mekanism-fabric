@@ -55,7 +55,10 @@ public final class GameEventBridge {
             bus.post(new PermissionGatherEvent.Nodes());
             bus.post(new ServerStartingEvent(server));
         });
-        ServerLifecycleEvents.SERVER_STARTED.register(server -> bus.post(new ServerStartedEvent(server)));
+        ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+            mekanism.neoshim.neoforge.common.world.chunk.ForcedChunkStore.reinstate(server);
+            bus.post(new ServerStartedEvent(server));
+        });
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> bus.post(new ServerStoppingEvent(server)));
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             bus.post(new ServerStoppedEvent(server));

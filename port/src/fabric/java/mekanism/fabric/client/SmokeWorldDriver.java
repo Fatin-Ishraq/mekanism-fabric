@@ -39,6 +39,7 @@ import net.minecraft.world.phys.Vec3;
 public final class SmokeWorldDriver {
 
     private static int stage = 0;
+    private static int waitTicks = 0;
     private static int ticks = 0;
     private static BlockPos base;
     private static final List<String> failures = new ArrayList<>();
@@ -64,6 +65,8 @@ public final class SmokeWorldDriver {
             case 0 -> {
                 if (client.getOverlay() == null && client.screen != null && client.level == null) {
                     stage = 1;
+                    //An unfocused window would otherwise pause the integrated server and desync the driver's tick counting
+                    client.options.pauseOnLostFocus = false;
                     log("creating world");
                     LevelSettings settings = new LevelSettings("mekanism_smoke", GameType.CREATIVE, false, Difficulty.PEACEFUL, true, new GameRules(),
                           WorldDataConfiguration.DEFAULT);
@@ -179,6 +182,17 @@ public final class SmokeWorldDriver {
         } else if (ticks == 4) {
             //Open in a later tick so the client already has the block entity (like a real player interaction)
             BlockPos checkPos = base.above(3);
+            BlockEntity serverBe = client.getSingleplayerServer().overworld().getBlockEntity(checkPos);
+            BlockEntity clientBe = client.level.getBlockEntity(checkPos);
+            if (clientBe != null && serverBe != null && (clientBe.getClass() != serverBe.getClass() || clientBe.getBlockState().getBlock() != block)) {
+                //Client still has the previous block's entity; wait for the update (re-enter this branch next tick, up to 40 ticks)
+                ticks = 3;
+                waitTicks++;
+                if (waitTicks < 40) {
+                    return;
+                }
+            }
+            waitTicks = 0;
             if (client.level.getBlockEntity(checkPos) == null) {
                 String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).toString();
                 noGui.add(id + "(no client BE: " + client.level.getBlockState(checkPos) + ")");
@@ -251,6 +265,15 @@ public final class SmokeWorldDriver {
             place(level, base.north(2).east(), MekanismBlocks.BASIC_MECHANICAL_PIPE.value().defaultBlockState());
             place(level, base.north(2).east(2), MekanismBlocks.BASIC_PRESSURIZED_TUBE.value().defaultBlockState());
             place(level, base.north(2).east(3), MekanismBlocks.STEEL_CASING.value().defaultBlockState());
+            //IEntityWithComplexSpawn: the balloon's colour only reaches the client through spawn data (Additions is a separate source set, so reflection)
+            try {
+                Class<?> balloon = Class.forName("mekanism.additions.common.entity.EntityBalloon");
+                Object entity = balloon.getMethod("create", net.minecraft.world.level.Level.class, BlockPos.class, mekanism.api.text.EnumColor.class)
+                      .invoke(null, level, base.south(4).above(3), mekanism.api.text.EnumColor.RED);
+                level.addFreshEntity((net.minecraft.world.entity.Entity) entity);
+            } catch (ReflectiveOperationException e) {
+                fail("could not spawn balloon: " + e);
+            }
         });
     }
 
@@ -266,6 +289,25 @@ public final class SmokeWorldDriver {
             } else {
                 log("client BE at {}: {}", pos, be.getClass().getSimpleName());
             }
+        }
+        boolean foundBalloon = false;
+        for (net.minecraft.world.entity.Entity entity : client.level.entitiesForRendering()) {
+            if (entity.getClass().getName().equals("mekanism.additions.common.entity.EntityBalloon")) {
+                foundBalloon = true;
+                try {
+                    Object color = entity.getClass().getMethod("getColor").invoke(entity);
+                    if (color == mekanism.api.text.EnumColor.RED) {
+                        log("client balloon colour {} (spawn data received)", color);
+                    } else {
+                        fail("client balloon colour " + color + ", expected RED (spawn data not applied)");
+                    }
+                } catch (ReflectiveOperationException e) {
+                    fail("could not read balloon colour: " + e);
+                }
+            }
+        }
+        if (!foundBalloon) {
+            fail("client has no balloon entity");
         }
         if (client.level.getBlockEntity(base) instanceof TileEntityMekanism tile && tile.getEnergyContainer(0, null) != null) {
             log("client-side chamber energy {}", tile.getEnergyContainer(0, null).getEnergy());

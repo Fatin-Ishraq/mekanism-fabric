@@ -2,7 +2,7 @@ package mekanism.neoshim.neoforge.entity;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 
-/** Extra spawn data. Sent by the port's spawn packet hook (TODO phase 5: wire via Fabric entity spawn packet mixin). */
+/** Extra spawn data, sent right after the add-entity packet (mekanism.fabric.entity.ComplexSpawns / ServerEntityMixin). */
 public interface IEntityWithComplexSpawn {
 
     void writeSpawnData(RegistryFriendlyByteBuf buffer);

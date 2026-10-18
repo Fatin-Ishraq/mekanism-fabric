@@ -108,6 +108,8 @@ public final class ClientBridge {
 
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(mekanism.fabric.menu.ExtendedMenus.MenuDataPayload.TYPE,
               (payload, context) -> mekanism.fabric.menu.ExtendedMenus.setPendingClientData(payload.data()));
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(mekanism.fabric.entity.ComplexSpawns.SpawnDataPayload.TYPE,
+              (payload, context) -> mekanism.fabric.entity.ComplexSpawns.apply(context.client().level, context.client().getConnection().registryAccess(), payload));
 
         // Game-bus bridges
         ClientTickEvents.START_CLIENT_TICK.register(client -> bus.post(new ClientTickEvent.Pre()));

@@ -18,6 +18,7 @@
     "PlayerHooksMixin",
     "PlayerTickMixin",
     "ResultSlotMixin",
+    "ServerEntityMixin",
     "ServerLevelEntityTickMixin",
     "SlotMixin",
     "inject.BiomeInjectMixin",

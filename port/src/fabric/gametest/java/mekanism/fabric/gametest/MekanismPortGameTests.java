@@ -281,4 +281,22 @@ public class MekanismPortGameTests implements FabricGameTest {
         helper.assertTrue(player.getAttribute(mekanism.fabric.NeoAttributes.CREATIVE_FLIGHT) != null, "Player has no creative flight attribute");
         helper.succeed();
     }
+
+    /** Forced chunks are recorded in the per-level store (saved with the world and reinstated on server start) and removed again. */
+    @GameTest(template = EMPTY_STRUCTURE)
+    public void chunkLoaderTicketsPersisted(GameTestHelper helper) {
+        var level = helper.getLevel();
+        var controller = mekanism.common.tile.component.TileComponentChunkLoader.TICKET_CONTROLLER;
+        BlockPos owner = helper.absolutePos(new BlockPos(1, 1, 1));
+        int chunkX = (owner.getX() >> 4) + 64;
+        int chunkZ = owner.getZ() >> 4;
+        var store = mekanism.neoshim.neoforge.common.world.chunk.ForcedChunkStore.get(level);
+        controller.forceChunk(level, owner, chunkX, chunkZ, true, false);
+        net.minecraft.nbt.CompoundTag saved = store.save(new net.minecraft.nbt.CompoundTag(), level.registryAccess());
+        helper.assertTrue(saved.contains(controller.id().toString()), "Forced chunk not recorded for " + controller.id() + ": " + saved);
+        controller.forceChunk(level, owner, chunkX, chunkZ, false, false);
+        saved = store.save(new net.minecraft.nbt.CompoundTag(), level.registryAccess());
+        helper.assertFalse(saved.contains(controller.id().toString()), "Forced chunk not removed: " + saved);
+        helper.succeed();
+    }
 }
