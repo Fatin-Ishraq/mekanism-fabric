@@ -1,0 +1,14 @@
+# Upstream reference clone (48 MB, re-clonable; exact commit recorded in NOTES.md)
+/upstream/
+
+# Gradle / Loom
+port/.gradle/
+port/build/
+port/run/
+port/runs/
+port/out/
+port/.kotlin/
+port/**/build/
+port/.idea/
+port/*.iml
+port/logs/
