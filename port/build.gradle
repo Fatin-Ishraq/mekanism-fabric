@@ -118,6 +118,14 @@ mekModules.each { moduleName ->
     configurations.named("${moduleName}CompileOnly") { extendsFrom(configurations.compileOnly) }
 }
 
+// Upstream unit tests (src/test) plus the port's test bootstrap (src/fabric/test)
+sourceSets {
+    test {
+        java.srcDirs = ['src/test/java', 'src/fabric/test/java']
+        resources.srcDirs = ['src/test/resources', 'src/fabric/test/resources']
+    }
+}
+
 // Headless functional tests (Fabric GameTest), not shipped in the mod jar
 sourceSets {
     gametest {
@@ -241,6 +249,14 @@ dependencies {
     }
     compileOnly("cc.tweaked:cc-tweaked-${minecraft_version}-common-api:${cc_tweaked_version}")
 
+    // Upstream's unit tests (src/test, plain JUnit 5 + jqwik)
+    testImplementation("org.junit.jupiter:junit-jupiter-api:${junit_version}")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junit_version}")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    // Runs the tests inside Fabric Loader (Knot) so mixins/injected interfaces apply, like upstream's NeoForge JUnit runtime
+    testImplementation("net.fabricmc:fabric-loader-junit:${loader_version}")
+    testImplementation("net.jqwik:jqwik:${jqwik_version}")
+
     compileOnly(project(':annotation-processor'))
     annotationProcessor(project(':annotation-processor'))
 }
@@ -356,3 +372,150 @@ tasks.matching { it.name == 'runGametest' }.configureEach {
         }
     }
 }
+
+// Release jars: core (remapJar) plus one remapped jar per module, like upstream's separate Mekanism / Generators / Additions / Tools jars
+mekModules.each { moduleName ->
+    def displayName = "Mekanism${moduleName.capitalize()}-Fabric-Unofficial"
+    def moduleJar = tasks.register("${moduleName}Jar", Jar) {
+        archiveBaseName = displayName
+        archiveClassifier = 'dev'
+        destinationDirectory = layout.buildDirectory.dir('devlibs')
+        from(sourceSets.getByName(moduleName).output)
+    }
+    def remapModuleJar = tasks.register("remap${moduleName.capitalize()}Jar", net.fabricmc.loom.task.RemapJarTask) {
+        inputFile = moduleJar.flatMap { it.archiveFile }
+        // Inherited Minecraft members called through core/module subclasses must be resolvable while remapping
+        classpath.from(sourceSets.getByName(moduleName).compileClasspath)
+        archiveBaseName = displayName
+        addNestedDependencies = false
+    }
+    tasks.named('build') { dependsOn(remapModuleJar) }
+}
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
+}
+// jqwik's engine does not discover tests under fabric-loader-junit's Knot launcher; upstream's property tests need no game, so run them plainly
+def propertyTest = tasks.register('propertyTest', Test) {
+    description = 'Runs upstream jqwik property tests outside Knot'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath.filter { !it.name.startsWith('fabric-loader-junit') }
+    useJUnitPlatform { includeEngines('jqwik') }
+}
+tasks.named('check') { dependsOn(propertyTest) }
+
+// Production (intermediary) runs of the release jars, for verification: the same automated smoke checks as the dev runs
+def productionMods = configurations.detachedConfiguration(
+        dependencies.create("net.fabricmc.fabric-api:fabric-api:${fabric_version}"),
+        dependencies.create("fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${fcap_version}"))
+productionMods.transitive = false
+['prodSmokeClient': 'mekanism_fabric.smokeTest', 'prodSmokeWorld': 'mekanism_fabric.smokeWorld'].each { taskName, flag ->
+    tasks.register(taskName, net.fabricmc.loom.task.prod.ClientProductionRunTask) {
+        group = 'verification'
+        dependsOn('build', bridgeReleaseJars)
+        mods.from(tasks.named('remapJar'))
+        mekModules.each { mods.from(tasks.named("remap${it.capitalize()}Jar")) }
+        mods.from(productionMods)
+        jvmArgs.add("-D${flag}=true")
+        runDir = file("run/${taskName}")
+    }
+}
+
+// Remapping trap: some Mekanism interfaces declare methods that classes only "implement" through an inherited Minecraft method (BlockEntity#getLevel,
+// #getBlockPos). Remapping renames the Minecraft method to intermediary but not Mekanism's own declarations, which throws AbstractMethodError in
+// production. After remapping, every Mekanism-declared method with one of these exact signatures (still named after its Mojang name) is renamed, with its
+// references, to the intermediary name of the vanilla method it mirrors - consistently across all jars. scripts/ImplChecker.java
+// (checkRemappedImplementations) verifies that no such gap remains.
+def interfaceBridgeRules = [
+        // [named name, intermediary descriptor, intermediary name of the Minecraft method it mirrors]
+        ['getLevel', '()Lnet/minecraft/class_1937;', 'method_10997'],
+        ['getBlockPos', '()Lnet/minecraft/class_2338;', 'method_11016'],
+]
+def collectBridgeMappings = { List<File> jars ->
+    def found = []
+    jars.each { File jarFile ->
+        new java.util.zip.ZipFile(jarFile).withCloseable { zip ->
+            zip.entries().findAll { it.name.endsWith('.class') && it.name.startsWith('mekanism/') }.each { entry ->
+                def reader = new org.objectweb.asm.ClassReader(zip.getInputStream(entry).bytes)
+                def owner = reader.className
+                reader.accept(new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9) {
+                    @Override
+                    org.objectweb.asm.MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
+                        def rule = interfaceBridgeRules.find { it[0] == name && it[1] == desc }
+                        if (rule != null && (access & org.objectweb.asm.Opcodes.ACC_STATIC) == 0) {
+                            found << [owner, name, desc, rule[2]]
+                        }
+                        return null
+                    }
+                }, org.objectweb.asm.ClassReader.SKIP_CODE)
+            }
+        }
+    }
+    return found
+}
+def intermediaryMinecraft = { loom.getMinecraftJars(net.fabricmc.loom.api.mappings.layered.MappingsNamespace.INTERMEDIARY) }
+// One TinyRemapper pass over all release jars together, so hierarchy and references resolve across jars (module classes inherit core methods).
+// Idempotent: once renamed, no matching Mojang-named declarations remain.
+def releaseJarTasks = { [tasks.named('remapJar')] + mekModules.collect { tasks.named("remap${it.capitalize()}Jar") } }
+def bridgeReleaseJars = tasks.register('bridgeReleaseJars') {
+    description = 'Renames Mekanism methods that mirror inherited Minecraft methods to their intermediary names in the release jars'
+    dependsOn(releaseJarTasks())
+    doLast {
+        def jars = releaseJarTasks().collect { it.get().archiveFile.get().asFile }
+        def mappings = collectBridgeMappings(jars)
+        if (mappings.isEmpty()) {
+            return
+        }
+        def remapper = net.fabricmc.tinyremapper.TinyRemapper.newRemapper()
+                .withMappings({ acceptor -> mappings.each { m -> acceptor.acceptMethod(new net.fabricmc.tinyremapper.IMappingProvider.Member(m[0], m[1], m[2]), m[3]) } } as net.fabricmc.tinyremapper.IMappingProvider)
+                .build()
+        def outputs = []
+        try {
+            intermediaryMinecraft().each { remapper.readClassPath(it) }
+            def tagged = jars.collect { jar ->
+                // Must end in .jar: TinyRemapper's output consumer treats other paths as directories
+                def output = new File(jar.parentFile, jar.name.replace('.jar', '-bridged.jar')).toPath()
+                def tag = remapper.createInputTag()
+                remapper.readInputs(tag, jar.toPath())
+                [jar.toPath(), output, tag]
+            }
+            tagged.each { input, output, tag ->
+                def consumer = new net.fabricmc.tinyremapper.OutputConsumerPath.Builder(output).build()
+                try {
+                    consumer.addNonClassFiles(input, net.fabricmc.tinyremapper.NonClassCopyMode.UNCHANGED, remapper)
+                    remapper.apply(consumer, tag)
+                } finally {
+                    consumer.close()
+                }
+                outputs << [input, output]
+            }
+        } finally {
+            remapper.finish()
+        }
+        outputs.each { input, output -> java.nio.file.Files.move(output, input, java.nio.file.StandardCopyOption.REPLACE_EXISTING) }
+        logger.lifecycle("Bridged ${mappings.size()} Mekanism method declarations in ${jars.size()} release jars")
+    }
+}
+tasks.named('build') { dependsOn(bridgeReleaseJars) }
+def implCheckerClasspath = configurations.detachedConfiguration(dependencies.create('org.ow2.asm:asm:9.7.1'))
+def checkRemappedImplementations = tasks.register('checkRemappedImplementations', JavaExec) {
+    group = 'verification'
+    description = 'Fails if a class in the release jars leaves an interface method unimplemented after remapping'
+    dependsOn(bridgeReleaseJars)
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of("${java_version}") }
+    classpath = implCheckerClasspath
+    mainClass = 'ImplChecker'
+    def releaseJars = [tasks.named('remapJar')] + mekModules.collect { tasks.named("remap${it.capitalize()}Jar") }
+    doFirst {
+        // Libraries: Minecraft (intermediary) and the Fabric API modules (their interfaces are injected into Minecraft classes too)
+        def fabricApiJars = configurations.modCompileClasspath.resolvedConfiguration.resolvedArtifacts
+                .findAll { it.moduleVersion.id.group == 'net.fabricmc.fabric-api' }.collect { it.file.absolutePath }
+        args = ['--fail', releaseJars.collect { it.get().archiveFile.get().asFile.absolutePath }.join(','),
+                (intermediaryMinecraft().collect { it.toAbsolutePath().toString() } + fabricApiJars).join(',')]
+        // Single-file source launch
+        jvmArgs = []
+        mainClass.set(file('scripts/ImplChecker.java').absolutePath)
+    }
+}
+tasks.named('check') { dependsOn(checkRemappedImplementations) }
