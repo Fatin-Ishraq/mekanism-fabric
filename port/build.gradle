@@ -107,6 +107,13 @@ loom {
             name = 'Server'
             runDir = 'run/server'
         }
+        // Automated client boot check: exits by itself after resource loading reaches the title screen
+        smokeClient {
+            client()
+            name = 'Smoke Client'
+            runDir = 'run/smoke'
+            vmArg('-Dmekanism_fabric.smokeTest=true')
+        }
     }
 }
 

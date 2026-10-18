@@ -56,20 +56,27 @@ public final class ClientBridge {
         modBus.post(new EntityRenderersEvent.RegisterLayerDefinitions());
         modBus.post(new EntityRenderersEvent.RegisterRenderers());
         modBus.post(new RegisterParticleProvidersEvent());
-        modBus.post(new RegisterColorHandlersEvent.Block(null));
-        modBus.post(new RegisterColorHandlersEvent.Item(null, null));
         modBus.post(new RegisterClientExtensionsEvent());
         modBus.post(new RegisterItemDecorationsEvent());
         modBus.post(new ModelEvent.RegisterGeometryLoaders());
         RegisterGuiLayersEvent layers = new RegisterGuiLayersEvent();
         modBus.post(layers);
         guiLayers = List.copyOf(layers.getLayers());
-        RegisterClientReloadListenersEvent reloadListeners = new RegisterClientReloadListenersEvent();
-        modBus.post(reloadListeners);
-        registerClientReloadListeners(reloadListeners.getListeners());
+
         container.getCustomExtension(IConfigScreenFactory.class).ifPresent(factory ->
               ConfigScreenFactoryRegistry.INSTANCE.register(container.getModId(), (modId, parent) -> factory.createScreen(container, parent)));
         modBus.post(new FMLClientSetupEvent(container));
+
+        // Dev-only automated boot check (gradlew runSmokeClient): quit once the title screen is reached, no interaction
+        if (Boolean.getBoolean("mekanism_fabric.smokeTest")) {
+            ClientTickEvents.END_CLIENT_TICK.register(client -> {
+                if (client.getOverlay() == null && client.screen != null) {
+                    mekanism.common.Mekanism.logger.info("[Fabric port] Smoke test: resource loading finished, showing {}; stopping client",
+                          client.screen.getClass().getSimpleName());
+                    client.stop();
+                }
+            });
+        }
 
         // Game-bus bridges
         ClientTickEvents.START_CLIENT_TICK.register(client -> bus.post(new ClientTickEvent.Pre()));
@@ -97,28 +104,22 @@ public final class ClientBridge {
         WorldRenderEvents.LAST.register(context -> postStage(RenderLevelStageEvent.Stage.AFTER_LEVEL, context));
     }
 
+    /** Called from MinecraftInitMixin right before the initial resource reload (GL context, texture manager and colors exist). */
+    public static void onBeforeInitialReload(Minecraft minecraft, net.minecraft.server.packs.resources.ReloadableResourceManager resourceManager) {
+        for (ModContainer container : mekanism.fabric.bridge.ModBusLifecycle.mods()) {
+            IEventBus modBus = container.getEventBus();
+            modBus.post(new RegisterColorHandlersEvent.Block(minecraft.getBlockColors()));
+            modBus.post(new RegisterColorHandlersEvent.Item(minecraft.itemColors, minecraft.getBlockColors()));
+            RegisterClientReloadListenersEvent reloadListeners = new RegisterClientReloadListenersEvent();
+            modBus.post(reloadListeners);
+            reloadListeners.getListeners().forEach(resourceManager::registerReloadListener);
+        }
+    }
+
     private static void postStage(RenderLevelStageEvent.Stage stage, WorldRenderContext context) {
         com.mojang.blaze3d.vertex.PoseStack poseStack = context.matrixStack() != null ? context.matrixStack() : new com.mojang.blaze3d.vertex.PoseStack();
         NeoForge.EVENT_BUS.post(new RenderLevelStageEvent(stage, context.worldRenderer(), poseStack, context.positionMatrix(), context.projectionMatrix(),
               context.worldRenderer().getTicks(), context.tickCounter(), context.camera(), context.frustum()));
     }
 
-    private static void registerClientReloadListeners(List<PreparableReloadListener> listeners) {
-        int index = 0;
-        for (PreparableReloadListener listener : listeners) {
-            ResourceLocation id = ResourceLocation.fromNamespaceAndPath("mekanism_fabric", "client_reload_listener_" + index++);
-            ResourceManagerHelper.get(PackType.CLIENT_RESOURCES).registerReloadListener(new IdentifiableResourceReloadListener() {
-                @Override
-                public ResourceLocation getFabricId() {
-                    return id;
-                }
-
-                @Override
-                public java.util.concurrent.CompletableFuture<Void> reload(PreparationBarrier barrier, ResourceManager manager, ProfilerFiller prepProfiler,
-                      ProfilerFiller applyProfiler, java.util.concurrent.Executor backgroundExecutor, java.util.concurrent.Executor gameExecutor) {
-                    return listener.reload(barrier, manager, prepProfiler, applyProfiler, backgroundExecutor, gameExecutor);
-                }
-            });
-        }
-    }
 }

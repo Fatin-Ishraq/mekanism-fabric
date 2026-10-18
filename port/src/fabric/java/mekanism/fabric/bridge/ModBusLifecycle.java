@@ -57,6 +57,10 @@ public final class ModBusLifecycle {
     private ModBusLifecycle() {
     }
 
+    public static List<ModContainer> mods() {
+        return MODS;
+    }
+
     public static void addMod(ModContainer container) {
         MODS.add(container);
         //Bridge Forge Config API Port's config events onto the mod bus

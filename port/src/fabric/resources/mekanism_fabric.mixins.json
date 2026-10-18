@@ -45,6 +45,7 @@
   "client": [
     "client.AbstractWidgetMixin",
     "client.KeyMappingMixin",
+    "client.MinecraftInitMixin",
     "client.ModelManagerMixin",
     "inject.AbstractContainerScreenInjectMixin",
     "inject.BakedModelInjectMixin",
