@@ -12,11 +12,12 @@
     "dizzyd (original Mekanism)"
   ],
   "contributors": [
-    "unpairedbracket, CyanideX, Ridanisaurus and many others (original Mekanism)",
-    "Fabric port contributors"
+    "Fatin-Ishraq (Fabric port)"
   ],
   "contact": {
-    "sources": "https://github.com/mekanism/Mekanism"
+    "homepage": "https://github.com/Fatin-Ishraq/mekanism-fabric",
+    "sources": "https://github.com/Fatin-Ishraq/mekanism-fabric",
+    "issues": "https://github.com/Fatin-Ishraq/mekanism-fabric/issues"
   },
   "license": "MIT",
   "icon": "assets/mekanism_fabric/logo.png",

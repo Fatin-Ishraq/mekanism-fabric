@@ -281,10 +281,8 @@ def fabricModJsonProps = ['version': project.version, 'minecraft_version': minec
             filter { String line -> fabricModJsonProps.inject(line) { String l, k, v -> l.replace('${' + k + '}', v.toString()) } }
         }
         from(rootProject.file('LICENSE')) { rename { 'LICENSE_mekanism' } }
+        from(rootProject.file('logo.png')) { into('assets/mekanism_fabric') }
     }
-}
-processResources {
-    from(rootProject.file('logo.png')) { into('assets/mekanism_fabric') }
 }
 
 // ---- NeoForge -> Fabric data JSON transform (NOTES.md D11) ----

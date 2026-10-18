@@ -28,5 +28,14 @@
   },
   "depends": {
     "mekanism_fabric": "*"
-  }
+  },
+  "contact": {
+    "homepage": "https://github.com/Fatin-Ishraq/mekanism-fabric",
+    "sources": "https://github.com/Fatin-Ishraq/mekanism-fabric",
+    "issues": "https://github.com/Fatin-Ishraq/mekanism-fabric/issues"
+  },
+  "contributors": [
+    "Fatin-Ishraq (Fabric port)"
+  ],
+  "icon": "assets/mekanism_fabric/logo.png"
 }

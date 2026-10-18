@@ -3,3 +3,5 @@
 *.jar binary
 *.ogg binary
 *.nbt binary
+*.bat text eol=crlf
+*.blend binary

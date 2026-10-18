@@ -91,7 +91,7 @@ Fuzs' Forge Config API Port (FCAP, `fuzs.forgeconfigapiport:forgeconfigapiport-f
 * AccessTransformers are converted to `mekanism.accesswidener` by script (`public-f` → `accessible` + `mutable`/`extendable`; `protected` → `accessible`).
 
 ### D12. Toolchain
-Fabric Loom `1.11.8` on Gradle 9.2.1 (remapping, intermediary), Minecraft 1.21.1, Fabric Loader 0.16+/0.17+, Fabric API `0.116.17+1.21.1`, Mojang mappings + Parchment `2024.11.17` (the same Parchment version as upstream, so parameter names match), and Java 21 toolchain (the local JDK 21 is at `C:\Program Files\Eclipse Adoptium\jdk-21.0.12.8-hotspot`).
+Fabric Loom `1.11.8` on Gradle 9.2.1 (remapping, intermediary), Minecraft 1.21.1, Fabric Loader 0.16+/0.17+, Fabric API `0.116.17+1.21.1`, Mojang mappings + Parchment `2024.11.17` (the same Parchment version as upstream, so parameter names match), and Java 21 toolchain (provisioned automatically via the foojay resolver if not installed).
 
 ## Module plan / status
 
