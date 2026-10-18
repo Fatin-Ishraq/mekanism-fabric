@@ -133,6 +133,13 @@ loom {
             vmArg('-Dfabric-api.gametest')
             vmArg("-Dfabric-api.gametest.report-file=${project.layout.buildDirectory.get()}/gametest/junit.xml")
         }
+        // Automated in-world client check (creates a world, places machines, opens a GUI, exits)
+        smokeWorld {
+            client()
+            name = 'Smoke World'
+            runDir = 'run/smokeworld'
+            vmArg('-Dmekanism_fabric.smokeWorld=true')
+        }
         // Automated client boot check: exits by itself after resource loading reaches the title screen
         smokeClient {
             client()

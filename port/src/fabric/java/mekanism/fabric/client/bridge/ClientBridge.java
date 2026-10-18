@@ -68,6 +68,9 @@ public final class ClientBridge {
               ConfigScreenFactoryRegistry.INSTANCE.register(container.getModId(), (modId, parent) -> factory.createScreen(container, parent)));
         modBus.post(new FMLClientSetupEvent(container));
 
+        if (Boolean.getBoolean("mekanism_fabric.smokeWorld")) {
+            mekanism.fabric.client.SmokeWorldDriver.init();
+        }
         // Dev-only automated boot check (gradlew runSmokeClient): quit once the title screen is reached, no interaction
         if (Boolean.getBoolean("mekanism_fabric.smokeTest")) {
             ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -94,6 +97,9 @@ public final class ClientBridge {
             }
         });
         registerFluidRenderHandlers();
+
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(mekanism.fabric.menu.ExtendedMenus.MenuDataPayload.TYPE,
+              (payload, context) -> mekanism.fabric.menu.ExtendedMenus.setPendingClientData(payload.data()));
 
         // Game-bus bridges
         ClientTickEvents.START_CLIENT_TICK.register(client -> bus.post(new ClientTickEvent.Pre()));

@@ -54,6 +54,7 @@
     "client.ItemRendererMixin",
     "client.KeyMappingMixin",
     "client.LivingEntityRendererMixin",
+    "client.MenuTypeMixin",
     "client.MinecraftInitMixin",
     "client.MinecraftSetScreenMixin",
     "client.ModelManagerApplyMixin",
