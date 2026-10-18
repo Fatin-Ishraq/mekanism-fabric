@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "mekanismadditions_fabric",
   "version": "${version}",
-  "name": "Mekanism: Additions (Unofficial Fabric Port)",
-  "description": "Unofficial Fabric port of Mekanism: Additions. NOT affiliated with or endorsed by the Mekanism team.",
+  "name": "Mekanism Fabricated: Additions",
+  "description": "Fabric port of Mekanism: Additions, decorative blocks and extras for Mekanism. Unofficial: not affiliated with or endorsed by the Mekanism team.",
   "authors": [
     "Aidancbrady (original Mekanism)",
     "Thommy101 (original Mekanism)",

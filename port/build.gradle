@@ -6,7 +6,7 @@ plugins {
 // Unofficial Fabric port of Mekanism (https://github.com/mekanism/Mekanism). See ../NOTES.md.
 version = "${mod_version}+fabric.${port_revision}"
 group = 'mekanism'
-base { archivesName = 'Mekanism-Fabric-Unofficial' }
+base { archivesName = 'MekanismFabricated-Core' }
 
 java {
     toolchain.languageVersion = JavaLanguageVersion.of("${java_version}")
@@ -378,7 +378,7 @@ tasks.matching { it.name == 'runGametest' }.configureEach {
 
 // Release jars: core (remapJar) plus one remapped jar per module, like upstream's separate Mekanism / Generators / Additions / Tools jars
 mekModules.each { moduleName ->
-    def displayName = "Mekanism${moduleName.capitalize()}-Fabric-Unofficial"
+    def displayName = "MekanismFabricated-${moduleName.capitalize()}"
     def moduleJar = tasks.register("${moduleName}Jar", Jar) {
         archiveBaseName = displayName
         archiveClassifier = 'dev'

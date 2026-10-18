@@ -1,4 +1,6 @@
-# Mekanism for Fabric (unofficial)
+# Mekanism Fabricated
+
+<img src="media/icon_wordmark.png" width="128" align="right" alt="Mekanism Fabricated icon">
 
 An unofficial port of [Mekanism](https://github.com/mekanism/Mekanism) to the [Fabric](https://fabricmc.net) mod loader for **Minecraft 1.21.1**,
 based on Mekanism **10.7.19** (upstream commit `a00109e4`).

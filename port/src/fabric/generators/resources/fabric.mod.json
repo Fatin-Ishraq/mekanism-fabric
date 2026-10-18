@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "mekanismgenerators_fabric",
   "version": "${version}",
-  "name": "Mekanism: Generators (Unofficial Fabric Port)",
-  "description": "Unofficial Fabric port of Mekanism: Generators. NOT affiliated with or endorsed by the Mekanism team.",
+  "name": "Mekanism Fabricated: Generators",
+  "description": "Fabric port of Mekanism: Generators, power generation for Mekanism. Unofficial: not affiliated with or endorsed by the Mekanism team.",
   "authors": [
     "Aidancbrady (original Mekanism)",
     "Thommy101 (original Mekanism)",

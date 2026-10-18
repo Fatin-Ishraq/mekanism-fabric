@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "mekanism_fabric",
   "version": "${version}",
-  "name": "Mekanism (Unofficial Fabric Port)",
-  "description": "Unofficial Fabric port of Mekanism, a Minecraft add-on featuring high-tech machinery that can be used to create powerful tools, armor, and weapons. NOT affiliated with or endorsed by the Mekanism team - please do not report bugs from this port to the official Mekanism issue tracker.",
+  "name": "Mekanism Fabricated",
+  "description": "Fabric port of Mekanism, a Minecraft add-on featuring high-tech machinery that can be used to create powerful tools, armor, and weapons. Unofficial: not affiliated with or endorsed by the Mekanism team. Please report bugs to this port, not to the official Mekanism issue tracker.",
   "authors": [
     "Aidancbrady (original Mekanism)",
     "Thommy101 (original Mekanism)",
