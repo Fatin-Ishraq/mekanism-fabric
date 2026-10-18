@@ -91,7 +91,25 @@ sourceSets {
     }
 }
 
+// Headless functional tests (Fabric GameTest), not shipped in the mod jar
+sourceSets {
+    gametest {
+        java.srcDirs = ['src/fabric/gametest/java']
+        resources.srcDirs = ['src/fabric/gametest/resources']
+        compileClasspath += main.compileClasspath + main.output
+        runtimeClasspath += main.runtimeClasspath + main.output
+    }
+}
+
 loom {
+    mods {
+        mekanism_fabric {
+            sourceSet sourceSets.main
+        }
+        mekanism_fabric_gametest {
+            sourceSet sourceSets.gametest
+        }
+    }
     accessWidenerPath = file('src/fabric/resources/mekanism.accesswidener')
     mixin {
         defaultRefmapName = 'mekanism_fabric.refmap.json'
@@ -106,6 +124,14 @@ loom {
             server()
             name = 'Server'
             runDir = 'run/server'
+        }
+        gametest {
+            server()
+            name = 'GameTest'
+            source(sourceSets.gametest)
+            runDir = 'build/gametest'
+            vmArg('-Dfabric-api.gametest')
+            vmArg("-Dfabric-api.gametest.report-file=${project.layout.buildDirectory.get()}/gametest/junit.xml")
         }
         // Automated client boot check: exits by itself after resource loading reaches the title screen
         smokeClient {

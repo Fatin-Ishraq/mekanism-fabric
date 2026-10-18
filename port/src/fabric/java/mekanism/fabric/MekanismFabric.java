@@ -31,6 +31,8 @@ public class MekanismFabric implements ModInitializer {
 
         IngredientCodecs.registerNeoForgeIngredientTypes();
         GameEventBridge.init();
+        mekanism.fabric.datamaps.DataMapLoader.init();
+        mekanism.fabric.compat.CapabilityBridge.registerFallbacks();
 
         new Mekanism(container, modBus);
         EventBusSubscribers.registerCommon(modBus);

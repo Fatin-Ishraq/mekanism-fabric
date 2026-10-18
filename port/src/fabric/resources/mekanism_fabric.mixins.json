@@ -6,6 +6,7 @@
   "mixins": [
     "EntityThunderHitMixin",
     "ItemPropertiesMixin",
+    "LevelChunkMixin",
     "LightningBoltMixin",
     "PlayerTickMixin",
     "SlotMixin",
@@ -44,6 +45,7 @@
   ],
   "client": [
     "client.AbstractWidgetMixin",
+    "client.ClientPacketListenerMixin",
     "client.KeyMappingMixin",
     "client.MinecraftInitMixin",
     "client.ModelManagerMixin",

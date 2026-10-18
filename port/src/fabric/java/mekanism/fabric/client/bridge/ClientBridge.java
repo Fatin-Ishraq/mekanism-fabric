@@ -78,6 +78,9 @@ public final class ClientBridge {
             });
         }
 
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(mekanism.fabric.datamaps.DataMapLoader.SyncPayload.TYPE,
+              (payload, context) -> mekanism.fabric.datamaps.DataMapLoader.applySync(payload.data(), context.client().getConnection().registryAccess()));
+
         // Game-bus bridges
         ClientTickEvents.START_CLIENT_TICK.register(client -> bus.post(new ClientTickEvent.Pre()));
         ClientTickEvents.END_CLIENT_TICK.register(client -> bus.post(new ClientTickEvent.Post()));

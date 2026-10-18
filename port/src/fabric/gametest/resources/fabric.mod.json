@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "mekanism_fabric_gametest",
+  "version": "1.0.0",
+  "name": "Mekanism Fabric port - GameTests",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": ["mekanism.fabric.gametest.MekanismPortGameTests"]
+  },
+  "depends": {
+    "mekanism_fabric": "*"
+  }
+}
