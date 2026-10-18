@@ -17,9 +17,9 @@ public class NeoForgeMod {
     public static final Holder<Attribute> SWIM_SPEED = DeferredHolder.create(Registries.ATTRIBUTE, ResourceLocation.fromNamespaceAndPath("neoforge", "swim_speed"));
     public static final Holder<Attribute> CREATIVE_FLIGHT = DeferredHolder.create(Registries.ATTRIBUTE, ResourceLocation.fromNamespaceAndPath("neoforge", "creative_flight"));
     public static final DeferredHolder<Fluid, Fluid> MILK = DeferredHolder.create(Registries.FLUID, ResourceLocation.fromNamespaceAndPath("mekanism_fabric", "milk"));
-    public static final FluidType WATER_TYPE = FluidType.VanillaTypes.WATER;
-    public static final FluidType LAVA_TYPE = FluidType.VanillaTypes.LAVA;
-    public static final FluidType EMPTY_TYPE = FluidType.VanillaTypes.EMPTY;
+    public static final Holder<FluidType> WATER_TYPE = Holder.direct(FluidType.VanillaTypes.WATER);
+    public static final Holder<FluidType> LAVA_TYPE = Holder.direct(FluidType.VanillaTypes.LAVA);
+    public static final Holder<FluidType> EMPTY_TYPE = Holder.direct(FluidType.VanillaTypes.EMPTY);
 
     private static boolean enableMilkFluid = false;
 

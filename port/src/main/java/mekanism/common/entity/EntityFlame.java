@@ -193,9 +193,9 @@ public class EntityFlame extends Projectile implements IEntityWithComplexSpawn {
             level().setBlockAndUpdate(pos, modifiedState);
         }
         if (modifiedState == null || EventHooks.onBlockPlace(shooter, blockSnapshot, hitSide)) {
-            level().restoringBlockSnapshots = true;
+            //FABRIC: no restoringBlockSnapshots on Fabric: level().restoringBlockSnapshots = true;
             blockSnapshot.restore(blockSnapshot.getFlags() | Block.UPDATE_CLIENTS);
-            level().restoringBlockSnapshots = false;
+            //FABRIC: level().restoringBlockSnapshots = false;
             return false;
         }
         return true;
@@ -205,9 +205,9 @@ public class EntityFlame extends Projectile implements IEntityWithComplexSpawn {
         BlockSnapshot blockSnapshot = BlockSnapshot.create(level().dimension(), level(), pos);
         level().setBlockAndUpdate(pos, newState);
         if (EventHooks.onBlockPlace(shooter, blockSnapshot, hitSide)) {
-            level().restoringBlockSnapshots = true;
+            //FABRIC: no restoringBlockSnapshots on Fabric: level().restoringBlockSnapshots = true;
             blockSnapshot.restore(blockSnapshot.getFlags() | Block.UPDATE_CLIENTS);
-            level().restoringBlockSnapshots = false;
+            //FABRIC: level().restoringBlockSnapshots = false;
             return false;
         }
         return true;

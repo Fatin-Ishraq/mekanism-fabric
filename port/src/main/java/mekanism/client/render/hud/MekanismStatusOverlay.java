@@ -42,7 +42,7 @@ public class MekanismStatusOverlay implements LayeredDraw.Layer {
                     Color color = Color.rgbad(1, 1, 1, modeSwitchTimer / (float) BASE_TIMER);
                     Font font = minecraft.gui.getFont();
                     int componentWidth = font.width(scrollTextComponent);
-                    int targetShift = Math.max(59, Math.max(minecraft.gui.leftHeight, minecraft.gui.rightHeight));
+                    int targetShift = Math.max(59, Math.max(mekanism.fabric.client.HudHeights.leftHeight, mekanism.fabric.client.HudHeights.rightHeight)/*FABRIC: Gui#leftHeight/rightHeight are NeoForge fields*/);
                     if (minecraft.gameMode != null && !minecraft.gameMode.canHurtPlayer()) {
                         //Same shift as done in Gui#renderSelectedItemName
                         targetShift -= 14;

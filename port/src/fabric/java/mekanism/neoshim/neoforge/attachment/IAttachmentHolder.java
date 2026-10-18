@@ -37,6 +37,16 @@ public interface IAttachmentHolder {
     }
 
     @Nullable
+    default <T> T getExistingDataOrNull(AttachmentType<T> type) {
+        return mekanism$target().getAttached(type.fabric());
+    }
+
+    @Nullable
+    default <T> T getExistingDataOrNull(Supplier<AttachmentType<T>> type) {
+        return getExistingDataOrNull(type.get());
+    }
+
+    @Nullable
     default <T> T setData(AttachmentType<T> type, T data) {
         return mekanism$target().setAttached(type.fabric(), data);
     }

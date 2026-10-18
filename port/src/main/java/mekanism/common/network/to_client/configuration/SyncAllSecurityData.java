@@ -12,7 +12,7 @@ import org.jetbrains.annotations.NotNull;
 public record SyncAllSecurityData(ServerConfigurationPacketListener listener) implements ICustomConfigurationTask {
 
     private static final ResourceLocation ID = Mekanism.rl("sync_security");
-    private static final Type TYPE = new Type(ID);
+    private static final Type TYPE = new Type(ID.toString())/*FABRIC: vanilla ConfigurationTask.Type takes a String*/;
 
     @Override
     public void run(Consumer<CustomPacketPayload> sender) {

@@ -25,8 +25,6 @@ import net.minecraft.world.entity.player.Player;
 import mekanism.neoshim.neoforge.client.event.RegisterKeyMappingsEvent;
 import mekanism.neoshim.neoforge.client.settings.KeyModifier;
 import org.lwjgl.glfw.GLFW;
-import top.theillusivec4.curios.api.SlotContext;
-import top.theillusivec4.curios.api.SlotResult;
 
 public class MekanismKeyHandler {
 
@@ -80,19 +78,8 @@ public class MekanismKeyHandler {
             if (IModeItem.isModeItem(player, slot)) {
                 PacketUtils.sendToServer(new PacketModeChange(slot, player.isShiftKeyDown()));
                 SoundHandler.playSound(MekanismSounds.HYDRAULIC);
-            } else if (Mekanism.hooks.curios.isLoaded()) {
-                Optional<SlotResult> curiosResult = CuriosIntegration.findFirstCurioAsResult(player, stack -> {
-                    if (stack.canEquip(slot, player) && IModeItem.isModeItem(stack, slot)) {
-                        return !(stack.getItem() instanceof IChemicalItem item) || item.hasChemical(stack);
-                    }
-                    return false;
-                });
-                if (curiosResult.isPresent()) {
-                    SlotContext slotContext = curiosResult.get().slotContext();
-                    PacketUtils.sendToServer(new PacketModeChangeCurios(slotContext.identifier(), slotContext.index(), player.isShiftKeyDown()));
-                    SoundHandler.playSound(MekanismSounds.HYDRAULIC);
-                }
             }
+            //FABRIC: removed the Curios accessory-slot branch (Curios is NeoForge-only; Trinkets/Accessories support is TODO)
         }
     }
 }

@@ -23,11 +23,11 @@ public abstract class MekanismSavedData extends SavedData {
             throw new IllegalStateException("Current server is null");
         }
         DimensionDataStorage dataStorage = currentServer.overworld().getDataStorage();
-        return createSavedData(dataStorage, new Factory<>(createFunction, (tag, provider) -> {
+        return createSavedData(dataStorage, new Factory<>(createFunction, (tag, provider) -> {//FABRIC: vanilla Factory needs an explicit DataFixTypes (null) argument, added below
             DATA handler = createFunction.get();
             handler.load(tag, provider);
             return handler;
-        }), name);
+        }, null), name);
     }
 
     /**

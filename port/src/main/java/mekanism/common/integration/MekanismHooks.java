@@ -4,15 +4,8 @@ import java.util.List;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import mekanism.common.integration.computer.FactoryRegistry;
-import mekanism.common.integration.computer.computercraft.CCCapabilityHelper;
-import mekanism.common.integration.crafttweaker.content.CrTContentUtils;
 import mekanism.common.integration.curios.CuriosIntegration;
 import mekanism.common.integration.energy.EnergyCompatUtils;
-import mekanism.common.integration.framedblocks.FramedBlocksIntegration;
-import mekanism.common.integration.gender.MekanismGenderArmor;
-import mekanism.common.integration.jsonthings.JsonThingsIntegration;
-import mekanism.common.integration.lookingat.theoneprobe.TOPProvider;
-import mekanism.common.integration.projecte.MekanismNormalizedSimpleStacks;
 import mekanism.common.recipe.bin.BinInsertRecipe;
 import mekanism.common.registries.MekanismItems;
 import net.minecraft.resources.ResourceLocation;
@@ -100,36 +93,18 @@ public final class MekanismHooks {
         if (curios.isLoaded()) {
             CuriosIntegration.addListeners(modEventBus);
         }
-        if (craftTweaker.isLoaded() && !DatagenModLoader.isRunningDataGen()) {
-            //Register our CrT listener at lowest priority to try and ensure they get later ids than our normal registries
-            modEventBus.addListener(EventPriority.LOWEST, CrTContentUtils::registerCrTContent);
-        }
-        if (jsonThings.isLoaded()) {
-            JsonThingsIntegration.hook(modEventBus);
-        }
-        if (projecte.isLoaded()) {
-            MekanismNormalizedSimpleStacks.NSS_SERIALIZERS.register(modEventBus);
-        }
-        if (framedBlocks.isLoaded()) {
-            FramedBlocksIntegration.init(modEventBus);
-        }
+        //FABRIC: CraftTweaker, JsonThings, ProjectE and FramedBlocks hooks removed (NeoForge-only integrations, see NOTES.md)
     }
 
     public void hookCapabilityRegistration(RegisterCapabilitiesEvent event) {
         EnergyCompatUtils.initLoadedCache();
-        if (genderMod.isLoaded()) {
-            MekanismGenderArmor.HAZMAT.register(event, MekanismItems.HAZMAT_GOWN);
-            MekanismGenderArmor.OPEN_FRONT.register(event, MekanismItems.JETPACK, MekanismItems.SCUBA_TANK);
-            MekanismGenderArmor.HIDES_BREASTS.register(event, MekanismItems.ARMORED_JETPACK, MekanismItems.MEKASUIT_BODYARMOR);
-        }
+        //FABRIC: Wildfire's Gender Mod armor config removed (NeoForge capability based)
     }
 
     public void hookCommonSetup() {
         if (computerCompatEnabled()) {
             FactoryRegistry.load();
-            if (computerCraft.isLoaded()) {
-                CCCapabilityHelper.registerApis();
-            }
+            //FABRIC: ComputerCraft API registration (CCCapabilityHelper) is TODO
         }
 
         //TODO - 1.20: Move this out of here and back to always being registered whenever it gets fixed in Neo.
@@ -145,9 +120,7 @@ public final class MekanismHooks {
             // we add this check here, so we can skip iterating the list of things we want to blacklist when it is not present
             sendDarkModeEverywhereIMC();
         }
-        if (theOneProbe.isLoaded()) {
-            theOneProbe.sendImc("getTheOneProbe", TOPProvider::new);
-        }
+        //FABRIC: The One Probe IMC removed (NeoForge-only)
     }
 
     public boolean computerCompatEnabled() {

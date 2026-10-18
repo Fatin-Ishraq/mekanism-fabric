@@ -16,6 +16,18 @@ repositories {
     maven { name = 'ParchmentMC'; url = 'https://maven.parchmentmc.org' }
     maven { name = 'Fuzs (Forge Config API Port)'; url = 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/' }
     exclusiveContent {
+        forRepository { maven { name = 'BlameJared (JEI)'; url = 'https://maven.blamejared.com' } }
+        filter { includeGroup('mezz.jei') }
+    }
+    exclusiveContent {
+        forRepository { maven { name = 'TerraformersMC (EMI)'; url = 'https://maven.terraformersmc.com/releases' } }
+        filter { includeGroup('dev.emi') }
+    }
+    exclusiveContent {
+        forRepository { maven { name = 'SquidDev (CC: Tweaked)'; url = 'https://maven.squiddev.cc' } }
+        filter { includeGroup('cc.tweaked') }
+    }
+    exclusiveContent {
         // Only needed by upstream's annotation processor
         forRepository { maven { name = 'BlameJared'; url = 'https://maven.blamejared.com' } }
         filter { includeGroup('org.openzen.zencode') }
@@ -25,9 +37,24 @@ repositories {
 
 // Packages from upstream that are not (yet) compiled in the Fabric port. Each entry is tracked in NOTES.md "Stubbed / disabled".
 def excludedFromCompile = [
-        // Recipe viewer plugins (JEI/EMI NeoForge builds) - phase 9. The loader-agnostic recipe_viewer base stays compiled.
+        // Recipe viewer plugins - phase 9 (their APIs are on the compile classpath so the shared recipe_viewer code compiles)
         'mekanism/client/recipe_viewer/jei/**',
-        'mekanism/client/recipe_viewer/emi/**',
+        'mekanism/client/recipe_viewer/emi/MekanismEmi.java',
+        'mekanism/client/recipe_viewer/emi/MekanismEmiHelper.java',
+        'mekanism/client/recipe_viewer/emi/EmiExclusionHandler.java',
+        'mekanism/client/recipe_viewer/emi/EmiGhostIngredientHandler.java',
+        'mekanism/client/recipe_viewer/emi/EmiStackUnderMouseProvider.java',
+        'mekanism/client/recipe_viewer/emi/ChemicalEmiIngredientSerializer.java',
+        'mekanism/client/recipe_viewer/emi/ChemicalEmiStack.java',
+        'mekanism/client/recipe_viewer/emi/MekanismEmiRecipeCategory.java',
+        'mekanism/client/recipe_viewer/emi/recipe/**',
+        'mekanism/client/recipe_viewer/emi/transfer/**',
+        'mekanism/client/recipe_viewer/emi/widget/**',
+        // ComputerCraft peripheral glue (NeoForge capability based) - phase 9
+        'mekanism/common/integration/computer/computercraft/CC*.java',
+        'mekanism/common/integration/computer/computercraft/MekanismPeripheral.java',
+        // Curios client renderer (Curios is NeoForge-only; Fabric equivalent TBD) - phase 9
+        'mekanism/client/render/MekanismCurioRenderer.java',
         // Third-party integrations compiled against NeoForge builds of other mods - phase 9
         'mekanism/common/integration/crafttweaker/**',
         'mekanism/common/integration/framedblocks/**',
@@ -38,6 +65,8 @@ def excludedFromCompile = [
         'mekanism/common/integration/computer/opencomputers2/**',
         'mekanism/common/integration/energy/fluxnetworks/**',
         'mekanism/common/integration/energy/grandpower/**',
+        // Datagen helpers in the API (datagen is not ported, NOTES.md D11)
+        'mekanism/api/datagen/**',
 ]
 // Same-path replacements: any upstream source file whose relative path also exists in src/fabric/overrides/java is replaced by
 // the override (used for stubbing optional-integration classes that core references). Listed in NOTES.md "Overrides".
@@ -99,6 +128,11 @@ dependencies {
     // Provided transitively by NeoForge upstream
     compileOnly('com.google.code.findbugs:jsr305:3.0.2')
     implementation(include('org.apache.maven:maven-artifact:3.9.9')) { transitive = false }
+
+    // Third-party APIs (compile only) so upstream's integration-facing code compiles unchanged. Runtime integrations are phase 9.
+    compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
+    compileOnly("dev.emi:emi-fabric:${emi_version}:api")
+    compileOnly("cc.tweaked:cc-tweaked-${minecraft_version}-common-api:${cc_tweaked_version}")
 
     compileOnly(project(':annotation-processor'))
     annotationProcessor(project(':annotation-processor'))

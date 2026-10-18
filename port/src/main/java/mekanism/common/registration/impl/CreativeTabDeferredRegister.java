@@ -52,10 +52,10 @@ public class CreativeTabDeferredRegister extends MekanismDeferredRegister<Creati
      */
     public MekanismDeferredHolder<CreativeModeTab, CreativeModeTab> register(String name, ILangEntry title, Holder<Item> icon, UnaryOperator<CreativeModeTab.Builder> operator) {
         return register(name, () -> {
-            CreativeModeTab.Builder builder = CreativeModeTab.builder()
+            //FABRIC: FabricItemGroup.builder() instead of NeoForge's no-arg builder; withTabFactory (custom label color) is NeoForge-only
+            CreativeModeTab.Builder builder = net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup.builder()
                   .title(title.translate())
-                  .icon(() -> new ItemStack(icon))
-                  .withTabFactory(MekanismCreativeTab::new);
+                  .icon(() -> new ItemStack(icon));
             return operator.apply(builder).build();
         });
     }
@@ -120,8 +120,10 @@ public class CreativeTabDeferredRegister extends MekanismDeferredRegister<Creati
 
     public static class MekanismCreativeTab extends CreativeModeTab {
 
+        //FABRIC: NeoForge's CreativeModeTab(Builder) constructor does not exist; this class is unused on Fabric (see register)
         protected MekanismCreativeTab(CreativeModeTab.Builder builder) {
-            super(builder);
+            super(Row.TOP, 0, Type.CATEGORY, net.minecraft.network.chat.Component.empty(), () -> ItemStack.EMPTY, (parameters, output) -> {
+            });
         }
 
         @Override

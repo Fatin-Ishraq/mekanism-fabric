@@ -71,7 +71,7 @@ public class MeltdownLevelData implements INBTSerializable<ListTag> {
             return null;
         }
 
-        ListTag list = new ListTag(meltdowns.size());
+        ListTag list = new ListTag()/*FABRIC: no capacity ctor*/;
         for (Meltdown meltdown : meltdowns) {
             list.add(meltdown.write());
         }

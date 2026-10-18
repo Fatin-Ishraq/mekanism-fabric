@@ -91,7 +91,7 @@ public class ChemicalBuilder {
      */
     @Deprecated(forRemoval = true, since = "10.7.11")
     public ChemicalBuilder ore(ResourceLocation oreTagLocation) {
-        return ore(ItemTags.create(Objects.requireNonNull(oreTagLocation)));
+        return ore(net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.ITEM, Objects.requireNonNull(oreTagLocation)));//FABRIC: ItemTags.create is NeoForge-only
     }
 
     /**

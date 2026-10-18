@@ -20,6 +20,23 @@ import org.lwjgl.glfw.GLFW;
 //TODO - 1.22: Heavily re-evaluate this class/make sure nothing has gotten broken
 public abstract class VirtualSlotContainerScreen<T extends AbstractContainerMenu> extends AbstractContainerScreen<T> {
 
+    //FABRIC: NeoForge adds these getters to AbstractContainerScreen
+    public int getGuiLeft() {
+        return leftPos;
+    }
+
+    public int getGuiTop() {
+        return topPos;
+    }
+
+    public int getXSize() {
+        return imageWidth;
+    }
+
+    public int getYSize() {
+        return imageHeight;
+    }
+
     public VirtualSlotContainerScreen(T container, Inventory inv, Component titleIn) {
         super(container, inv, titleIn);
     }

@@ -26,7 +26,7 @@ public class DataComponentIngredient implements ICustomIngredient {
 
     public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath("neoforge", "components");
     public static final MapCodec<DataComponentIngredient> CODEC = RecordCodecBuilder.mapCodec(builder -> builder.group(
-          HolderSetCodec.create(Registries.ITEM, Item.CODEC, false).fieldOf("items").forGetter(DataComponentIngredient::items),
+          HolderSetCodec.create(Registries.ITEM, net.minecraft.core.registries.BuiltInRegistries.ITEM.holderByNameCodec(), false).fieldOf("items").forGetter(DataComponentIngredient::items),
           DataComponentPredicate.CODEC.fieldOf("components").forGetter(DataComponentIngredient::components),
           Codec.BOOL.optionalFieldOf("strict", false).forGetter(DataComponentIngredient::isStrict)
     ).apply(builder, DataComponentIngredient::new));

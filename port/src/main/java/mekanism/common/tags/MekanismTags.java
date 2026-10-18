@@ -160,11 +160,11 @@ public class MekanismTags {
         public static final TagKey<Item> COLORABLE_BANNERS = tag("colorable/banners");
 
         private static TagKey<Item> commonTag(String name) {
-            return ItemTags.create(ResourceLocation.fromNamespaceAndPath("c", name));
+            return TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("c", name));//FABRIC: ItemTags.create is NeoForge-only
         }
 
         private static TagKey<Item> tag(String name) {
-            return ItemTags.create(Mekanism.rl(name));
+            return TagKey.create(Registries.ITEM, Mekanism.rl(name));//FABRIC
         }
     }
 
@@ -214,11 +214,11 @@ public class MekanismTags {
         public static final TagKey<Block> STORAGE_BLOCKS_FLUORITE = commonTag("storage_blocks/fluorite");
 
         private static TagKey<Block> commonTag(String name) {
-            return BlockTags.create(ResourceLocation.fromNamespaceAndPath("c", name));
+            return TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("c", name));//FABRIC: BlockTags.create is NeoForge-only
         }
 
         private static TagKey<Block> tag(String name) {
-            return BlockTags.create(Mekanism.rl(name));
+            return TagKey.create(Registries.BLOCK, Mekanism.rl(name));//FABRIC
         }
     }
 
@@ -280,7 +280,7 @@ public class MekanismTags {
         public static final TagKey<Fluid> NUTRITIONAL_PASTE = commonTag("nutritional_paste");
 
         private static TagKey<Fluid> commonTag(String name) {
-            return FluidTags.create(ResourceLocation.fromNamespaceAndPath("c", name));
+            return TagKey.create(Registries.FLUID, ResourceLocation.fromNamespaceAndPath("c", name));//FABRIC: FluidTags.create is NeoForge-only
         }
     }
 

@@ -16,6 +16,18 @@ public record BlockSnapshot(ResourceKey<Level> dimension, LevelAccessor level, B
         return new BlockSnapshot(dim, world, pos.immutable(), world.getBlockState(pos), flag);
     }
 
+    public int getFlags() {
+        return flags;
+    }
+
+    public boolean restore(int flags) {
+        return level.setBlock(pos, state, flags);
+    }
+
+    public boolean restore() {
+        return restore(flags);
+    }
+
     public BlockState getState() {
         return state;
     }

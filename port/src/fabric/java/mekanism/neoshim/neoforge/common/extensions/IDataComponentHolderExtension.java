@@ -1,0 +1,27 @@
+package mekanism.neoshim.neoforge.common.extensions;
+
+import java.util.function.Supplier;
+import net.minecraft.core.component.DataComponentHolder;
+import net.minecraft.core.component.DataComponentType;
+import org.jetbrains.annotations.Nullable;
+
+/** Injected into {@link DataComponentHolder}: overloads taking component type suppliers (e.g. DeferredHolders). */
+public interface IDataComponentHolderExtension {
+
+    private DataComponentHolder self() {
+        return (DataComponentHolder) this;
+    }
+
+    @Nullable
+    default <T> T get(Supplier<? extends DataComponentType<? extends T>> type) {
+        return self().get(type.get());
+    }
+
+    default <T> T getOrDefault(Supplier<? extends DataComponentType<? extends T>> type, T defaultValue) {
+        return self().getOrDefault(type.get(), defaultValue);
+    }
+
+    default boolean has(Supplier<? extends DataComponentType<?>> type) {
+        return self().has(type.get());
+    }
+}

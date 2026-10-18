@@ -107,7 +107,7 @@ public class RadiationLevelData implements INBTSerializable<ListTag> {
         if (isEmpty()) {
             return null;
         }
-        ListTag tag = new ListTag(sources.values().size());
+        ListTag tag = new ListTag()/*FABRIC: no capacity ctor*/;
         for (RadiationSource value : sources.values()) {
             tag.add(value.serializeNBT());
         }

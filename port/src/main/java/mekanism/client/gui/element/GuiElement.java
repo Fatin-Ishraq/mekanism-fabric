@@ -48,6 +48,10 @@ import org.jetbrains.annotations.Nullable;
 //Note: We don't just extend AbstractContainerWidget as we want to be able to reference default implementations of AbstractWidget
 public abstract class GuiElement extends AbstractWidget implements IFancyFontRenderer, ContainerEventHandler {
 
+    //FABRIC: NeoForge adds these to AbstractWidget
+    public static final int UNSET_FG_COLOR = -1;
+    protected int packedFGColor = UNSET_FG_COLOR;
+
     private static final int BUTTON_TEX_X = 200, BUTTON_TEX_Y = 60, BUTTON_INDIVIDUAL_TEX_Y = BUTTON_TEX_Y / 3;
     public static final ResourceLocation WARNING_BACKGROUND_TEXTURE = MekanismUtils.getResource(ResourceType.GUI, "warning_background.png");
     public static final ResourceLocation WARNING_TEXTURE = MekanismUtils.getResource(ResourceType.GUI, "warning.png");
@@ -610,7 +614,7 @@ public abstract class GuiElement extends AbstractWidget implements IFancyFontRen
 
     @Override
     public int getFGColor() {
-        if (packedFGColor != UNSET_FG_COLOR) {
+        if (packedFGColor != UNSET_FG_COLOR) {//FABRIC: fields live in IAbstractWidgetExtension mixin on NeoForge
             return packedFGColor;
         }
         return this.active ? activeButtonTextColor() : inactiveButtonTextColor();

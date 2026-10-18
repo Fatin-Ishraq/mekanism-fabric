@@ -77,7 +77,7 @@ public class BaseModelCache {
     protected JSONModelData registerJSONAndBake(ResourceLocation rl) {
         ModelManager modelManager = Minecraft.getInstance().getModelManager();
         ModelBakery modelBakery = modelManager.getModelBakery();
-        ModelResourceLocation mrl = ModelResourceLocation.standalone(rl);
+        ModelResourceLocation mrl = mekanism.fabric.client.model.StandaloneModels.location(rl);
         ModelBaker baker = modelBakery.new ModelBakerImpl(
               (modelLoc, material) -> material.sprite(),
               mrl
@@ -85,9 +85,9 @@ public class BaseModelCache {
         //Register the model
         JSONModelData data = registerJSON(rl);
         //Manually run the JsonModelData#reload logic
-        data.bakedModel = baker.bake(rl, BlockModelRotation.X0_Y0, Material::sprite);
+        data.bakedModel = baker.bake(rl, BlockModelRotation.X0_Y0);//FABRIC: vanilla bake has no sprite getter param
         if (getUnbakedModel(modelBakery, baker, mrl) instanceof BlockModel blockModel) {
-            data.model = blockModel.customData.getCustomGeometry();
+            data.model = mekanism.fabric.client.model.CustomGeometryAccess.getCustomGeometry(blockModel)/*FABRIC: NeoForge BlockModel#customData*/;
         }
         return data;
     }
@@ -125,7 +125,7 @@ public class BaseModelCache {
 
         protected MekanismModelData(ResourceLocation rl) {
             this.rl = rl;
-            this.mrl = ModelResourceLocation.standalone(rl);
+            this.mrl = mekanism.fabric.client.model.StandaloneModels.location(rl);
         }
 
         protected void reload(BakingCompleted evt) {
@@ -192,7 +192,7 @@ public class BaseModelCache {
                   mrl
             );
             if (getUnbakedModel(evt.getModelBakery(), baker, mrl) instanceof BlockModel blockModel) {
-                model = blockModel.customData.getCustomGeometry();
+                model = mekanism.fabric.client.model.CustomGeometryAccess.getCustomGeometry(blockModel)/*FABRIC: NeoForge BlockModel#customData*/;
             }
         }
 

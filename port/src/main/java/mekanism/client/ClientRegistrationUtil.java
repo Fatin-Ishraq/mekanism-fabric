@@ -161,7 +161,7 @@ public class ClientRegistrationUtil {
     }
 
     public static void setPropertyOverride(Holder<Item> item, ResourceLocation override, ItemPropertyFunction propertyGetter) {
-        ItemProperties.register(item.value(), override, propertyGetter);
+        ItemProperties.register(item.value(), override, (net.minecraft.client.renderer.item.ClampedItemPropertyFunction) propertyGetter::call);//FABRIC: vanilla requires a clamped function
     }
 
     public static void registerItemColorHandler(RegisterColorHandlersEvent.Item event, ItemColor itemColor, ItemLike... items) {

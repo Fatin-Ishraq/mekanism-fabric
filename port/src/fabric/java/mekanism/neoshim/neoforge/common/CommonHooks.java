@@ -40,8 +40,9 @@ public class CommonHooks {
         return event;
     }
 
-    public static boolean onDamageBlock(Player player, net.minecraft.world.damagesource.DamageSource source, float damage) {
-        return false;
+    public static mekanism.neoshim.neoforge.event.entity.living.LivingShieldBlockEvent onDamageBlock(net.minecraft.world.entity.LivingEntity blocker,
+          mekanism.neoshim.neoforge.common.damagesource.DamageContainer container, boolean originalBlocked) {
+        return NeoForge.EVENT_BUS.post(new mekanism.neoshim.neoforge.event.entity.living.LivingShieldBlockEvent(blocker, container, originalBlocked));
     }
 
     public static boolean tryDispenseShearsHarvestBlock(net.minecraft.core.dispenser.BlockSource source, net.minecraft.world.item.ItemStack stack,

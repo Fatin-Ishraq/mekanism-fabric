@@ -278,6 +278,18 @@ public class FluidType {
         }
     }
 
+    public boolean canBePlacedInLevel(BlockAndTintGetter level, BlockPos pos, FluidState state) {
+        return state.getType() != Fluids.EMPTY;
+    }
+
+    public boolean canBePlacedInLevel(BlockAndTintGetter level, BlockPos pos, FluidStack stack) {
+        return !stack.isEmpty() && !stack.getFluid().defaultFluidState().createLegacyBlock().isAir();
+    }
+
+    public FluidState getStateForPlacement(BlockAndTintGetter level, BlockPos pos, FluidStack stack) {
+        return stack.getFluid().defaultFluidState();
+    }
+
     public ItemStack getBucket(FluidStack stack) {
         return new ItemStack(stack.getFluid().getBucket());
     }

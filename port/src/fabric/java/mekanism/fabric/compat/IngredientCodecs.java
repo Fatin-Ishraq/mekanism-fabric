@@ -36,7 +36,7 @@ public final class IngredientCodecs {
         public <T> DataResult<Ingredient> decode(DynamicOps<T> ops, MapLike<T> input) {
             T type = input.get("type");
             if (type == null) {
-                type = input.get(CustomIngredientSerializer.TYPE_KEY);
+                type = input.get("fabric:type");
             }
             if (type != null) {
                 return ResourceLocation.CODEC.parse(ops, type).flatMap(id -> {
@@ -49,7 +49,7 @@ public final class IngredientCodecs {
             }
             T item = input.get("item");
             if (item != null) {
-                return Item.CODEC.parse(ops, item).map(holder -> Ingredient.of(new ItemStack(holder)));
+                return net.minecraft.core.registries.BuiltInRegistries.ITEM.holderByNameCodec().parse(ops, item).map(holder -> Ingredient.of(new ItemStack(holder)));
             }
             T tag = input.get("tag");
             if (tag != null) {
@@ -64,7 +64,7 @@ public final class IngredientCodecs {
             CustomIngredient custom = input.getCustomIngredient();
             if (custom != null) {
                 CustomIngredientSerializer serializer = custom.getSerializer();
-                String key = serializer.getIdentifier().getNamespace().equals("neoforge") ? "type" : CustomIngredientSerializer.TYPE_KEY;
+                String key = serializer.getIdentifier().getNamespace().equals("neoforge") ? "type" : "fabric:type";
                 prefix.add(key, ops.createString(serializer.getIdentifier().toString()));
                 return serializer.getCodec(false).encode(custom, ops, prefix);
             }

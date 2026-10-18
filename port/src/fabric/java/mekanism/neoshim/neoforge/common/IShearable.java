@@ -14,6 +14,10 @@ public interface IShearable {
         return !(this instanceof net.minecraft.world.entity.Shearable shearable) || shearable.readyForShearing();
     }
 
+    default void spawnShearedDrop(Level level, BlockPos pos, ItemStack drop) {
+        net.minecraft.world.level.block.Block.popResource(level, pos, drop);
+    }
+
     default List<ItemStack> onSheared(@Nullable Player player, ItemStack item, Level level, BlockPos pos) {
         if (this instanceof net.minecraft.world.entity.Shearable shearable && level instanceof net.minecraft.server.level.ServerLevel) {
             shearable.shear(player == null ? SoundSource.BLOCKS : SoundSource.PLAYERS);
