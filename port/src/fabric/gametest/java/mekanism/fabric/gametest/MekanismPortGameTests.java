@@ -218,4 +218,15 @@ public class MekanismPortGameTests implements FabricGameTest {
             helper.assertTrue(tile.getMultiblock().isFormed(), "Dynamic tank did not form");
         });
     }
+
+    @GameTest(template = EMPTY_STRUCTURE)
+    public void oresAddedToOverworldBiomes(GameTestHelper helper) {
+        var biomes = helper.getLevel().registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        var plains = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.PLAINS);
+        boolean found = plains.getGenerationSettings().features().stream()
+              .flatMap(set -> set.stream())
+              .anyMatch(feature -> feature.unwrapKey().map(key -> key.location().toString().equals("mekanism:ore_osmium_upper")).orElse(false));
+        helper.assertTrue(found, "Plains biome does not generate Mekanism osmium ore");
+        helper.succeed();
+    }
 }

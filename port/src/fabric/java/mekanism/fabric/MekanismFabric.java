@@ -39,6 +39,7 @@ public class MekanismFabric implements ModInitializer {
         EventBusSubscribers.registerCommon(modBus);
 
         ModBusLifecycle.runCommonLifecycle();
+        mekanism.fabric.compat.BiomeModifierBridge.apply(FABRIC_MOD_ID);
         logRegistrationSummary();
     }
 
