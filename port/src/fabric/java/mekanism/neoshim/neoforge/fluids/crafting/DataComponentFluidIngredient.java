@@ -17,7 +17,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.HolderSetCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.material.Fluid;
 
 public final class DataComponentFluidIngredient extends FluidIngredient {
@@ -33,7 +33,7 @@ public final class DataComponentFluidIngredient extends FluidIngredient {
           ByteBufCodecs.BOOL, DataComponentFluidIngredient::isStrict,
           DataComponentFluidIngredient::new);
     public static final FluidIngredientTypes.Type<DataComponentFluidIngredient> TYPE = FluidIngredientTypes.register(
-          ResourceLocation.fromNamespaceAndPath("neoforge", "components"), CODEC, STREAM_CODEC);
+          Identifier.fromNamespaceAndPath("neoforge", "components"), CODEC, STREAM_CODEC);
 
     private final HolderSet<Fluid> fluids;
     private final DataComponentPredicate components;

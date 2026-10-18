@@ -9,14 +9,14 @@ import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 
 /** Union of ingredients. Serialized like NeoForge: {@code {"type": "neoforge:compound", "children": [...]}}. */
 public record CompoundIngredient(List<Ingredient> children) implements ICustomIngredient {
 
-    public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath("neoforge", "compound");
+    public static final Identifier ID = Identifier.fromNamespaceAndPath("neoforge", "compound");
     public static final MapCodec<CompoundIngredient> CODEC = IngredientCodecs.LIST_CODEC_NONEMPTY.fieldOf("children").xmap(CompoundIngredient::new, CompoundIngredient::children);
     public static final StreamCodec<RegistryFriendlyByteBuf, CompoundIngredient> STREAM_CODEC = Ingredient.CONTENTS_STREAM_CODEC.apply(ByteBufCodecs.list())
           .map(CompoundIngredient::new, CompoundIngredient::children);

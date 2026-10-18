@@ -42,7 +42,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -59,10 +59,10 @@ import org.jetbrains.annotations.Nullable;
 public final class DataMapLoader {
 
     private static final Map<DataMapType<?, ?>, Map<ResourceKey<?>, Object>> VALUES = new ConcurrentHashMap<>();
-    private static final Map<ResourceLocation, DataMapType<?, ?>> TYPES = new ConcurrentHashMap<>();
+    private static final Map<Identifier, DataMapType<?, ?>> TYPES = new ConcurrentHashMap<>();
     /** Raw entries from the last reload, waiting for tags to be bound. */
     private static Map<DataMapType<?, ?>, List<RawEntry>> pending = Map.of();
-    private static final ResourceLocation FURNACE_FUELS = ResourceLocation.fromNamespaceAndPath("neoforge", "furnace_fuels");
+    private static final Identifier FURNACE_FUELS = Identifier.fromNamespaceAndPath("neoforge", "furnace_fuels");
     private static final Map<Item, Integer> appliedFuels = new HashMap<>();
 
     private record RawEntry(String key, JsonElement value, boolean remove) {
@@ -95,12 +95,12 @@ public final class DataMapLoader {
         register(DataMapType.builder(FURNACE_FUELS, Registries.ITEM, FurnaceFuel.CODEC).build());
         ResourceManagerHelper.get(PackType.SERVER_DATA).registerReloadListener(new IdentifiableResourceReloadListener() {
             @Override
-            public ResourceLocation getFabricId() {
-                return ResourceLocation.fromNamespaceAndPath("mekanism_fabric", "data_maps");
+            public Identifier getFabricId() {
+                return Identifier.fromNamespaceAndPath("mekanism_fabric", "data_maps");
             }
 
             @Override
-            public java.util.Collection<ResourceLocation> getFabricDependencies() {
+            public java.util.Collection<Identifier> getFabricDependencies() {
                 return List.of(ResourceReloadListenerKeys.TAGS);
             }
 
@@ -128,9 +128,9 @@ public final class DataMapLoader {
     private static Map<DataMapType<?, ?>, List<RawEntry>> load(ResourceManager manager) {
         Map<DataMapType<?, ?>, List<RawEntry>> result = new HashMap<>();
         for (DataMapType<?, ?> type : TYPES.values()) {
-            ResourceLocation registry = type.registryKey().location();
+            Identifier registry = type.registryKey().location();
             String registryPath = registry.getNamespace().equals("minecraft") ? registry.getPath() : registry.getNamespace() + "/" + registry.getPath();
-            ResourceLocation file = ResourceLocation.fromNamespaceAndPath(type.id().getNamespace(), "data_maps/" + registryPath + "/" + type.id().getPath() + ".json");
+            Identifier file = Identifier.fromNamespaceAndPath(type.id().getNamespace(), "data_maps/" + registryPath + "/" + type.id().getPath() + ".json");
             List<RawEntry> entries = new ArrayList<>();
             for (Resource resource : manager.getResourceStack(file)) {
                 try (Reader reader = resource.openAsReader()) {
@@ -174,10 +174,10 @@ public final class DataMapLoader {
             for (RawEntry raw : entry.getValue()) {
                 List<ResourceKey<?>> keys = new ArrayList<>();
                 if (raw.key().startsWith("#")) {
-                    TagKey tag = TagKey.create(type.registryKey(), ResourceLocation.parse(raw.key().substring(1)));
+                    TagKey tag = TagKey.create(type.registryKey(), Identifier.parse(raw.key().substring(1)));
                     registry.getTag(tag).ifPresent(set -> ((Iterable<Holder>) set).forEach(h -> h.unwrapKey().ifPresent(k -> keys.add((ResourceKey<?>) k))));
                 } else {
-                    keys.add(ResourceKey.create(type.registryKey(), ResourceLocation.parse(raw.key())));
+                    keys.add(ResourceKey.create(type.registryKey(), Identifier.parse(raw.key())));
                 }
                 if (raw.remove()) {
                     keys.forEach(resolved::remove);
@@ -241,14 +241,14 @@ public final class DataMapLoader {
     public static void applySync(CompoundTag root, RegistryAccess registries) {
         RegistryOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
         for (String typeId : root.getAllKeys()) {
-            DataMapType type = TYPES.get(ResourceLocation.parse(typeId));
+            DataMapType type = TYPES.get(Identifier.parse(typeId));
             if (type == null || type.networkCodec() == null) {
                 continue;
             }
             Map<ResourceKey<?>, Object> values = new ConcurrentHashMap<>();
             for (Tag element : root.getList(typeId, Tag.TAG_COMPOUND)) {
                 CompoundTag pair = (CompoundTag) element;
-                ResourceKey<?> key = ResourceKey.create(type.registryKey(), ResourceLocation.parse(pair.getString("key")));
+                ResourceKey<?> key = ResourceKey.create(type.registryKey(), Identifier.parse(pair.getString("key")));
                 ((Codec) type.networkCodec()).parse(ops, pair.get("value")).result().ifPresent(v -> values.put(key, v));
             }
             VALUES.put(type, values);
@@ -265,7 +265,7 @@ public final class DataMapLoader {
 
     public record SyncPayload(CompoundTag data) implements CustomPacketPayload {
 
-        public static final Type<SyncPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("mekanism_fabric", "data_maps"));
+        public static final Type<SyncPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath("mekanism_fabric", "data_maps"));
         public static final StreamCodec<RegistryFriendlyByteBuf, SyncPayload> STREAM_CODEC = ByteBufCodecs.COMPOUND_TAG.<RegistryFriendlyByteBuf>cast()
               .map(SyncPayload::new, SyncPayload::data);
 

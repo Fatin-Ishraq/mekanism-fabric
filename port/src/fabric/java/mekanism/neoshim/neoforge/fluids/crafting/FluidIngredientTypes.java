@@ -10,17 +10,17 @@ import java.util.Map;
 import java.util.stream.Stream;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /** Registry of fluid ingredient types (NeoForge's FLUID_INGREDIENT_TYPES), keyed by the same ids NeoForge uses. */
 public final class FluidIngredientTypes {
 
-    public record Type<T extends FluidIngredient>(ResourceLocation id, MapCodec<T> codec, StreamCodec<RegistryFriendlyByteBuf, T> streamCodec) {
+    public record Type<T extends FluidIngredient>(Identifier id, MapCodec<T> codec, StreamCodec<RegistryFriendlyByteBuf, T> streamCodec) {
     }
 
-    private static final Map<ResourceLocation, Type<?>> TYPES = new LinkedHashMap<>();
+    private static final Map<Identifier, Type<?>> TYPES = new LinkedHashMap<>();
 
-    public static synchronized <T extends FluidIngredient> Type<T> register(ResourceLocation id, MapCodec<T> codec, StreamCodec<RegistryFriendlyByteBuf, T> streamCodec) {
+    public static synchronized <T extends FluidIngredient> Type<T> register(Identifier id, MapCodec<T> codec, StreamCodec<RegistryFriendlyByteBuf, T> streamCodec) {
         Type<T> type = new Type<>(id, codec, streamCodec);
         if (TYPES.putIfAbsent(id, type) != null) {
             throw new IllegalStateException("Duplicate fluid ingredient type " + id);
@@ -51,7 +51,7 @@ public final class FluidIngredientTypes {
                 }
                 return DataResult.error(() -> "Fluid ingredient needs a 'type', 'fluid' or 'tag'");
             }
-            return ResourceLocation.CODEC.parse(ops, typeValue).flatMap(id -> {
+            return Identifier.CODEC.parse(ops, typeValue).flatMap(id -> {
                 Type<?> type = TYPES.get(id);
                 if (type == null) {
                     return DataResult.error(() -> "Unknown fluid ingredient type " + id);
@@ -76,7 +76,7 @@ public final class FluidIngredientTypes {
         @Override
         public FluidIngredient decode(RegistryFriendlyByteBuf buf) {
             bootstrap();
-            ResourceLocation id = ResourceLocation.STREAM_CODEC.decode(buf);
+            Identifier id = Identifier.STREAM_CODEC.decode(buf);
             Type<?> type = TYPES.get(id);
             if (type == null) {
                 throw new io.netty.handler.codec.DecoderException("Unknown fluid ingredient type " + id);
@@ -88,7 +88,7 @@ public final class FluidIngredientTypes {
         @SuppressWarnings({"unchecked", "rawtypes"})
         public void encode(RegistryFriendlyByteBuf buf, FluidIngredient ingredient) {
             Type type = ingredient.getType();
-            ResourceLocation.STREAM_CODEC.encode(buf, type.id());
+            Identifier.STREAM_CODEC.encode(buf, type.id());
             type.streamCodec().encode(buf, ingredient);
         }
     };

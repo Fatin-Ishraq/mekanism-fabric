@@ -11,7 +11,7 @@ import net.minecraft.core.HolderOwner;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -26,11 +26,11 @@ public class DeferredHolder<R, T extends R> implements Holder<R>, Supplier<T> {
     @Nullable
     private Holder<R> holder = null;
 
-    public static <R, T extends R> DeferredHolder<R, T> create(ResourceKey<? extends Registry<R>> registryKey, ResourceLocation valueName) {
+    public static <R, T extends R> DeferredHolder<R, T> create(ResourceKey<? extends Registry<R>> registryKey, Identifier valueName) {
         return create(ResourceKey.create(registryKey, valueName));
     }
 
-    public static <R, T extends R> DeferredHolder<R, T> create(ResourceLocation registryName, ResourceLocation valueName) {
+    public static <R, T extends R> DeferredHolder<R, T> create(Identifier registryName, Identifier valueName) {
         return create(ResourceKey.createRegistryKey(registryName), valueName);
     }
 
@@ -83,7 +83,7 @@ public class DeferredHolder<R, T extends R> implements Holder<R>, Supplier<T> {
         }
     }
 
-    public ResourceLocation getId() {
+    public Identifier getId() {
         return this.key.location();
     }
 
@@ -98,7 +98,7 @@ public class DeferredHolder<R, T extends R> implements Holder<R>, Supplier<T> {
     }
 
     @Override
-    public boolean is(ResourceLocation id) {
+    public boolean is(Identifier id) {
         return id.equals(this.key.location());
     }
 

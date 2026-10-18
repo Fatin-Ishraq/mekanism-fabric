@@ -4,14 +4,14 @@ import com.mojang.serialization.MapCodec;
 import java.util.stream.Stream;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public final class EmptyFluidIngredient extends FluidIngredient {
 
     public static final EmptyFluidIngredient INSTANCE = new EmptyFluidIngredient();
     public static final MapCodec<EmptyFluidIngredient> CODEC = MapCodec.unit(INSTANCE);
     public static final FluidIngredientTypes.Type<EmptyFluidIngredient> TYPE = FluidIngredientTypes.register(
-          ResourceLocation.fromNamespaceAndPath("neoforge", "empty"), CODEC, StreamCodec.unit(INSTANCE));
+          Identifier.fromNamespaceAndPath("neoforge", "empty"), CODEC, StreamCodec.unit(INSTANCE));
 
     private EmptyFluidIngredient() {
     }

@@ -7,7 +7,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,18 +20,18 @@ public abstract class MappedRegistryAliasMixin<T> {
     public abstract ResourceKey<? extends Registry<T>> key();
 
     @Shadow
-    public abstract T get(ResourceLocation name);
+    public abstract T get(Identifier name);
 
     @Shadow
-    public abstract Optional<Holder.Reference<T>> getHolder(ResourceLocation location);
+    public abstract Optional<Holder.Reference<T>> getHolder(Identifier location);
 
     @Shadow
-    public abstract boolean containsKey(ResourceLocation name);
+    public abstract boolean containsKey(Identifier name);
 
-    @ModifyReturnValue(method = "get(Lnet/minecraft/resources/ResourceLocation;)Ljava/lang/Object;", at = @At("RETURN"))
-    private T mekanism$aliasGet(T value, ResourceLocation name) {
+    @ModifyReturnValue(method = "get(Lnet/minecraft/resources/Identifier;)Ljava/lang/Object;", at = @At("RETURN"))
+    private T mekanism$aliasGet(T value, Identifier name) {
         if (value == null) {
-            ResourceLocation alias = RegistryAliases.resolve(key(), name);
+            Identifier alias = RegistryAliases.resolve(key(), name);
             if (alias != null) {
                 return get(alias);
             }
@@ -42,7 +42,7 @@ public abstract class MappedRegistryAliasMixin<T> {
     @ModifyReturnValue(method = "get(Lnet/minecraft/resources/ResourceKey;)Ljava/lang/Object;", at = @At("RETURN"))
     private T mekanism$aliasGetKey(T value, ResourceKey<T> key) {
         if (value == null && key != null) {
-            ResourceLocation alias = RegistryAliases.resolve(key(), key.location());
+            Identifier alias = RegistryAliases.resolve(key(), key.location());
             if (alias != null) {
                 return get(alias);
             }
@@ -50,10 +50,10 @@ public abstract class MappedRegistryAliasMixin<T> {
         return value;
     }
 
-    @ModifyReturnValue(method = "getHolder(Lnet/minecraft/resources/ResourceLocation;)Ljava/util/Optional;", at = @At("RETURN"))
-    private Optional<Holder.Reference<T>> mekanism$aliasHolder(Optional<Holder.Reference<T>> value, ResourceLocation location) {
+    @ModifyReturnValue(method = "getHolder(Lnet/minecraft/resources/Identifier;)Ljava/util/Optional;", at = @At("RETURN"))
+    private Optional<Holder.Reference<T>> mekanism$aliasHolder(Optional<Holder.Reference<T>> value, Identifier location) {
         if (value.isEmpty()) {
-            ResourceLocation alias = RegistryAliases.resolve(key(), location);
+            Identifier alias = RegistryAliases.resolve(key(), location);
             if (alias != null) {
                 return getHolder(alias);
             }
@@ -64,7 +64,7 @@ public abstract class MappedRegistryAliasMixin<T> {
     @ModifyReturnValue(method = "getHolder(Lnet/minecraft/resources/ResourceKey;)Ljava/util/Optional;", at = @At("RETURN"))
     private Optional<Holder.Reference<T>> mekanism$aliasHolderKey(Optional<Holder.Reference<T>> value, ResourceKey<T> key) {
         if (value.isEmpty()) {
-            ResourceLocation alias = RegistryAliases.resolve(key(), key.location());
+            Identifier alias = RegistryAliases.resolve(key(), key.location());
             if (alias != null) {
                 return getHolder(alias);
             }
@@ -72,10 +72,10 @@ public abstract class MappedRegistryAliasMixin<T> {
         return value;
     }
 
-    @ModifyReturnValue(method = "containsKey(Lnet/minecraft/resources/ResourceLocation;)Z", at = @At("RETURN"))
-    private boolean mekanism$aliasContains(boolean value, ResourceLocation name) {
+    @ModifyReturnValue(method = "containsKey(Lnet/minecraft/resources/Identifier;)Z", at = @At("RETURN"))
+    private boolean mekanism$aliasContains(boolean value, Identifier name) {
         if (!value) {
-            ResourceLocation alias = RegistryAliases.resolve(key(), name);
+            Identifier alias = RegistryAliases.resolve(key(), name);
             return alias != null && containsKey(alias);
         }
         return true;

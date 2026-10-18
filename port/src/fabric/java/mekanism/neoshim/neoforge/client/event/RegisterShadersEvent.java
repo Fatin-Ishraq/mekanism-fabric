@@ -7,11 +7,11 @@ import mekanism.neoshim.bus.api.Event;
 import mekanism.neoshim.fml.event.IModBusEvent;
 import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback;
 import net.minecraft.client.renderer.ShaderInstance;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
  * Fired from Fabric's CoreShaderRegistrationCallback. NeoForge's variant takes a pre-built ShaderInstance; on Fabric the shader is created
- * by Fabric from its id, so callers use {@link #registerShader(ResourceLocation, VertexFormat, Consumer)} (see the //FABRIC edit in
+ * by Fabric from its id, so callers use {@link #registerShader(Identifier, VertexFormat, Consumer)} (see the //FABRIC edit in
  * MekanismShaders).
  */
 public class RegisterShadersEvent extends Event implements IModBusEvent {
@@ -22,7 +22,7 @@ public class RegisterShadersEvent extends Event implements IModBusEvent {
         this.context = context;
     }
 
-    public void registerShader(ResourceLocation id, VertexFormat vertexFormat, Consumer<ShaderInstance> onLoaded) throws IOException {
+    public void registerShader(Identifier id, VertexFormat vertexFormat, Consumer<ShaderInstance> onLoaded) throws IOException {
         context.register(id, vertexFormat, onLoaded);
     }
 }

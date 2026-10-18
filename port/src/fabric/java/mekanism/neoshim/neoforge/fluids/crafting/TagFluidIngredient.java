@@ -9,17 +9,17 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.material.Fluid;
 
 public final class TagFluidIngredient extends FluidIngredient {
 
     public static final MapCodec<TagFluidIngredient> CODEC = TagKey.codec(Registries.FLUID).xmap(TagFluidIngredient::new, TagFluidIngredient::tag).fieldOf("tag");
-    public static final StreamCodec<RegistryFriendlyByteBuf, TagFluidIngredient> STREAM_CODEC = ResourceLocation.STREAM_CODEC
+    public static final StreamCodec<RegistryFriendlyByteBuf, TagFluidIngredient> STREAM_CODEC = Identifier.STREAM_CODEC
           .map(rl -> new TagFluidIngredient(TagKey.create(Registries.FLUID, rl)), i -> i.tag().location()).cast();
     public static final FluidIngredientTypes.Type<TagFluidIngredient> TYPE = FluidIngredientTypes.register(
-          ResourceLocation.fromNamespaceAndPath("neoforge", "tag"), CODEC, STREAM_CODEC);
+          Identifier.fromNamespaceAndPath("neoforge", "tag"), CODEC, STREAM_CODEC);
 
     private final TagKey<Fluid> tag;
 

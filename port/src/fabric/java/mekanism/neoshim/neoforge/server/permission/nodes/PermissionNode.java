@@ -2,7 +2,7 @@ package mekanism.neoshim.neoforge.server.permission.nodes;
 
 import java.util.UUID;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.Nullable;
 
@@ -17,7 +17,7 @@ public final class PermissionNode<T> {
     @Nullable
     private Component description;
 
-    public PermissionNode(ResourceLocation nodeName, PermissionType<T> type, PermissionResolver<T> defaultResolver, PermissionDynamicContextKey<?>... dynamics) {
+    public PermissionNode(Identifier nodeName, PermissionType<T> type, PermissionResolver<T> defaultResolver, PermissionDynamicContextKey<?>... dynamics) {
         this(nodeName.getNamespace(), nodeName.getPath(), type, defaultResolver, dynamics);
     }
 

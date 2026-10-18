@@ -13,7 +13,7 @@ import net.fabricmc.fabric.api.resource.conditions.v1.ResourceConditions;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -41,15 +41,15 @@ public final class ConditionBridge {
         reg("not", ICondition.CODEC.fieldOf("value").xmap(Not::new, Not::value));
         reg("and", ICondition.CODEC.listOf().fieldOf("values").xmap(And::new, And::values));
         reg("or", ICondition.CODEC.listOf().fieldOf("values").xmap(Or::new, Or::values));
-        reg("item_exists", ResourceLocation.CODEC.fieldOf("item").xmap(ItemExists::new, ItemExists::item));
+        reg("item_exists", Identifier.CODEC.fieldOf("item").xmap(ItemExists::new, ItemExists::item));
     }
 
     private static void reg(String path, MapCodec<? extends ICondition> codec) {
-        Registry.register(NeoForgeRegistries.CONDITION_SERIALIZERS, ResourceLocation.fromNamespaceAndPath("neoforge", path), codec);
+        Registry.register(NeoForgeRegistries.CONDITION_SERIALIZERS, Identifier.fromNamespaceAndPath("neoforge", path), codec);
     }
 
     @SuppressWarnings("unchecked")
-    private static <C extends ICondition> void register(ResourceLocation id, MapCodec<C> codec) {
+    private static <C extends ICondition> void register(Identifier id, MapCodec<C> codec) {
         if (id.getNamespace().equals("neoforge") || ResourceConditions.getConditionType(id) != null) {
             return;
         }
@@ -94,7 +94,7 @@ public final class ConditionBridge {
 
         @Override
         public MapCodec<? extends ICondition> codec() {
-            return NeoForgeRegistries.CONDITION_SERIALIZERS.get(ResourceLocation.fromNamespaceAndPath("neoforge", "mod_loaded"));
+            return NeoForgeRegistries.CONDITION_SERIALIZERS.get(Identifier.fromNamespaceAndPath("neoforge", "mod_loaded"));
         }
     }
 
@@ -107,7 +107,7 @@ public final class ConditionBridge {
 
         @Override
         public MapCodec<? extends ICondition> codec() {
-            return NeoForgeRegistries.CONDITION_SERIALIZERS.get(ResourceLocation.fromNamespaceAndPath("neoforge", "not"));
+            return NeoForgeRegistries.CONDITION_SERIALIZERS.get(Identifier.fromNamespaceAndPath("neoforge", "not"));
         }
     }
 
@@ -120,7 +120,7 @@ public final class ConditionBridge {
 
         @Override
         public MapCodec<? extends ICondition> codec() {
-            return NeoForgeRegistries.CONDITION_SERIALIZERS.get(ResourceLocation.fromNamespaceAndPath("neoforge", "and"));
+            return NeoForgeRegistries.CONDITION_SERIALIZERS.get(Identifier.fromNamespaceAndPath("neoforge", "and"));
         }
     }
 
@@ -133,11 +133,11 @@ public final class ConditionBridge {
 
         @Override
         public MapCodec<? extends ICondition> codec() {
-            return NeoForgeRegistries.CONDITION_SERIALIZERS.get(ResourceLocation.fromNamespaceAndPath("neoforge", "or"));
+            return NeoForgeRegistries.CONDITION_SERIALIZERS.get(Identifier.fromNamespaceAndPath("neoforge", "or"));
         }
     }
 
-    private record ItemExists(ResourceLocation item) implements ICondition {
+    private record ItemExists(Identifier item) implements ICondition {
 
         @Override
         public boolean test(IContext context) {
@@ -146,7 +146,7 @@ public final class ConditionBridge {
 
         @Override
         public MapCodec<? extends ICondition> codec() {
-            return NeoForgeRegistries.CONDITION_SERIALIZERS.get(ResourceLocation.fromNamespaceAndPath("neoforge", "item_exists"));
+            return NeoForgeRegistries.CONDITION_SERIALIZERS.get(Identifier.fromNamespaceAndPath("neoforge", "item_exists"));
         }
     }
 }

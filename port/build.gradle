@@ -309,6 +309,22 @@ transformJson = { Object node ->
 
 (['processResources'] + mekModules.collect { "process${it.capitalize()}Resources".toString() }).each { taskName -> tasks.named(taskName, ProcessResources) {
     doLast {
+        // Model JSON: NeoForge selects custom model loaders with "loader", Fabric's model deserializer with "fabric:type"
+        def assetsDir = new File(destinationDir, 'assets')
+        if (assetsDir.exists()) {
+            assetsDir.eachFileRecurse { File f ->
+                if (f.name.endsWith('.json') && f.path.replace(File.separator, '/').contains('/models/')) {
+                    String text = f.getText('UTF-8')
+                    if (text.contains('"loader"')) {
+                        def json = new JsonSlurper().parseText(text)
+                        if (json instanceof Map && json.containsKey('loader')) {
+                            json['fabric:type'] = json.remove('loader')
+                            f.setText(JsonOutput.toJson(json), 'UTF-8')
+                        }
+                    }
+                }
+            }
+        }
         def dataDir = new File(destinationDir, 'data')
         if (dataDir.exists()) {
             dataDir.eachFileRecurse { File f ->

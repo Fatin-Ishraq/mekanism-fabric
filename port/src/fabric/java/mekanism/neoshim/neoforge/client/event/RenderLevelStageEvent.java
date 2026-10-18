@@ -6,7 +6,7 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.culling.Frustum;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.joml.Matrix4f;
 
 public class RenderLevelStageEvent extends Event {
@@ -70,7 +70,7 @@ public class RenderLevelStageEvent extends Event {
         return frustum;
     }
 
-    public record Stage(ResourceLocation name) {
+    public record Stage(Identifier name) {
 
         public static final Stage AFTER_SKY = create("after_sky");
         public static final Stage AFTER_SOLID_BLOCKS = create("after_solid_blocks");
@@ -85,7 +85,7 @@ public class RenderLevelStageEvent extends Event {
         public static final Stage AFTER_LEVEL = create("after_level");
 
         private static Stage create(String name) {
-            return new Stage(ResourceLocation.withDefaultNamespace(name));
+            return new Stage(Identifier.withDefaultNamespace(name));
         }
 
         @Override

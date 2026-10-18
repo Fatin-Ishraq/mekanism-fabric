@@ -17,7 +17,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -70,11 +70,11 @@ public final class ScreenshotDriver {
     }
 
     private static Block block(String id) {
-        return BuiltInRegistries.BLOCK.get(ResourceLocation.fromNamespaceAndPath("mekanism", id));
+        return BuiltInRegistries.BLOCK.get(Identifier.fromNamespaceAndPath("mekanism", id));
     }
 
     private static ItemStack item(String id) {
-        return new ItemStack(BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("mekanism", id)));
+        return new ItemStack(BuiltInRegistries.ITEM.get(Identifier.fromNamespaceAndPath("mekanism", id)));
     }
 
     private static BlockState facing(Block block, Direction direction) {

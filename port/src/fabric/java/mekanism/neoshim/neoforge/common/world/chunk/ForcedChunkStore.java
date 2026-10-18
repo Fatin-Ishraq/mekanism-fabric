@@ -12,7 +12,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -31,13 +31,13 @@ public final class ForcedChunkStore extends SavedData {
     private static final SavedData.Factory<ForcedChunkStore> FACTORY = new SavedData.Factory<>(ForcedChunkStore::new, ForcedChunkStore::load, null);
 
     /** controller id -> owner position -> chunks */
-    private final Map<ResourceLocation, Map<BlockPos, TicketSet>> blockTickets = new HashMap<>();
+    private final Map<Identifier, Map<BlockPos, TicketSet>> blockTickets = new HashMap<>();
 
     public static ForcedChunkStore get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(FACTORY, NAME);
     }
 
-    void update(ResourceLocation controller, BlockPos owner, long chunk, boolean add, boolean ticking) {
+    void update(Identifier controller, BlockPos owner, long chunk, boolean add, boolean ticking) {
         if (add) {
             TicketSet set = blockTickets.computeIfAbsent(controller, c -> new HashMap<>()).computeIfAbsent(owner.immutable(),
                   o -> new TicketSet(new LongOpenHashSet(), new LongOpenHashSet()));
@@ -68,8 +68,8 @@ public final class ForcedChunkStore extends SavedData {
             if (store.blockTickets.isEmpty()) {
                 continue;
             }
-            for (Iterator<Map.Entry<ResourceLocation, Map<BlockPos, TicketSet>>> iterator = store.blockTickets.entrySet().iterator(); iterator.hasNext(); ) {
-                Map.Entry<ResourceLocation, Map<BlockPos, TicketSet>> entry = iterator.next();
+            for (Iterator<Map.Entry<Identifier, Map<BlockPos, TicketSet>>> iterator = store.blockTickets.entrySet().iterator(); iterator.hasNext(); ) {
+                Map.Entry<Identifier, Map<BlockPos, TicketSet>> entry = iterator.next();
                 if (!TicketController.CONTROLLERS.containsKey(entry.getKey())) {
                     LOGGER.warn("Dropping forced chunks of unknown ticket controller {} in {}", entry.getKey(), level.dimension().location());
                     iterator.remove();
@@ -77,7 +77,7 @@ public final class ForcedChunkStore extends SavedData {
                 }
             }
             //Copy, as reinstating goes through TicketController#forceChunk which mutates the store
-            Map<ResourceLocation, Map<BlockPos, TicketSet>> copy = new HashMap<>();
+            Map<Identifier, Map<BlockPos, TicketSet>> copy = new HashMap<>();
             store.blockTickets.forEach((controller, owners) -> {
                 Map<BlockPos, TicketSet> ownersCopy = new HashMap<>();
                 owners.forEach((pos, set) -> ownersCopy.put(pos, new TicketSet(new LongOpenHashSet(set.nonTicking()), new LongOpenHashSet(set.ticking()))));
@@ -130,7 +130,7 @@ public final class ForcedChunkStore extends SavedData {
     private static ForcedChunkStore load(CompoundTag tag, HolderLookup.Provider provider) {
         ForcedChunkStore store = new ForcedChunkStore();
         for (String controllerId : tag.getAllKeys()) {
-            ResourceLocation controller = ResourceLocation.tryParse(controllerId);
+            Identifier controller = Identifier.tryParse(controllerId);
             if (controller == null) {
                 continue;
             }

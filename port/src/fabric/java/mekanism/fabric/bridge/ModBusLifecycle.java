@@ -42,7 +42,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.syncher.EntityDataSerializer;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -140,15 +140,15 @@ public final class ModBusLifecycle {
         NeoForge.EVENT_BUS.post(reloadEvent);
         int index = 0;
         for (PreparableReloadListener listener : reloadEvent.getListeners()) {
-            ResourceLocation id = ResourceLocation.fromNamespaceAndPath("mekanism_fabric", "reload_listener_" + index++);
+            Identifier id = Identifier.fromNamespaceAndPath("mekanism_fabric", "reload_listener_" + index++);
             ResourceManagerHelper.get(PackType.SERVER_DATA).registerReloadListener(new IdentifiableResourceReloadListener() {
                 @Override
-                public ResourceLocation getFabricId() {
+                public Identifier getFabricId() {
                     return id;
                 }
 
                 @Override
-                public java.util.Collection<ResourceLocation> getFabricDependencies() {
+                public java.util.Collection<Identifier> getFabricDependencies() {
                     return List.of(ResourceReloadListenerKeys.RECIPES, ResourceReloadListenerKeys.TAGS);
                 }
 

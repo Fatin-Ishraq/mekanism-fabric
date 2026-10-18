@@ -51,7 +51,7 @@ public class ItemAttributeModifierEvent extends Event {
         entries.add(new ItemAttributeModifiers.Entry(attribute, modifier, slot));
     }
 
-    public boolean removeModifier(Holder<Attribute> attribute, net.minecraft.resources.ResourceLocation id) {
+    public boolean removeModifier(Holder<Attribute> attribute, net.minecraft.resources.Identifier id) {
         return entries.removeIf(entry -> entry.attribute().equals(attribute) && entry.modifier().id().equals(id));
     }
 

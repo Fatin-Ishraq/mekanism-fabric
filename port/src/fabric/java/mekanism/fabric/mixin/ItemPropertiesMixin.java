@@ -9,11 +9,16 @@ import org.spongepowered.asm.mixin.Unique;
 public abstract class ItemPropertiesMixin implements IItemPropertiesExtension {
 
     @Unique
-    private boolean mekanism$noRepair;
+    private boolean mekanism$noCombineRepair;
 
     @Override
-    public Item.Properties setNoRepair() {
-        this.mekanism$noRepair = true;
+    public Item.Properties setNoCombineRepair() {
+        this.mekanism$noCombineRepair = true;
         return (Item.Properties) (Object) this;
+    }
+
+    @Override
+    public boolean mekanism$noCombineRepair() {
+        return mekanism$noCombineRepair;
     }
 }

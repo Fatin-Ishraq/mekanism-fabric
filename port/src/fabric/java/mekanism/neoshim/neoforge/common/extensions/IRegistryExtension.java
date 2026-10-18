@@ -6,7 +6,7 @@ import mekanism.neoshim.neoforge.registries.datamaps.DataMapType;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 /** Injected into {@link Registry}. */
@@ -18,7 +18,7 @@ public interface IRegistryExtension<T> {
 
     /** Like getKey, but never falls back to a defaulted registry's default key. */
     @Nullable
-    default ResourceLocation getKeyOrNull(T element) {
+    default Identifier getKeyOrNull(T element) {
         return self().getResourceKey(element).map(ResourceKey::location).orElse(null);
     }
 

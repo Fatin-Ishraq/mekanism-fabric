@@ -9,7 +9,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.material.Fluid;
 
 public final class SingleFluidIngredient extends FluidIngredient {
@@ -19,7 +19,7 @@ public final class SingleFluidIngredient extends FluidIngredient {
     public static final StreamCodec<RegistryFriendlyByteBuf, SingleFluidIngredient> STREAM_CODEC = ByteBufCodecs.holderRegistry(Registries.FLUID)
           .map(SingleFluidIngredient::new, SingleFluidIngredient::fluid);
     public static final FluidIngredientTypes.Type<SingleFluidIngredient> TYPE = FluidIngredientTypes.register(
-          ResourceLocation.fromNamespaceAndPath("neoforge", "single"), CODEC, STREAM_CODEC);
+          Identifier.fromNamespaceAndPath("neoforge", "single"), CODEC, STREAM_CODEC);
 
     private final Holder<Fluid> fluid;
 

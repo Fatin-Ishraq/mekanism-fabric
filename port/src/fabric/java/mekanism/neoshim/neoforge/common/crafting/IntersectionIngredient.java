@@ -9,14 +9,14 @@ import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 
 /** Intersection of ingredients. Serialized like NeoForge: {@code {"type": "neoforge:intersection", "children": [...]}}. */
 public record IntersectionIngredient(List<Ingredient> children) implements ICustomIngredient {
 
-    public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath("neoforge", "intersection");
+    public static final Identifier ID = Identifier.fromNamespaceAndPath("neoforge", "intersection");
     public static final MapCodec<IntersectionIngredient> CODEC = IngredientCodecs.LIST_CODEC_NONEMPTY.fieldOf("children").xmap(IntersectionIngredient::new, IntersectionIngredient::children);
     public static final StreamCodec<RegistryFriendlyByteBuf, IntersectionIngredient> STREAM_CODEC = Ingredient.CONTENTS_STREAM_CODEC.apply(ByteBufCodecs.list())
           .map(IntersectionIngredient::new, IntersectionIngredient::children);

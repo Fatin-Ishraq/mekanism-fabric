@@ -9,7 +9,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.FogRenderer;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
@@ -37,21 +37,21 @@ public interface IClientFluidTypeExtensions {
         return 0xFFFFFFFF;
     }
 
-    default ResourceLocation getStillTexture() {
+    default Identifier getStillTexture() {
         return null;
     }
 
-    default ResourceLocation getFlowingTexture() {
-        return null;
-    }
-
-    @Nullable
-    default ResourceLocation getOverlayTexture() {
+    default Identifier getFlowingTexture() {
         return null;
     }
 
     @Nullable
-    default ResourceLocation getRenderOverlayTexture(Minecraft mc) {
+    default Identifier getOverlayTexture() {
+        return null;
+    }
+
+    @Nullable
+    default Identifier getRenderOverlayTexture(Minecraft mc) {
         return null;
     }
 
@@ -66,16 +66,16 @@ public interface IClientFluidTypeExtensions {
           FogShape shape) {
     }
 
-    default ResourceLocation getStillTexture(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
+    default Identifier getStillTexture(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
         return getStillTexture();
     }
 
-    default ResourceLocation getFlowingTexture(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
+    default Identifier getFlowingTexture(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
         return getFlowingTexture();
     }
 
     @Nullable
-    default ResourceLocation getOverlayTexture(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
+    default Identifier getOverlayTexture(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
         return getOverlayTexture();
     }
 
@@ -83,15 +83,15 @@ public interface IClientFluidTypeExtensions {
         return getTintColor();
     }
 
-    default ResourceLocation getStillTexture(FluidStack stack) {
+    default Identifier getStillTexture(FluidStack stack) {
         return getStillTexture();
     }
 
-    default ResourceLocation getFlowingTexture(FluidStack stack) {
+    default Identifier getFlowingTexture(FluidStack stack) {
         return getFlowingTexture();
     }
 
-    default ResourceLocation getOverlayTexture(FluidStack stack) {
+    default Identifier getOverlayTexture(FluidStack stack) {
         return getOverlayTexture();
     }
 

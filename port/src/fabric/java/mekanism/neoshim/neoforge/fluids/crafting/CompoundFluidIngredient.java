@@ -8,7 +8,7 @@ import mekanism.neoshim.neoforge.fluids.FluidStack;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public final class CompoundFluidIngredient extends FluidIngredient {
 
@@ -17,7 +17,7 @@ public final class CompoundFluidIngredient extends FluidIngredient {
     public static final StreamCodec<RegistryFriendlyByteBuf, CompoundFluidIngredient> STREAM_CODEC = FluidIngredient.STREAM_CODEC.apply(ByteBufCodecs.list())
           .map(CompoundFluidIngredient::new, CompoundFluidIngredient::children);
     public static final FluidIngredientTypes.Type<CompoundFluidIngredient> TYPE = FluidIngredientTypes.register(
-          ResourceLocation.fromNamespaceAndPath("neoforge", "compound"), CODEC, STREAM_CODEC);
+          Identifier.fromNamespaceAndPath("neoforge", "compound"), CODEC, STREAM_CODEC);
 
     private final List<FluidIngredient> children;
 

@@ -2,25 +2,25 @@ package mekanism.fabric.client;
 
 import mekanism.neoshim.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import mekanism.neoshim.neoforge.fluids.FluidType;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /** Client fluid extensions for vanilla water/lava (NeoForge provides these itself). */
 public final class VanillaFluidClientExtensions {
 
     private static final IClientFluidTypeExtensions WATER = new IClientFluidTypeExtensions() {
         @Override
-        public ResourceLocation getStillTexture() {
-            return ResourceLocation.withDefaultNamespace("block/water_still");
+        public Identifier getStillTexture() {
+            return Identifier.withDefaultNamespace("block/water_still");
         }
 
         @Override
-        public ResourceLocation getFlowingTexture() {
-            return ResourceLocation.withDefaultNamespace("block/water_flow");
+        public Identifier getFlowingTexture() {
+            return Identifier.withDefaultNamespace("block/water_flow");
         }
 
         @Override
-        public ResourceLocation getOverlayTexture() {
-            return ResourceLocation.withDefaultNamespace("block/water_overlay");
+        public Identifier getOverlayTexture() {
+            return Identifier.withDefaultNamespace("block/water_overlay");
         }
 
         @Override
@@ -30,13 +30,13 @@ public final class VanillaFluidClientExtensions {
     };
     private static final IClientFluidTypeExtensions LAVA = new IClientFluidTypeExtensions() {
         @Override
-        public ResourceLocation getStillTexture() {
-            return ResourceLocation.withDefaultNamespace("block/lava_still");
+        public Identifier getStillTexture() {
+            return Identifier.withDefaultNamespace("block/lava_still");
         }
 
         @Override
-        public ResourceLocation getFlowingTexture() {
-            return ResourceLocation.withDefaultNamespace("block/lava_flow");
+        public Identifier getFlowingTexture() {
+            return Identifier.withDefaultNamespace("block/lava_flow");
         }
     };
 

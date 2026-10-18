@@ -15,7 +15,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.HolderSetCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -24,7 +24,7 @@ import net.minecraft.world.level.ItemLike;
 /** Serialized like NeoForge: {@code {"type": "neoforge:components", "items": ..., "components": {...}, "strict": bool}}. */
 public class DataComponentIngredient implements ICustomIngredient {
 
-    public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath("neoforge", "components");
+    public static final Identifier ID = Identifier.fromNamespaceAndPath("neoforge", "components");
     public static final MapCodec<DataComponentIngredient> CODEC = RecordCodecBuilder.mapCodec(builder -> builder.group(
           HolderSetCodec.create(Registries.ITEM, net.minecraft.core.registries.BuiltInRegistries.ITEM.holderByNameCodec(), false).fieldOf("items").forGetter(DataComponentIngredient::items),
           DataComponentPredicate.CODEC.fieldOf("components").forGetter(DataComponentIngredient::components),

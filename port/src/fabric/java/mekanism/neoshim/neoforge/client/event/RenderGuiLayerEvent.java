@@ -5,16 +5,16 @@ import mekanism.neoshim.bus.api.ICancellableEvent;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.LayeredDraw;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public abstract class RenderGuiLayerEvent extends Event {
 
     private final GuiGraphics guiGraphics;
     private final DeltaTracker partialTick;
-    private final ResourceLocation name;
+    private final Identifier name;
     private final LayeredDraw.Layer layer;
 
-    protected RenderGuiLayerEvent(GuiGraphics guiGraphics, DeltaTracker partialTick, ResourceLocation name, LayeredDraw.Layer layer) {
+    protected RenderGuiLayerEvent(GuiGraphics guiGraphics, DeltaTracker partialTick, Identifier name, LayeredDraw.Layer layer) {
         this.guiGraphics = guiGraphics;
         this.partialTick = partialTick;
         this.name = name;
@@ -29,7 +29,7 @@ public abstract class RenderGuiLayerEvent extends Event {
         return partialTick;
     }
 
-    public ResourceLocation getName() {
+    public Identifier getName() {
         return name;
     }
 
@@ -39,14 +39,14 @@ public abstract class RenderGuiLayerEvent extends Event {
 
     public static class Pre extends RenderGuiLayerEvent implements ICancellableEvent {
 
-        public Pre(GuiGraphics guiGraphics, DeltaTracker partialTick, ResourceLocation name, LayeredDraw.Layer layer) {
+        public Pre(GuiGraphics guiGraphics, DeltaTracker partialTick, Identifier name, LayeredDraw.Layer layer) {
             super(guiGraphics, partialTick, name, layer);
         }
     }
 
     public static class Post extends RenderGuiLayerEvent {
 
-        public Post(GuiGraphics guiGraphics, DeltaTracker partialTick, ResourceLocation name, LayeredDraw.Layer layer) {
+        public Post(GuiGraphics guiGraphics, DeltaTracker partialTick, Identifier name, LayeredDraw.Layer layer) {
             super(guiGraphics, partialTick, name, layer);
         }
     }

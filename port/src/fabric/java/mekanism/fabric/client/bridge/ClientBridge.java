@@ -31,7 +31,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -61,7 +61,6 @@ public final class ClientBridge {
             bus0.post(new RegisterParticleProvidersEvent());
             bus0.post(new RegisterClientExtensionsEvent());
             bus0.post(new RegisterItemDecorationsEvent());
-            bus0.post(new ModelEvent.RegisterGeometryLoaders());
             RegisterGuiLayersEvent layers = new RegisterGuiLayersEvent();
             bus0.post(layers);
             allLayers.addAll(layers.getLayers());
@@ -69,7 +68,7 @@ public final class ClientBridge {
                   ConfigScreenFactoryRegistry.INSTANCE.register(mod.getModId(), (modId, parent) -> factory.createScreen(mod, parent)));
         }
         guiLayers = List.copyOf(allLayers);
-        mekanism.fabric.client.model.NeoModelLoadingPlugin.register();
+        mekanism.fabric.client.model.ModelBridge.init();
         net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback.EVENT.register(shaderContext -> {
             for (ModContainer mod : mekanism.fabric.bridge.ModBusLifecycle.mods()) {
                 try {

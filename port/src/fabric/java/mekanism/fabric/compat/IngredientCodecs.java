@@ -13,7 +13,7 @@ import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -39,7 +39,7 @@ public final class IngredientCodecs {
                 type = input.get("fabric:type");
             }
             if (type != null) {
-                return ResourceLocation.CODEC.parse(ops, type).flatMap(id -> {
+                return Identifier.CODEC.parse(ops, type).flatMap(id -> {
                     CustomIngredientSerializer<?> serializer = CustomIngredientSerializer.get(id);
                     if (serializer == null) {
                         return DataResult.error(() -> "Unknown ingredient type " + id);
@@ -79,11 +79,11 @@ public final class IngredientCodecs {
     public static final Codec<List<Ingredient>> LIST_CODEC_NONEMPTY = Ingredient.CODEC_NONEMPTY.listOf()
           .validate(list -> list.isEmpty() ? DataResult.error(() -> "Ingredient list cannot be empty") : DataResult.success(list));
 
-    public static <T extends CustomIngredient> CustomIngredientSerializer<T> serializer(ResourceLocation id, MapCodec<T> codec,
+    public static <T extends CustomIngredient> CustomIngredientSerializer<T> serializer(Identifier id, MapCodec<T> codec,
           StreamCodec<RegistryFriendlyByteBuf, T> streamCodec) {
         return new CustomIngredientSerializer<>() {
             @Override
-            public ResourceLocation getIdentifier() {
+            public Identifier getIdentifier() {
                 return id;
             }
 

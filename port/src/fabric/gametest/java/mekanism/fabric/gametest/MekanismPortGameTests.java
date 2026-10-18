@@ -394,7 +394,7 @@ public class MekanismPortGameTests implements FabricGameTest {
         }
         placeLikeItem(helper, MekanismBlocks.ENRICHMENT_CHAMBER.value());
         BlockPos absolute = helper.absolutePos(POS);
-        var lookup = net.fabricmc.fabric.api.lookup.v1.block.BlockApiLookup.get(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("computercraft", "peripheral"),
+        var lookup = net.fabricmc.fabric.api.lookup.v1.block.BlockApiLookup.get(net.minecraft.resources.Identifier.fromNamespaceAndPath("computercraft", "peripheral"),
               dan200.computercraft.api.peripheral.IPeripheral.class, Direction.class);
         var peripheral = lookup.find(helper.getLevel(), absolute, Direction.UP);
         helper.assertTrue(peripheral != null, "Enrichment chamber is not a ComputerCraft peripheral");
@@ -431,7 +431,7 @@ public class MekanismPortGameTests implements FabricGameTest {
             helper.succeed();
             return;
         }
-        var recipe = helper.getLevel().getRecipeManager().byKey(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("crafttweaker", "port_test_enriching"));
+        var recipe = helper.getLevel().getRecipeManager().byKey(net.minecraft.resources.Identifier.fromNamespaceAndPath("crafttweaker", "port_test_enriching"));
         helper.assertTrue(recipe.isPresent(), "CraftTweaker script recipe crafttweaker:port_test_enriching not found");
         helper.assertTrue(recipe.get().value().getType() == mekanism.common.recipe.MekanismRecipeType.ENRICHING.get(), "Recipe has type " + recipe.get().value().getType());
         helper.succeed();
@@ -448,7 +448,7 @@ public class MekanismPortGameTests implements FabricGameTest {
         helper.assertTrue(armors.get(mekanism.common.registries.MekanismItems.HAZMAT_GOWN.asItem()) == mekanism.common.integration.gender.MekanismGenderArmor.HAZMAT,
               "Hazmat gown gender armor settings not registered");
         helper.assertTrue(armors.containsKey(mekanism.common.registries.MekanismItems.MEKASUIT_BODYARMOR.asItem()), "MekaSuit body armor not registered");
-        var bronze = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("mekanismtools", "bronze_chestplate"));
+        var bronze = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.Identifier.fromNamespaceAndPath("mekanismtools", "bronze_chestplate"));
         helper.assertTrue(armors.containsKey(bronze), "Tools bronze chestplate not registered");
         helper.succeed();
     }

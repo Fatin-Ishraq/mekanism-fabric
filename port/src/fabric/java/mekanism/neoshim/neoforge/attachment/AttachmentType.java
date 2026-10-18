@@ -12,7 +12,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -65,7 +65,7 @@ public final class AttachmentType<T> {
     }
 
     /** Creates and registers the backing Fabric attachment. */
-    public synchronized void bind(ResourceLocation id) {
+    public synchronized void bind(Identifier id) {
         if (fabricType != null) {
             return;
         }
