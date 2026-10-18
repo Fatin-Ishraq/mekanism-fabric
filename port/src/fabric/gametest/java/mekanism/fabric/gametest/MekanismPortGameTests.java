@@ -229,4 +229,56 @@ public class MekanismPortGameTests implements FabricGameTest {
         helper.assertTrue(found, "Plains biome does not generate Mekanism osmium ore");
         helper.succeed();
     }
+
+    /** ItemAttributeModifierEvent: the Meka-Tool has no static attribute modifiers, its attack damage comes only from the event. */
+    @GameTest(template = EMPTY_STRUCTURE)
+    public void mekaToolAttributesFromEvent(GameTestHelper helper) {
+        ItemStack mekaTool = new ItemStack(mekanism.common.registries.MekanismItems.MEKA_TOOL.get());
+        double[] attackDamage = {0};
+        mekaTool.forEachModifier(net.minecraft.world.entity.EquipmentSlotGroup.MAINHAND, (attribute, modifier) -> {
+            if (attribute.is(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE)) {
+                attackDamage[0] += modifier.amount();
+            }
+        });
+        helper.assertTrue(attackDamage[0] > 0, "Meka-Tool has no attack damage modifier (ItemAttributeModifierEvent not fired)");
+        helper.succeed();
+    }
+
+    /** LivingFallEvent: charged free runners absorb fall damage, an unequipped mob takes it. */
+    @GameTest(template = EMPTY_STRUCTURE)
+    public void freeRunnersCancelFallDamage(GameTestHelper helper) {
+        net.minecraft.world.entity.animal.Pig control = helper.spawn(net.minecraft.world.entity.EntityType.PIG, new BlockPos(1, 2, 1));
+        net.minecraft.world.entity.animal.Pig runner = helper.spawn(net.minecraft.world.entity.EntityType.PIG, new BlockPos(3, 2, 3));
+        ItemStack freeRunners = new ItemStack(mekanism.common.registries.MekanismItems.FREE_RUNNERS.get());
+        mekanism.api.energy.IEnergyContainer container = mekanism.common.util.StorageUtils.getEnergyContainer(freeRunners, 0);
+        helper.assertTrue(container != null, "Free runners have no energy container");
+        container.setEnergy(container.getMaxEnergy());
+        runner.setItemSlot(net.minecraft.world.entity.EquipmentSlot.FEET, freeRunners);
+        control.causeFallDamage(8, 1, control.damageSources().fall());
+        runner.causeFallDamage(8, 1, runner.damageSources().fall());
+        helper.assertTrue(control.getHealth() < control.getMaxHealth(), "Control pig took no fall damage");
+        helper.assertTrue(runner.getHealth() == runner.getMaxHealth(), "Pig wearing charged free runners took fall damage: " + runner.getHealth());
+        helper.succeed();
+    }
+
+    /** EntityInvulnerabilityCheckEvent: entity types in mekanism:radiation_immune ignore radiation damage. */
+    @GameTest(template = EMPTY_STRUCTURE)
+    public void radiationImmuneEntitiesInvulnerable(GameTestHelper helper) {
+        var golem = helper.spawn(net.minecraft.world.entity.EntityType.IRON_GOLEM, new BlockPos(1, 2, 1));
+        var pig = helper.spawn(net.minecraft.world.entity.EntityType.PIG, new BlockPos(3, 2, 3));
+        var radiation = mekanism.common.registries.MekanismDamageTypes.RADIATION.source(helper.getLevel());
+        helper.assertTrue(golem.isInvulnerableTo(radiation), "Iron golem is not immune to radiation");
+        helper.assertFalse(pig.isInvulnerableTo(radiation), "Pig is immune to radiation");
+        helper.succeed();
+    }
+
+    /** neoforge:swim_speed and neoforge:creative_flight exist and are on the default attribute suppliers. */
+    @GameTest(template = EMPTY_STRUCTURE)
+    public void neoForgeAttributesPresent(GameTestHelper helper) {
+        var pig = helper.spawn(net.minecraft.world.entity.EntityType.PIG, new BlockPos(1, 2, 1));
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        helper.assertTrue(pig.getAttribute(mekanism.fabric.NeoAttributes.SWIM_SPEED) != null, "Pig has no swim speed attribute");
+        helper.assertTrue(player.getAttribute(mekanism.fabric.NeoAttributes.CREATIVE_FLIGHT) != null, "Player has no creative flight attribute");
+        helper.succeed();
+    }
 }
