@@ -436,4 +436,20 @@ public class MekanismPortGameTests implements FabricGameTest {
         helper.assertTrue(recipe.get().value().getType() == mekanism.common.recipe.MekanismRecipeType.ENRICHING.get(), "Recipe has type " + recipe.get().value().getType());
         helper.succeed();
     }
+
+    /** Wildfire's Female Gender Mod (only when installed, -Pgender=true): Mekanism and Tools armor settings are registered through WildfireAPI. */
+    @GameTest(template = EMPTY_STRUCTURE)
+    public void genderArmorRegistered(GameTestHelper helper) {
+        if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("wildfire_gender")) {
+            helper.succeed();
+            return;
+        }
+        var armors = com.wildfire.api.WildfireAPI.getGenderArmors();
+        helper.assertTrue(armors.get(mekanism.common.registries.MekanismItems.HAZMAT_GOWN.asItem()) == mekanism.common.integration.gender.MekanismGenderArmor.HAZMAT,
+              "Hazmat gown gender armor settings not registered");
+        helper.assertTrue(armors.containsKey(mekanism.common.registries.MekanismItems.MEKASUIT_BODYARMOR.asItem()), "MekaSuit body armor not registered");
+        var bronze = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("mekanismtools", "bronze_chestplate"));
+        helper.assertTrue(armors.containsKey(bronze), "Tools bronze chestplate not registered");
+        helper.succeed();
+    }
 }

@@ -3,12 +3,11 @@ package mekanism.common.integration.gender;
 import com.wildfire.api.IGenderArmor;
 import mekanism.common.Mekanism;
 import net.minecraft.world.level.ItemLike;
-import mekanism.neoshim.neoforge.capabilities.ItemCapability;
 import mekanism.neoshim.neoforge.capabilities.RegisterCapabilitiesEvent;
 
 public record MekanismGenderArmor(boolean coversBreasts, boolean alwaysHidesBreasts, float physicsResistance, float tightness, boolean armorStandsCopySettings) implements IGenderArmor {
 
-    private static final ItemCapability<IGenderArmor, Void> GENDER_ARMOR_CAPABILITY = ItemCapability.createVoid(Mekanism.hooks.genderMod.rl("gender_armor"), IGenderArmor.class);
+    //FABRIC: the Fabric build of Wildfire's Gender Mod registers armor through WildfireAPI#addGenderArmor instead of an item capability
     public static final MekanismGenderArmor OPEN_FRONT = new MekanismGenderArmor(false, false, 0, 0, false);
     public static final MekanismGenderArmor HIDES_BREASTS = new MekanismGenderArmor(true, true, 0, 0, false);
     public static final MekanismGenderArmor HAZMAT = new MekanismGenderArmor(0.5F, 0.25F, false);
@@ -34,6 +33,8 @@ public record MekanismGenderArmor(boolean coversBreasts, boolean alwaysHidesBrea
     }
 
     public void register(RegisterCapabilitiesEvent event, ItemLike... items) {
-        event.registerItem(GENDER_ARMOR_CAPABILITY, (stack, ctx) -> this, items);
+        for (ItemLike item : items) {
+            com.wildfire.api.WildfireAPI.addGenderArmor(item.asItem(), this);//FABRIC: see above
+        }
     }
 }

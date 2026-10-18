@@ -98,7 +98,11 @@ public final class MekanismHooks {
 
     public void hookCapabilityRegistration(RegisterCapabilitiesEvent event) {
         EnergyCompatUtils.initLoadedCache();
-        //FABRIC: Wildfire's Gender Mod armor config removed (NeoForge capability based)
+        if (genderMod.isLoaded()) {
+            mekanism.common.integration.gender.MekanismGenderArmor.HAZMAT.register(event, MekanismItems.HAZMAT_GOWN);
+            mekanism.common.integration.gender.MekanismGenderArmor.OPEN_FRONT.register(event, MekanismItems.JETPACK, MekanismItems.SCUBA_TANK);
+            mekanism.common.integration.gender.MekanismGenderArmor.HIDES_BREASTS.register(event, MekanismItems.ARMORED_JETPACK, MekanismItems.MEKASUIT_BODYARMOR);
+        }
     }
 
     public void hookCommonSetup() {

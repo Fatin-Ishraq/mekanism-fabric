@@ -29,6 +29,11 @@ public class ToolsModule implements NeoModule {
     }
 
     @Override
+    public String[] commonSubscribers() {
+        return new String[]{"mekanism.tools.common.integration.gender.ToolsGenderCapabilityHelper"};
+    }
+
+    @Override
     public String[] clientSubscribers() {
         return new String[]{"mekanism.tools.client.ToolsClientRegistration"};
     }

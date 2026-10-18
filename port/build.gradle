@@ -56,7 +56,6 @@ def excludedFromCompile = [
         'mekanism/common/integration/crafttweaker/projecte/**',
         'mekanism/common/integration/crafttweaker/jeitweaker/**',
         'mekanism/common/integration/framedblocks/**',
-        'mekanism/common/integration/gender/**',
         'mekanism/common/integration/jsonthings/**',
         // The One Probe has no Fabric build (Jade and WTHIT are supported)
         'mekanism/common/integration/lookingat/theoneprobe/**',
@@ -93,8 +92,6 @@ sourceSets {
 // Generators / Additions / Tools: each its own Fabric mod (src/<module> upstream code + src/fabric/<module> bootstrap)
 def mekModules = ['generators', 'additions', 'tools']
 def moduleExcludes = [
-        // Wildfire's Gender Mod integration (NeoForge capability based) - phase 9
-        'mekanism/tools/common/integration/gender/**',
 ]
 sourceSets {
     mekModules.each { moduleName ->
@@ -227,6 +224,7 @@ dependencies {
         modLocalRuntime("lol.bai:badpackets:fabric-${badpackets_version}")
     }
     modCompileOnly("com.blamejared.crafttweaker:CraftTweaker-fabric-${minecraft_version}:${crafttweaker_version}") { transitive = false }
+    modCompileOnly("maven.modrinth:female-gender:${wildfire_gender_version}") { transitive = false }
     modCompileOnly("dev.emi:trinkets:${trinkets_version}") { transitive = false }
     modCompileOnly("org.ladysnake.cardinal-components-api:cardinal-components-base:${cca_version}") { transitive = false }
     // Accessory slots at dev runtime: -Paccessories=trinkets (verification runs only; never bundled)
@@ -236,6 +234,10 @@ dependencies {
     // CraftTweaker at dev runtime: -Ptweaker=crt (verification runs only; never bundled)
     if (project.findProperty('tweaker') == 'crt') {
         modLocalRuntime("com.blamejared.crafttweaker:CraftTweaker-fabric-${minecraft_version}:${crafttweaker_version}")
+    }
+    // Wildfire's Female Gender Mod at dev runtime: -Pgender=true (verification runs only; never bundled)
+    if (project.findProperty('gender') == 'true') {
+        modLocalRuntime("maven.modrinth:female-gender:${wildfire_gender_version}")
     }
     // ComputerCraft at dev runtime: -Pcomputers=cc (verification runs only; never bundled)
     if (project.findProperty('computers') == 'cc') {
