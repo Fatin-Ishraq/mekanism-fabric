@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "id": "mekanism_fabric",
+  "version": "${version}",
+  "name": "Mekanism (Unofficial Fabric Port)",
+  "description": "Unofficial Fabric port of Mekanism, a Minecraft add-on featuring high-tech machinery that can be used to create powerful tools, armor, and weapons. NOT affiliated with or endorsed by the Mekanism team - please do not report bugs from this port to the official Mekanism issue tracker.",
+  "authors": [
+    "Aidancbrady (original Mekanism)",
+    "Thommy101 (original Mekanism)",
+    "Thiakil (original Mekanism)",
+    "pupnewfster (original Mekanism)",
+    "dizzyd (original Mekanism)"
+  ],
+  "contributors": [
+    "unpairedbracket, CyanideX, Ridanisaurus and many others (original Mekanism)",
+    "Fabric port contributors"
+  ],
+  "contact": {
+    "sources": "https://github.com/mekanism/Mekanism"
+  },
+  "license": "MIT",
+  "icon": "assets/mekanism_fabric/logo.png",
+  "environment": "*",
+  "provides": [
+    "mekanism"
+  ],
+  "entrypoints": {
+    "main": [
+      "mekanism.fabric.MekanismFabric"
+    ],
+    "client": [
+      "mekanism.fabric.client.MekanismFabricClient"
+    ]
+  },
+  "mixins": [
+    "mekanism_fabric.mixins.json"
+  ],
+  "accessWidener": "mekanism.accesswidener",
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=21",
+    "fabric-api": "*",
+    "forgeconfigapiport": ">=${fcap_version}"
+  },
+  "custom": {
+    "modmenu": {
+      "links": {
+        "modmenu.wiki": "https://wiki.aidancbrady.com/wiki/Mekanism"
+      }
+    }
+  }
+}

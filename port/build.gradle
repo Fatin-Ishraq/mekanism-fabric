@@ -1,0 +1,120 @@
+plugins {
+    id('fabric-loom').version("${loom_version}")
+    id('java')
+}
+
+// Unofficial Fabric port of Mekanism (https://github.com/mekanism/Mekanism). See ../NOTES.md.
+version = "${mod_version}+fabric.${port_revision}"
+group = 'mekanism'
+base { archivesName = 'Mekanism-Fabric-Unofficial' }
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of("${java_version}")
+}
+
+repositories {
+    maven { name = 'ParchmentMC'; url = 'https://maven.parchmentmc.org' }
+    maven { name = 'Fuzs (Forge Config API Port)'; url = 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/' }
+    exclusiveContent {
+        // Only needed by upstream's annotation processor
+        forRepository { maven { name = 'BlameJared'; url = 'https://maven.blamejared.com' } }
+        filter { includeGroup('org.openzen.zencode') }
+    }
+    mavenCentral()
+}
+
+// Packages from upstream that are not (yet) compiled in the Fabric port. Each entry is tracked in NOTES.md "Stubbed / disabled".
+def excludedFromCompile = [
+        // Recipe viewer plugins (JEI/EMI NeoForge builds) - phase 9. The loader-agnostic recipe_viewer base stays compiled.
+        'mekanism/client/recipe_viewer/jei/**',
+        'mekanism/client/recipe_viewer/emi/**',
+        // Third-party integrations compiled against NeoForge builds of other mods - phase 9
+        'mekanism/common/integration/crafttweaker/**',
+        'mekanism/common/integration/framedblocks/**',
+        'mekanism/common/integration/gender/**',
+        'mekanism/common/integration/jsonthings/**',
+        'mekanism/common/integration/lookingat/**',
+        'mekanism/common/integration/projecte/**',
+        'mekanism/common/integration/computer/opencomputers2/**',
+        'mekanism/common/integration/energy/fluxnetworks/**',
+        'mekanism/common/integration/energy/grandpower/**',
+]
+// Same-path replacements: any upstream source file whose relative path also exists in src/fabric/overrides/java is replaced by
+// the override (used for stubbing optional-integration classes that core references). Listed in NOTES.md "Overrides".
+def overridesDir = file('src/fabric/overrides/java')
+def overriddenFiles = overridesDir.exists() ? fileTree(overridesDir).matching { include('**/*.java') }.files.collect {
+    overridesDir.toPath().relativize(it.toPath()).toString().replace(File.separator, '/')
+} : []
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/api/java', 'src/main/java', 'src/fabric/java', 'src/fabric/overrides/java']
+            exclude(excludedFromCompile)
+            // Drop the upstream copy of overridden files (but never the override itself)
+            exclude { FileTreeElement e -> !e.file.toPath().startsWith(overridesDir.toPath()) && overriddenFiles.contains(e.relativePath.pathString) }
+        }
+        resources {
+            srcDirs = ['src/main/resources', 'src/datagen/generated/mekanism', 'src/fabric/resources']
+            exclude('**/*.blend', '**/*.bbmodel', '.cache', '**/convert_uv.py',
+                    'META-INF/neoforge.mods.toml', 'META-INF/accesstransformer.cfg', 'wthit_plugins.json')
+        }
+    }
+}
+
+loom {
+    accessWidenerPath = file('src/fabric/resources/mekanism.accesswidener')
+    mixin {
+        defaultRefmapName = 'mekanism_fabric.refmap.json'
+    }
+    runs {
+        client {
+            client()
+            name = 'Client'
+            runDir = 'run'
+        }
+        server {
+            server()
+            name = 'Server'
+            runDir = 'run/server'
+        }
+    }
+}
+
+dependencies {
+    minecraft("com.mojang:minecraft:${minecraft_version}")
+    mappings(loom.layered {
+        officialMojangMappings()
+        parchment("org.parchmentmc.data:parchment-${parchment_minecraft_version}:${parchment_mappings_version}@zip")
+    })
+    modImplementation("net.fabricmc:fabric-loader:${loader_version}")
+    modImplementation("net.fabricmc.fabric-api:fabric-api:${fabric_version}")
+
+    // Config: real NeoForge ModConfigSpec API on Fabric (NOTES.md D7). Required dependency, not bundled.
+    modApi("fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${fcap_version}")
+    // Energy interop (NOTES.md D8)
+    modApi(include("teamreborn:energy:${tr_energy_version}"))
+    // Listener event-type resolution for the shim event bus (NOTES.md D2)
+    implementation(include("net.jodah:typetools:${typetools_version}"))
+    // Provided transitively by NeoForge upstream
+    compileOnly('com.google.code.findbugs:jsr305:3.0.2')
+    implementation(include('org.apache.maven:maven-artifact:3.9.9')) { transitive = false }
+
+    compileOnly(project(':annotation-processor'))
+    annotationProcessor(project(':annotation-processor'))
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = Integer.parseInt(java_version)
+    options.compilerArgs.addAll(['-AmekanismModule=mekanism', '-parameters', '-Xmaxerrs', '100000'])
+}
+
+processResources {
+    def props = ['version': project.version, 'minecraft_version': minecraft_version, 'loader_version': loader_version,
+                 'fabric_version': fabric_version, 'fcap_version': fcap_version]
+    inputs.properties(props)
+    filesMatching('fabric.mod.json') { expand(props) }
+    from(rootProject.file('logo.png')) { into('assets/mekanism_fabric') }
+    from(rootProject.file('LICENSE')) { rename { 'LICENSE_mekanism' } }
+}
