@@ -281,7 +281,10 @@ def fabricModJsonProps = ['version': project.version, 'minecraft_version': minec
             filter { String line -> fabricModJsonProps.inject(line) { String l, k, v -> l.replace('${' + k + '}', v.toString()) } }
         }
         from(rootProject.file('LICENSE')) { rename { 'LICENSE_mekanism' } }
-        from(rootProject.file('logo.png')) { into('assets/mekanism_fabric') }
+        if (taskName != 'processResources') {
+            // Module jars carry the shared mod icon too (the core gets it from src/fabric/resources)
+            from('src/fabric/resources/assets/mekanism_fabric/icon.png') { into('assets/mekanism_fabric') }
+        }
     }
 }
 

@@ -20,7 +20,7 @@
     "issues": "https://github.com/Fatin-Ishraq/mekanism-fabric/issues"
   },
   "license": "MIT",
-  "icon": "assets/mekanism_fabric/logo.png",
+  "icon": "assets/mekanism_fabric/icon.png",
   "environment": "*",
   "provides": [
     "mekanism"
