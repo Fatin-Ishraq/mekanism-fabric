@@ -12,7 +12,6 @@ import mekanism.client.recipe_viewer.alias.RVAliasHelper;
 import mekanism.common.Mekanism;
 import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.ingredients.IIngredientType;
-import mezz.jei.api.neoforge.NeoForgeTypes;
 import mezz.jei.api.registration.IIngredientAliasRegistration;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
@@ -92,7 +91,7 @@ public class JEIAliasHelper implements RVAliasHelper<ItemStack, FluidStack, Chem
 
     @Override
     public void addFluidAliases(List<FluidStack> stacks, IHasTranslationKey... aliases) {
-        addAliases(NeoForgeTypes.FLUID_STACK, stacks, FLUID_TO_STRING, aliases);
+        addAliases(mezz.jei.api.fabric.constants.FabricTypes.FLUID_STACK, mekanism.fabric.compat.recipeviewer.JeiFluids.of(stacks), stack -> stack.getFluidVariant().getFluid().toString(), aliases);//FABRIC: JEI on Fabric uses droplet based fluid ingredients
     }
 
     @Override

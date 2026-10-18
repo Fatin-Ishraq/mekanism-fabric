@@ -33,7 +33,6 @@ import mezz.jei.api.gui.widgets.IRecipeExtrasBuilder;
 import mezz.jei.api.helpers.ICodecHelper;
 import mezz.jei.api.helpers.IGuiHelper;
 import mezz.jei.api.ingredients.IIngredientType;
-import mezz.jei.api.neoforge.NeoForgeTypes;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.IRecipeManager;
 import mezz.jei.api.recipe.RecipeIngredientRole;
@@ -296,8 +295,8 @@ public abstract class BaseRecipeCategory<RECIPE> extends AbstractContainerEventH
         //If we have no max (no fluids or just an empty fluid) we want to ensure the fluid renderer doesn't throw errors,
         // so we just return a capacity for the render of a bucket
         int max = stacks.stream().mapToInt(FluidStack::getAmount).filter(stackSize -> stackSize > 0).max().orElse(FluidType.BUCKET_VOLUME);
-        return init(builder, NeoForgeTypes.FLUID_STACK, role, gauge, stacks)
-              .setFluidRenderer(max, false, width, height);
+        return init(builder, mezz.jei.api.fabric.constants.FabricTypes.FLUID_STACK, role, gauge, mekanism.fabric.compat.recipeviewer.JeiFluids.of(stacks))//FABRIC: JEI on Fabric uses droplet based fluid ingredients
+              .setFluidRenderer(max * mekanism.fabric.compat.recipeviewer.JeiFluids.DROPLETS_PER_MB, false, width, height);
     }
 
     protected IRecipeSlotBuilder initChemical(IRecipeLayoutBuilder builder, RecipeIngredientRole role, GuiElement element, List<ChemicalStack> stacks) {

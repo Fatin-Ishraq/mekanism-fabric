@@ -59,7 +59,6 @@ import mezz.jei.api.helpers.IGuiHelper;
 import mezz.jei.api.helpers.IStackHelper;
 import mezz.jei.api.ingredients.IIngredientType;
 import mezz.jei.api.ingredients.subtypes.ISubtypeInterpreter;
-import mezz.jei.api.neoforge.NeoForgeTypes;
 import mezz.jei.api.recipe.RecipeType;
 import mezz.jei.api.recipe.transfer.IRecipeTransferHandlerHelper;
 import mezz.jei.api.registration.IGuiHandlerRegistration;
@@ -266,7 +265,7 @@ public class MekanismJEI implements IModPlugin {
         RecipeRegistryHelper.register(registry, RecipeViewerRecipeType.CHEMICAL_CONVERSION, MekanismRecipeType.CHEMICAL_CONVERSION);
         RecipeRegistryHelper.addAnvilRecipes(registry, MekanismItems.HDPE_REINFORCED_ELYTRA, item -> new ItemStack[]{MekanismItems.HDPE_SHEET.asStack()});
         //Note: Use a "full" bucket's worth of heavy water, so that JEI renders it as desired in the info page
-        registry.addIngredientInfo(MekanismFluids.HEAVY_WATER.asStack(FluidType.BUCKET_VOLUME), NeoForgeTypes.FLUID_STACK,
+        registry.addIngredientInfo(mekanism.fabric.compat.recipeviewer.JeiFluids.of(MekanismFluids.HEAVY_WATER.asStack(FluidType.BUCKET_VOLUME)), mezz.jei.api.fabric.constants.FabricTypes.FLUID_STACK,//FABRIC: droplet based fluid ingredients
               MekanismLang.RECIPE_VIEWER_INFO_HEAVY_WATER.translate(MekanismConfig.general.pumpHeavyWaterAmount.get()));
         registry.addIngredientInfo(MekanismAPI.MODULE_REGISTRY.stream().map(data -> new ItemStack(data.getItemHolder())).toList(),
               VanillaTypes.ITEM_STACK, MekanismLang.RECIPE_VIEWER_INFO_MODULE_INSTALLATION.translate());

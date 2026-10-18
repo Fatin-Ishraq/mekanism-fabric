@@ -4,12 +4,24 @@
   "version": "${version}",
   "name": "Mekanism: Tools (Unofficial Fabric Port)",
   "description": "Unofficial Fabric port of Mekanism: Tools. NOT affiliated with or endorsed by the Mekanism team.",
-  "authors": ["Aidancbrady (original Mekanism)", "Thommy101 (original Mekanism)", "Thiakil (original Mekanism)", "pupnewfster (original Mekanism)"],
+  "authors": [
+    "Aidancbrady (original Mekanism)",
+    "Thommy101 (original Mekanism)",
+    "Thiakil (original Mekanism)",
+    "pupnewfster (original Mekanism)"
+  ],
   "license": "MIT",
   "environment": "*",
-  "provides": ["mekanismtools"],
+  "provides": [
+    "mekanismtools"
+  ],
   "entrypoints": {
-    "mekanism_fabric:module": ["mekanism.fabric.modules.ToolsModule"]
+    "mekanism_fabric:module": [
+      "mekanism.fabric.modules.ToolsModule"
+    ],
+    "jei_mod_plugin": [
+      "mekanism.tools.client.recipe_viewer.jei.ToolsJEI"
+    ]
   },
   "depends": {
     "mekanism_fabric": "*"

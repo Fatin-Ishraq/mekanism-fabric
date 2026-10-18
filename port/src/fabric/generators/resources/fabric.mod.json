@@ -4,12 +4,27 @@
   "version": "${version}",
   "name": "Mekanism: Generators (Unofficial Fabric Port)",
   "description": "Unofficial Fabric port of Mekanism: Generators. NOT affiliated with or endorsed by the Mekanism team.",
-  "authors": ["Aidancbrady (original Mekanism)", "Thommy101 (original Mekanism)", "Thiakil (original Mekanism)", "pupnewfster (original Mekanism)"],
+  "authors": [
+    "Aidancbrady (original Mekanism)",
+    "Thommy101 (original Mekanism)",
+    "Thiakil (original Mekanism)",
+    "pupnewfster (original Mekanism)"
+  ],
   "license": "MIT",
   "environment": "*",
-  "provides": ["mekanismgenerators"],
+  "provides": [
+    "mekanismgenerators"
+  ],
   "entrypoints": {
-    "mekanism_fabric:module": ["mekanism.fabric.modules.GeneratorsModule"]
+    "mekanism_fabric:module": [
+      "mekanism.fabric.modules.GeneratorsModule"
+    ],
+    "jei_mod_plugin": [
+      "mekanism.generators.client.recipe_viewer.jei.GeneratorsJEI"
+    ],
+    "emi": [
+      "mekanism.generators.client.recipe_viewer.emi.GeneratorsEmi"
+    ]
   },
   "depends": {
     "mekanism_fabric": "*"

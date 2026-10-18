@@ -37,19 +37,6 @@ repositories {
 
 // Packages from upstream that are not (yet) compiled in the Fabric port. Each entry is tracked in NOTES.md "Stubbed / disabled".
 def excludedFromCompile = [
-        // Recipe viewer plugins - phase 9 (their APIs are on the compile classpath so the shared recipe_viewer code compiles)
-        'mekanism/client/recipe_viewer/jei/**',
-        'mekanism/client/recipe_viewer/emi/MekanismEmi.java',
-        'mekanism/client/recipe_viewer/emi/MekanismEmiHelper.java',
-        'mekanism/client/recipe_viewer/emi/EmiExclusionHandler.java',
-        'mekanism/client/recipe_viewer/emi/EmiGhostIngredientHandler.java',
-        'mekanism/client/recipe_viewer/emi/EmiStackUnderMouseProvider.java',
-        'mekanism/client/recipe_viewer/emi/ChemicalEmiIngredientSerializer.java',
-        'mekanism/client/recipe_viewer/emi/ChemicalEmiStack.java',
-        'mekanism/client/recipe_viewer/emi/MekanismEmiRecipeCategory.java',
-        'mekanism/client/recipe_viewer/emi/recipe/**',
-        'mekanism/client/recipe_viewer/emi/transfer/**',
-        'mekanism/client/recipe_viewer/emi/widget/**',
         // ComputerCraft peripheral glue (NeoForge capability based) - phase 9
         'mekanism/common/integration/computer/computercraft/CC*.java',
         'mekanism/common/integration/computer/computercraft/MekanismPeripheral.java',
@@ -96,9 +83,6 @@ def mekModules = ['generators', 'additions', 'tools']
 def moduleExcludes = [
         // Wildfire's Gender Mod integration (NeoForge capability based) - phase 9
         'mekanism/tools/common/integration/gender/**',
-        // Module JEI/EMI plugins (depend on the core plugins) - phase 9
-        'mekanism/*/client/recipe_viewer/jei/**',
-        'mekanism/*/client/recipe_viewer/emi/**',
 ]
 sourceSets {
     mekModules.each { moduleName ->
@@ -211,7 +195,14 @@ dependencies {
 
     // Third-party APIs (compile only) so upstream's integration-facing code compiles unchanged. Runtime integrations are phase 9.
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
-    compileOnly("dev.emi:emi-fabric:${emi_version}:api")
+    modCompileOnly("mezz.jei:jei-${minecraft_version}-fabric-api:${jei_version}")
+    modCompileOnly("dev.emi:emi-fabric:${emi_version}:api")
+    // Recipe viewers at dev runtime: -Precipe_viewer=jei|emi (verification runs only; never bundled)
+    if (project.findProperty('recipe_viewer') == 'jei') {
+        modLocalRuntime("mezz.jei:jei-${minecraft_version}-fabric:${jei_version}")
+    } else if (project.findProperty('recipe_viewer') == 'emi') {
+        modLocalRuntime("dev.emi:emi-fabric:${emi_version}")
+    }
     compileOnly("cc.tweaked:cc-tweaked-${minecraft_version}-common-api:${cc_tweaked_version}")
 
     compileOnly(project(':annotation-processor'))

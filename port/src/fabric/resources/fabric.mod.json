@@ -30,6 +30,12 @@
     ],
     "client": [
       "mekanism.fabric.client.MekanismFabricClient"
+    ],
+    "jei_mod_plugin": [
+      "mekanism.client.recipe_viewer.jei.MekanismJEI"
+    ],
+    "emi": [
+      "mekanism.client.recipe_viewer.emi.MekanismEmi"
     ]
   },
   "mixins": [
