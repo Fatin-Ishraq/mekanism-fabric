@@ -30,7 +30,7 @@ repositories {
     exclusiveContent {
         // Only needed by upstream's annotation processor
         forRepository { maven { name = 'BlameJared'; url = 'https://maven.blamejared.com' } }
-        filter { includeGroup('org.openzen.zencode') }
+        filter { includeGroup('org.openzen.zencode'); includeGroup('com.blamejared.crafttweaker'); includeGroupByRegex('com[.]faux.*') }
     }
     exclusiveContent {
         forRepository { maven { name = 'bai (WTHIT)'; url = 'https://maven2.bai.lol' } }
@@ -52,7 +52,9 @@ def excludedFromCompile = [
         // Curios client renderer (Curios is NeoForge-only; Fabric equivalent TBD) - phase 9
         'mekanism/client/render/MekanismCurioRenderer.java',
         // Third-party integrations compiled against NeoForge builds of other mods - phase 9
-        'mekanism/common/integration/crafttweaker/**',
+        // CraftTweaker add-on bridges whose targets do not exist on Fabric 1.21.1 (ProjectE, JeiTweaker)
+        'mekanism/common/integration/crafttweaker/projecte/**',
+        'mekanism/common/integration/crafttweaker/jeitweaker/**',
         'mekanism/common/integration/framedblocks/**',
         'mekanism/common/integration/gender/**',
         'mekanism/common/integration/jsonthings/**',
@@ -216,11 +218,16 @@ dependencies {
         modLocalRuntime("mcp.mobius.waila:wthit:fabric-${wthit_version}")
         modLocalRuntime("lol.bai:badpackets:fabric-${badpackets_version}")
     }
+    modCompileOnly("com.blamejared.crafttweaker:CraftTweaker-fabric-${minecraft_version}:${crafttweaker_version}") { transitive = false }
     modCompileOnly("dev.emi:trinkets:${trinkets_version}") { transitive = false }
     modCompileOnly("org.ladysnake.cardinal-components-api:cardinal-components-base:${cca_version}") { transitive = false }
     // Accessory slots at dev runtime: -Paccessories=trinkets (verification runs only; never bundled)
     if (project.findProperty('accessories') == 'trinkets') {
         modLocalRuntime("dev.emi:trinkets:${trinkets_version}")
+    }
+    // CraftTweaker at dev runtime: -Ptweaker=crt (verification runs only; never bundled)
+    if (project.findProperty('tweaker') == 'crt') {
+        modLocalRuntime("com.blamejared.crafttweaker:CraftTweaker-fabric-${minecraft_version}:${crafttweaker_version}")
     }
     // ComputerCraft at dev runtime: -Pcomputers=cc (verification runs only; never bundled)
     if (project.findProperty('computers') == 'cc') {
@@ -336,4 +343,16 @@ transformJson = { Object node ->
         }
     }
 }
+}
+
+// GameTest run with CraftTweaker: install the test script (and remove it again otherwise)
+tasks.matching { it.name == 'runGametest' }.configureEach {
+    doFirst {
+        def scripts = file('build/gametest/scripts')
+        if (project.findProperty('tweaker') == 'crt') {
+            copy { from('src/fabric/gametest/scripts'); into(scripts) }
+        } else {
+            delete(file('build/gametest/scripts/mekanism_port_test.zs'))
+        }
+    }
 }

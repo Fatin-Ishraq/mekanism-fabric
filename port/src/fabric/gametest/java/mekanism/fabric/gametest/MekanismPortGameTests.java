@@ -423,4 +423,17 @@ public class MekanismPortGameTests implements FabricGameTest {
         helper.assertTrue(mekanism.common.Mekanism.hooks.curios.isLoaded(), "Mekanism does not see the accessory integration as loaded");
         helper.succeed();
     }
+
+    /** CraftTweaker (only when installed, -Ptweaker=crt): the test script's enrichment recipe is registered through Mekanism's CrT integration. */
+    @GameTest(template = EMPTY_STRUCTURE)
+    public void craftTweakerAddsMekanismRecipe(GameTestHelper helper) {
+        if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("crafttweaker")) {
+            helper.succeed();
+            return;
+        }
+        var recipe = helper.getLevel().getRecipeManager().byKey(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("crafttweaker", "port_test_enriching"));
+        helper.assertTrue(recipe.isPresent(), "CraftTweaker script recipe crafttweaker:port_test_enriching not found");
+        helper.assertTrue(recipe.get().value().getType() == mekanism.common.recipe.MekanismRecipeType.ENRICHING.get(), "Recipe has type " + recipe.get().value().getType());
+        helper.succeed();
+    }
 }

@@ -9,10 +9,6 @@ import com.blamejared.crafttweaker.api.recipe.component.IRecipeComponent;
 import com.blamejared.crafttweaker.api.tag.CraftTweakerTagRegistry;
 import com.blamejared.crafttweaker.api.tag.manager.type.KnownTagManager;
 import com.blamejared.crafttweaker.api.tag.type.KnownTag;
-import com.blamejared.crafttweaker.natives.ingredient.ExpandCTFluidIngredientNeoForge;
-import com.blamejared.crafttweaker.natives.ingredient.ExpandIIngredientWithAmountNeoForge;
-import com.blamejared.crafttweaker.natives.ingredient.ExpandSizedFluidIngredient;
-import com.blamejared.crafttweaker.natives.ingredient.ExpandSizedIngredient;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -49,28 +45,51 @@ public class CrTUtils {
      * Converts a CrT item ingredient to one of ours.
      */
     public static ItemStackIngredient fromCrT(IIngredientWithAmount ingredient) {
-        return IngredientCreatorAccess.item().from(ExpandIIngredientWithAmountNeoForge.asSizedIngredient(ingredient));
+        //FABRIC: CraftTweaker's NeoForge-only SizedIngredient expansions are replaced by the equivalent conversion
+        return IngredientCreatorAccess.item().from(new mekanism.neoshim.neoforge.common.crafting.SizedIngredient(ingredient.ingredient().asVanillaIngredient(),
+              ingredient.amount()));
     }
 
     /**
      * Converts one of our item ingredients to a CrT item ingredient.
      */
     public static IIngredientWithAmount toCrT(ItemStackIngredient ingredient) {
-        return ExpandSizedIngredient.asIIngredientWithAmount(ingredient.ingredient());
+        //FABRIC: CraftTweaker's NeoForge-only SizedIngredient expansions are replaced by the equivalent conversion
+        return com.blamejared.crafttweaker.api.ingredient.IIngredient.fromIngredient(ingredient.ingredient().ingredient()).mul(ingredient.ingredient().count());
     }
 
     /**
      * Converts a CrT fluid ingredient to one of ours.
      */
     public static FluidStackIngredient fromCrT(CTFluidIngredient ingredient) {
-        return IngredientCreatorAccess.fluid().from(ExpandCTFluidIngredientNeoForge.asSizedFluidIngredient(ingredient));
+        //FABRIC: CraftTweaker's NeoForge-only SizedFluidIngredient expansions are replaced by mapping the CrT ingredient's parts (amounts in mB)
+        return ingredient.<FluidStackIngredient>mapTo(
+              stack -> IngredientCreatorAccess.fluid().from(new FluidStack(stack.getFluid().builtInRegistryHolder(), (int) stack.getAmount(),
+                    stack.getComponents().asPatch())),
+              (tag, amount) -> IngredientCreatorAccess.fluid().from(tag, amount),
+              parts -> {
+                  List<FluidStackIngredient> list = parts.toList();
+                  int amount = list.getFirst().ingredient().amount();
+                  if (list.stream().anyMatch(part -> part.ingredient().amount() != amount)) {
+                      throw new IllegalArgumentException("Compound fluid ingredients must use a single amount: " + ingredient.getCommandString());
+                  }
+                  return IngredientCreatorAccess.fluid().from(mekanism.neoshim.neoforge.fluids.crafting.CompoundFluidIngredient.of(
+                        list.stream().map(part -> part.ingredient().ingredient())), amount);
+              });
     }
 
     /**
      * Converts one of our fluid ingredients to a CrT fluid ingredient.
      */
     public static CTFluidIngredient toCrT(FluidStackIngredient ingredient) {
-        return ExpandSizedFluidIngredient.asCTFluidIngredient(ingredient.ingredient());
+        //FABRIC: CraftTweaker's NeoForge-only SizedFluidIngredient expansions are replaced by converting the represented stacks
+        CTFluidIngredient result = null;
+        for (FluidStack stack : ingredient.getRepresentations()) {
+            CTFluidIngredient part = new CTFluidIngredient.FluidStackIngredient(com.blamejared.crafttweaker.api.fluid.IFluidStack.of(stack.getFluid(), stack.getAmount(),
+                  stack.getComponentsPatch()));
+            result = result == null ? part : result.asCompound(part);
+        }
+        return result == null ? CTFluidIngredient.EMPTY.get() : result;
     }
 
     /**
