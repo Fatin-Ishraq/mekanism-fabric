@@ -1,0 +1,124 @@
+package mekanism.fabric.client.bridge;
+
+import fuzs.forgeconfigapiport.fabric.api.neoforge.v4.client.ConfigScreenFactoryRegistry;
+import java.util.List;
+import mekanism.fabric.client.HudHeights;
+import mekanism.neoshim.bus.api.IEventBus;
+import mekanism.neoshim.fml.ModContainer;
+import mekanism.neoshim.fml.event.lifecycle.FMLClientSetupEvent;
+import mekanism.neoshim.neoforge.client.event.ClientPlayerNetworkEvent;
+import mekanism.neoshim.neoforge.client.event.ClientTickEvent;
+import mekanism.neoshim.neoforge.client.event.EntityRenderersEvent;
+import mekanism.neoshim.neoforge.client.event.ModelEvent;
+import mekanism.neoshim.neoforge.client.event.RegisterClientReloadListenersEvent;
+import mekanism.neoshim.neoforge.client.event.RegisterColorHandlersEvent;
+import mekanism.neoshim.neoforge.client.event.RegisterGuiLayersEvent;
+import mekanism.neoshim.neoforge.client.event.RegisterItemDecorationsEvent;
+import mekanism.neoshim.neoforge.client.event.RegisterKeyMappingsEvent;
+import mekanism.neoshim.neoforge.client.event.RegisterMenuScreensEvent;
+import mekanism.neoshim.neoforge.client.event.RegisterParticleProvidersEvent;
+import mekanism.neoshim.neoforge.client.event.RenderLevelStageEvent;
+import mekanism.neoshim.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
+import mekanism.neoshim.neoforge.client.gui.IConfigScreenFactory;
+import mekanism.neoshim.neoforge.common.NeoForge;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientBlockEntityEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
+import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.resources.PreparableReloadListener;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.util.profiling.ProfilerFiller;
+import net.minecraft.world.level.block.entity.BlockEntity;
+
+/** Client half of the event bridge. Model/shader hooks are phase 6 (NOTES.md "Hook status"). */
+public final class ClientBridge {
+
+    private static List<RegisterGuiLayersEvent.Entry> guiLayers = List.of();
+
+    private ClientBridge() {
+    }
+
+    public static void init(ModContainer container) {
+        IEventBus modBus = container.getEventBus();
+        IEventBus bus = NeoForge.EVENT_BUS;
+
+        // Mod-bus registration events (NeoForge fires these during client mod loading)
+        modBus.post(new RegisterKeyMappingsEvent());
+        modBus.post(new RegisterMenuScreensEvent());
+        modBus.post(new EntityRenderersEvent.RegisterLayerDefinitions());
+        modBus.post(new EntityRenderersEvent.RegisterRenderers());
+        modBus.post(new RegisterParticleProvidersEvent());
+        modBus.post(new RegisterColorHandlersEvent.Block(null));
+        modBus.post(new RegisterColorHandlersEvent.Item(null, null));
+        modBus.post(new RegisterClientExtensionsEvent());
+        modBus.post(new RegisterItemDecorationsEvent());
+        modBus.post(new ModelEvent.RegisterGeometryLoaders());
+        RegisterGuiLayersEvent layers = new RegisterGuiLayersEvent();
+        modBus.post(layers);
+        guiLayers = List.copyOf(layers.getLayers());
+        RegisterClientReloadListenersEvent reloadListeners = new RegisterClientReloadListenersEvent();
+        modBus.post(reloadListeners);
+        registerClientReloadListeners(reloadListeners.getListeners());
+        container.getCustomExtension(IConfigScreenFactory.class).ifPresent(factory ->
+              ConfigScreenFactoryRegistry.INSTANCE.register(container.getModId(), (modId, parent) -> factory.createScreen(container, parent)));
+        modBus.post(new FMLClientSetupEvent(container));
+
+        // Game-bus bridges
+        ClientTickEvents.START_CLIENT_TICK.register(client -> bus.post(new ClientTickEvent.Pre()));
+        ClientTickEvents.END_CLIENT_TICK.register(client -> bus.post(new ClientTickEvent.Post()));
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) ->
+              bus.post(new ClientPlayerNetworkEvent.LoggingIn(client.gameMode, client.player, handler.getConnection())));
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) ->
+              bus.post(new ClientPlayerNetworkEvent.LoggingOut(client.gameMode, client.player, handler.getConnection())));
+        ClientBlockEntityEvents.BLOCK_ENTITY_LOAD.register((blockEntity, level) -> blockEntity.onLoad());
+        ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> {
+            for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
+                blockEntity.onChunkUnloaded();
+            }
+        });
+        HudRenderCallback.EVENT.register((graphics, deltaTracker) -> {
+            HudHeights.reset();
+            if (!Minecraft.getInstance().options.hideGui) {
+                for (RegisterGuiLayersEvent.Entry entry : guiLayers) {
+                    entry.layer().render(graphics, deltaTracker);
+                }
+            }
+        });
+        WorldRenderEvents.AFTER_ENTITIES.register(context -> postStage(RenderLevelStageEvent.Stage.AFTER_ENTITIES, context));
+        WorldRenderEvents.AFTER_TRANSLUCENT.register(context -> postStage(RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS, context));
+        WorldRenderEvents.LAST.register(context -> postStage(RenderLevelStageEvent.Stage.AFTER_LEVEL, context));
+    }
+
+    private static void postStage(RenderLevelStageEvent.Stage stage, WorldRenderContext context) {
+        com.mojang.blaze3d.vertex.PoseStack poseStack = context.matrixStack() != null ? context.matrixStack() : new com.mojang.blaze3d.vertex.PoseStack();
+        NeoForge.EVENT_BUS.post(new RenderLevelStageEvent(stage, context.worldRenderer(), poseStack, context.positionMatrix(), context.projectionMatrix(),
+              context.worldRenderer().getTicks(), context.tickCounter(), context.camera(), context.frustum()));
+    }
+
+    private static void registerClientReloadListeners(List<PreparableReloadListener> listeners) {
+        int index = 0;
+        for (PreparableReloadListener listener : listeners) {
+            ResourceLocation id = ResourceLocation.fromNamespaceAndPath("mekanism_fabric", "client_reload_listener_" + index++);
+            ResourceManagerHelper.get(PackType.CLIENT_RESOURCES).registerReloadListener(new IdentifiableResourceReloadListener() {
+                @Override
+                public ResourceLocation getFabricId() {
+                    return id;
+                }
+
+                @Override
+                public java.util.concurrent.CompletableFuture<Void> reload(PreparationBarrier barrier, ResourceManager manager, ProfilerFiller prepProfiler,
+                      ProfilerFiller applyProfiler, java.util.concurrent.Executor backgroundExecutor, java.util.concurrent.Executor gameExecutor) {
+                    return listener.reload(barrier, manager, prepProfiler, applyProfiler, backgroundExecutor, gameExecutor);
+                }
+            });
+        }
+    }
+}

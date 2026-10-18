@@ -40,6 +40,10 @@ public final class FluidIngredientTypes {
             bootstrap();
             T typeValue = input.get("type");
             if (typeValue == null) {
+                //Converted resources use Fabric's key (see build.gradle D11 transform)
+                typeValue = input.get("fabric:type");
+            }
+            if (typeValue == null) {
                 if (input.get("fluid") != null) {
                     return SingleFluidIngredient.CODEC.decode(ops, input).map(i -> i);
                 } else if (input.get("tag") != null) {

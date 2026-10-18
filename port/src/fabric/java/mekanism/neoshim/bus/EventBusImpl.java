@@ -44,6 +44,18 @@ public class EventBusImpl implements IEventBus {
 
     @Override
     public void register(Object target) {
+        if (registerFiltered(target, type -> true) == 0) {
+            throw new IllegalArgumentException(target + " has no @SubscribeEvent methods of the right kind");
+        }
+    }
+
+    /**
+     * Registers only the {@link SubscribeEvent} methods whose event type passes {@code eventFilter} (used to split @EventBusSubscriber classes
+     * between the mod and game buses).
+     *
+     * @return the number of listeners added
+     */
+    public int registerFiltered(Object target, java.util.function.Predicate<Class<?>> eventFilter) {
         List<Listener> added = new ArrayList<>();
         boolean isStatic = target instanceof Class<?>;
         Class<?> clazz = isStatic ? (Class<?>) target : target.getClass();
@@ -54,6 +66,9 @@ public class EventBusImpl implements IEventBus {
             }
             if (method.getParameterCount() != 1 || !Event.class.isAssignableFrom(method.getParameterTypes()[0])) {
                 throw new IllegalArgumentException("Invalid @SubscribeEvent method " + method);
+            }
+            if (!eventFilter.test(method.getParameterTypes()[0])) {
+                continue;
             }
             method.setAccessible(true);
             MethodHandle handle;
@@ -77,10 +92,8 @@ public class EventBusImpl implements IEventBus {
             };
             added.add(addInternal(annotation.priority(), annotation.receiveCanceled(), method.getParameterTypes()[0], consumer));
         }
-        if (added.isEmpty()) {
-            throw new IllegalArgumentException(target + " has no @SubscribeEvent methods of the right kind (static: " + isStatic + ")");
-        }
         registeredTargets.computeIfAbsent(target, t -> new CopyOnWriteArrayList<>()).addAll(added);
+        return added.size();
     }
 
     private static List<Method> collectMethods(Class<?> clazz) {

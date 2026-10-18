@@ -148,7 +148,81 @@ processResources {
     def props = ['version': project.version, 'minecraft_version': minecraft_version, 'loader_version': loader_version,
                  'fabric_version': fabric_version, 'fcap_version': fcap_version]
     inputs.properties(props)
-    filesMatching('fabric.mod.json') { expand(props) }
+    // Literal token replacement (not Groovy templating: injected interface keys contain '$')
+    filesMatching('fabric.mod.json') {
+        filter { String line -> props.inject(line) { String l, k, v -> l.replace('${' + k + '}', v.toString()) } }
+    }
     from(rootProject.file('logo.png')) { into('assets/mekanism_fabric') }
     from(rootProject.file('LICENSE')) { rename { 'LICENSE_mekanism' } }
+}
+
+// ---- NeoForge -> Fabric data JSON transform (NOTES.md D11) ----
+// Upstream's generated data uses NeoForge load conditions and NeoForge custom ingredient type keys. The committed resources stay verbatim;
+// the copies in the build output are rewritten:
+//  * "neoforge:conditions": [...]       -> "fabric:load_conditions": [...]  (conditions use "condition" instead of "type")
+//  * neoforge:mod_loaded {modid}        -> fabric:all_mods_loaded {values: [modid]}
+//  * neoforge:not {value}               -> fabric:not {value}
+//  * neoforge:and/or {values}           -> fabric:and/or {values}
+//  * neoforge:tag_empty {tag}           -> fabric:not {fabric:tags_populated {registry: item, values: [tag]}}
+//  * neoforge:true/false                -> fabric:true/false
+//  * other conditions (mekanism:*)      -> same id, registered as Fabric resource conditions by mekanism.fabric.compat.ConditionBridge
+//  * ingredient {"type": "neoforge:difference|compound|intersection|components"} -> "fabric:type" so vanilla's Fabric-patched Ingredient codec
+//    dispatches them (the shim registers serializers under those ids)
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+
+def neoIngredientTypes = ['neoforge:difference', 'neoforge:compound', 'neoforge:intersection', 'neoforge:components'] as Set
+
+def convertCondition
+convertCondition = { Map c ->
+    String type = c.type
+    switch (type) {
+        case 'neoforge:mod_loaded': return [condition: 'fabric:all_mods_loaded', values: [c.modid]]
+        case 'neoforge:not': return [condition: 'fabric:not', value: convertCondition(c.value as Map)]
+        case 'neoforge:and': return [condition: 'fabric:and', values: c.values.collect { convertCondition(it as Map) }]
+        case 'neoforge:or': return [condition: 'fabric:or', values: c.values.collect { convertCondition(it as Map) }]
+        case 'neoforge:tag_empty': return [condition: 'fabric:not', value: [condition: 'fabric:tags_populated', registry: 'minecraft:item', values: [c.tag]]]
+        case 'neoforge:true': return [condition: 'fabric:true']
+        case 'neoforge:false': return [condition: 'fabric:false']
+        default:
+            def copy = new LinkedHashMap(c)
+            copy.remove('type')
+            return [condition: type] + copy  // nested conditions stay in NeoForge format (decoded by the shim's ICondition.CODEC)
+    }
+}
+
+def transformJson
+transformJson = { Object node ->
+    if (node instanceof Map) {
+        def out = new LinkedHashMap()
+        node.each { k, v ->
+            if (k == 'neoforge:conditions') {
+                out['fabric:load_conditions'] = v.collect { convertCondition(it as Map) }
+            } else if (k == 'type' && neoIngredientTypes.contains(v)) {
+                out['fabric:type'] = v
+            } else {
+                out[k] = transformJson(v)
+            }
+        }
+        return out
+    } else if (node instanceof List) {
+        return node.collect { transformJson(it) }
+    }
+    return node
+}
+
+processResources {
+    doLast {
+        def dataDir = new File(destinationDir, 'data')
+        if (dataDir.exists()) {
+            dataDir.eachFileRecurse { File f ->
+                if (f.name.endsWith('.json')) {
+                    String text = f.getText('UTF-8')
+                    if (text.contains('neoforge:')) {
+                        f.setText(JsonOutput.toJson(transformJson(new JsonSlurper().parseText(text))), 'UTF-8')
+                    }
+                }
+            }
+        }
+    }
 }

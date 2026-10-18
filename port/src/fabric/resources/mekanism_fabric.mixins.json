@@ -7,6 +7,7 @@
     "EntityThunderHitMixin",
     "ItemPropertiesMixin",
     "LightningBoltMixin",
+    "PlayerTickMixin",
     "SlotMixin",
     "inject.BiomeInjectMixin",
     "inject.BlockBehaviour_BlockStateBaseInjectMixin",
