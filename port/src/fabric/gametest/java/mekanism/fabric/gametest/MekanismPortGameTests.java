@@ -337,4 +337,51 @@ public class MekanismPortGameTests implements FabricGameTest {
         helper.assertTrue(item == mekanism.common.registries.MekanismItems.CHEMICAL_UPGRADE.get(), "mekanism:upgrade_gas resolved to " + item);
         helper.succeed();
     }
+
+    /** Item fluid capability import: vanilla buckets (Fabric fluid storage) work as IFluidHandlerItem, including the container swap. */
+    @GameTest(template = EMPTY_STRUCTURE)
+    public void vanillaBucketsAsFluidHandlerItems(GameTestHelper helper) {
+        var drainCap = Capabilities.FluidHandler.ITEM.getCapability(new ItemStack(Items.WATER_BUCKET), null);
+        helper.assertTrue(drainCap != null, "Water bucket has no IFluidHandlerItem");
+        var drained = drainCap.drain(1000, mekanism.neoshim.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+        helper.assertTrue(drained.getAmount() == 1000 && drained.getFluid() == Fluids.WATER, "Drained " + drained.getAmount() + " of " + drained.getFluid());
+        helper.assertTrue(drainCap.getContainer().is(Items.BUCKET), "Drained container is " + drainCap.getContainer());
+        var fillCap = Capabilities.FluidHandler.ITEM.getCapability(new ItemStack(Items.BUCKET), null);
+        helper.assertTrue(fillCap != null, "Empty bucket has no IFluidHandlerItem");
+        int filled = fillCap.fill(new mekanism.neoshim.neoforge.fluids.FluidStack(Fluids.LAVA, 1000),
+              mekanism.neoshim.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+        helper.assertTrue(filled == 1000 && fillCap.getContainer().is(Items.LAVA_BUCKET), "Filled " + filled + ", container " + fillCap.getContainer());
+        helper.succeed();
+    }
+
+    /** Item capability export: a fluid tank item accepts fluid through FluidStorage.ITEM, an energy tablet charges through EnergyStorage.ITEM. */
+    @GameTest(template = EMPTY_STRUCTURE)
+    public void mekanismItemsExportFabricItemStorage(GameTestHelper helper) {
+        net.minecraft.world.SimpleContainer inventory = new net.minecraft.world.SimpleContainer(2);
+        inventory.setItem(0, new ItemStack(MekanismBlocks.BASIC_FLUID_TANK.value()));
+        inventory.setItem(1, new ItemStack(mekanism.common.registries.MekanismItems.ENERGY_TABLET.get()));
+        var slots = net.fabricmc.fabric.api.transfer.v1.item.InventoryStorage.of(inventory, null);
+        var tankContext = net.fabricmc.fabric.api.transfer.v1.context.ContainerItemContext.ofSingleSlot(slots.getSlot(0));
+        Storage<FluidVariant> tank = FluidStorage.ITEM.find(inventory.getItem(0), tankContext);
+        helper.assertTrue(tank != null, "Fluid tank item exposes no FluidStorage.ITEM");
+        try (Transaction transaction = Transaction.openOuter()) {
+            long inserted = tank.insert(FluidVariant.of(Fluids.WATER), FluidConstants.BUCKET, transaction);
+            helper.assertTrue(inserted == FluidConstants.BUCKET, "Inserted " + inserted + " droplets into the fluid tank item");
+            transaction.commit();
+        }
+        var tankHandler = Capabilities.FluidHandler.ITEM.getCapability(inventory.getItem(0), null);
+        helper.assertTrue(tankHandler != null && tankHandler.getFluidInTank(0).getAmount() == 1000, "Fluid tank item holds "
+              + (tankHandler == null ? "?" : tankHandler.getFluidInTank(0).getAmount()) + " mB after the exchange");
+        var tabletContext = net.fabricmc.fabric.api.transfer.v1.context.ContainerItemContext.ofSingleSlot(slots.getSlot(1));
+        EnergyStorage tablet = EnergyStorage.ITEM.find(inventory.getItem(1), tabletContext);
+        helper.assertTrue(tablet != null, "Energy tablet exposes no EnergyStorage.ITEM");
+        try (Transaction transaction = Transaction.openOuter()) {
+            long inserted = tablet.insert(10_000, transaction);
+            helper.assertTrue(inserted > 0, "Energy tablet accepted no energy");
+            transaction.commit();
+        }
+        mekanism.api.energy.IEnergyContainer container = mekanism.common.util.StorageUtils.getEnergyContainer(inventory.getItem(1), 0);
+        helper.assertTrue(container != null && container.getEnergy() > 0, "Energy tablet has no energy after the exchange");
+        helper.succeed();
+    }
 }

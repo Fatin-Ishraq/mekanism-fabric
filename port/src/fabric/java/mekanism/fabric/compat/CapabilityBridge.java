@@ -2,6 +2,10 @@ package mekanism.fabric.compat;
 
 import mekanism.fabric.compat.transfer.EnergyStorageAdapters;
 import mekanism.fabric.compat.transfer.FluidHandlerStorage;
+import mekanism.fabric.compat.transfer.ItemEnergyExport;
+import mekanism.fabric.compat.transfer.ItemEnergyImport;
+import mekanism.fabric.compat.transfer.ItemFluidExport;
+import mekanism.fabric.compat.transfer.ItemFluidImport;
 import mekanism.fabric.compat.transfer.ItemHandlerStorage;
 import mekanism.fabric.compat.transfer.StorageFluidHandler;
 import mekanism.fabric.compat.transfer.StorageItemHandler;
@@ -20,6 +24,7 @@ import net.fabricmc.fabric.api.transfer.v1.storage.Storage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -37,7 +42,9 @@ import team.reborn.energy.api.EnergyStorage;
  *     <li>Import: the standard block capabilities get fallback providers wrapping any foreign Fabric storage (vanilla containers included),
  *     unwrapping our own adapters to avoid chains.</li>
  * </ul>
- * Item-level (ContainerItemContext) interop is not bridged yet (NOTES.md "Stubbed / disabled").
+ * The same applies to items: Mekanism items registering the item fluid/energy capabilities get {@link FluidStorage#ITEM}/{@link EnergyStorage#ITEM} providers
+ * (changes go through {@code ContainerItemContext#exchange}), and the item capabilities fall back to foreign item storages (vanilla buckets, other mods' tanks and
+ * batteries), written back into the stack.
  */
 public final class CapabilityBridge {
 
@@ -84,6 +91,19 @@ public final class CapabilityBridge {
             }
             return storage instanceof EnergyStorageAdapters.ToTeamReborn(IEnergyStorage ours) ? ours : new EnergyStorageAdapters.FromTeamReborn(storage);
         });
+        Capabilities.FluidHandler.ITEM.lookup().registerFallback((stack, context) -> EXPORTING.get() ? null : ItemFluidImport.of(stack));
+        Capabilities.EnergyStorage.ITEM.lookup().registerFallback((stack, context) -> EXPORTING.get() ? null : ItemEnergyImport.of(stack));
+    }
+
+    @Nullable
+    private static <T> T queryItem(ItemCapability<T, Void> capability, ItemStack stack) {
+        boolean previous = EXPORTING.get();
+        EXPORTING.set(true);
+        try {
+            return capability.getCapability(stack, null);
+        } finally {
+            EXPORTING.set(previous);
+        }
     }
 
     @Nullable
@@ -138,7 +158,11 @@ public final class CapabilityBridge {
     }
 
     public static void onItemRegistered(ItemCapability<?, ?> capability, ItemLike... items) {
-        //Item-level interop (ContainerItemContext) is TODO
+        if (capability == Capabilities.FluidHandler.ITEM) {
+            FluidStorage.ITEM.registerForItems((stack, context) -> new ItemFluidExport(context, copy -> queryItem(Capabilities.FluidHandler.ITEM, copy)), items);
+        } else if (capability == Capabilities.EnergyStorage.ITEM) {
+            EnergyStorage.ITEM.registerForItems((stack, context) -> new ItemEnergyExport(context, copy -> queryItem(Capabilities.EnergyStorage.ITEM, copy)), items);
+        }
     }
 
     public static void onEntityRegistered(EntityCapability<?, ?> capability, EntityType<?> type) {
