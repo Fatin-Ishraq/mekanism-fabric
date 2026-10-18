@@ -11,7 +11,12 @@ public class ModifiableBiomeInfo {
             private final BiomeGenerationSettings.PlainBuilder generationSettings;
 
             public Builder(BiomeGenerationSettings.PlainBuilder generationSettings) {
+                this(generationSettings, new mekanism.neoshim.neoforge.common.world.MobSpawnSettingsBuilder());
+            }
+
+            public Builder(BiomeGenerationSettings.PlainBuilder generationSettings, mekanism.neoshim.neoforge.common.world.MobSpawnSettingsBuilder mobSpawnSettings) {
                 this.generationSettings = generationSettings;
+                this.mobSpawnSettings = mobSpawnSettings;
             }
 
             public BiomeGenerationSettings.PlainBuilder getGenerationSettings() {
@@ -22,7 +27,7 @@ public class ModifiableBiomeInfo {
                 return mobSpawnSettings;
             }
 
-            private final mekanism.neoshim.neoforge.common.world.MobSpawnSettingsBuilder mobSpawnSettings = new mekanism.neoshim.neoforge.common.world.MobSpawnSettingsBuilder();
+            private final mekanism.neoshim.neoforge.common.world.MobSpawnSettingsBuilder mobSpawnSettings;
         }
     }
 }

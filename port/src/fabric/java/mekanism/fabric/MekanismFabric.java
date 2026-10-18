@@ -42,7 +42,9 @@ public class MekanismFabric implements ModInitializer {
         ModuleLoader.constructModules();
 
         ModBusLifecycle.runCommonLifecycle();
-        mekanism.fabric.compat.BiomeModifierBridge.apply(FABRIC_MOD_ID);
+        for (mekanism.neoshim.fml.ModContainer mod : ModBusLifecycle.mods()) {
+            mekanism.fabric.compat.BiomeModifierBridge.apply(mod.getFabricModId());
+        }
         logRegistrationSummary();
     }
 

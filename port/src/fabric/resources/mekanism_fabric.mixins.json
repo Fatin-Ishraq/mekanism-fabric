@@ -21,6 +21,8 @@
     "PlayerHooksMixin",
     "PlayerTickMixin",
     "ResultSlotMixin",
+    "ServerConfigEarlyLoadMixin",
+    "ServerConfigEarlyUnloadMixin",
     "ServerEntityMixin",
     "ServerLevelEntityTickMixin",
     "SlotMixin",

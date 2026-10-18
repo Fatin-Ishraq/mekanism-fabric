@@ -318,4 +318,15 @@ public class MekanismPortGameTests implements FabricGameTest {
         helper.assertTrue(emission == 15, "Positional emission of a lava tank is " + emission);
         helper.succeed();
     }
+
+    /** Additions' custom biome modifier type (mekanismadditions:baby_mob_spawn) is decoded and replayed: plains spawn baby skeletons. */
+    @GameTest(template = EMPTY_STRUCTURE)
+    public void babyMobsSpawnInPlains(GameTestHelper helper) {
+        var biomes = helper.getLevel().registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        var plains = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.PLAINS);
+        boolean found = plains.getMobSettings().getMobs(net.minecraft.world.entity.MobCategory.MONSTER).unwrap().stream()
+              .anyMatch(spawner -> net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(spawner.type).toString().equals("mekanismadditions:baby_skeleton"));
+        helper.assertTrue(found, "Plains biome does not spawn Mekanism Additions baby skeletons");
+        helper.succeed();
+    }
 }
