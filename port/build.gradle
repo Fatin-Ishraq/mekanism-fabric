@@ -417,9 +417,9 @@ productionMods.transitive = false
     tasks.register(taskName, net.fabricmc.loom.task.prod.ClientProductionRunTask) {
         group = 'verification'
         dependsOn('bundleReleaseJar')
-        // The single release jar, exactly as published
-        mods.from(layout.buildDirectory.file("release/MekanismFabricated-${project.version}.jar"))
-        mods.from(productionMods)
+        // Exactly the published jar plus its dependencies. setFrom, not from: Loom's production run task pre-adds the remapJar output (the core
+        // jar without the nested modules, same mod id), and Fabric would silently load only one of the two
+        mods.setFrom(layout.buildDirectory.file("release/MekanismFabricated-${project.version}.jar"), productionMods)
         jvmArgs.add("-D${flag}=true")
         runDir = file("run/${taskName}")
     }

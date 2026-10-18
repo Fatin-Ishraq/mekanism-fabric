@@ -168,6 +168,8 @@ public final class SmokeWorldDriver {
     private static final List<String> noGui = new ArrayList<>();
     private static int guiOk = 0;
     private static volatile String lastUseResult = "";
+    /** Server tick at which the current GUI block was placed (-1 until the placement task ran). */
+    private static volatile int placedAtTick = -1;
 
     private static List<Block> collectGuiBlocks() {
         List<Block> blocks = new ArrayList<>();
@@ -190,17 +192,28 @@ public final class SmokeWorldDriver {
         }
         Block block = guiBlocks.get(guiIndex);
         if (ticks == 1) {
+            log("GUI block {}/{}: {}", guiIndex + 1, guiBlocks.size(), net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block));
             MinecraftServer server = client.getSingleplayerServer();
+            placedAtTick = -1;
             server.execute(() -> {
                 ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
                 ServerLevel level = player.serverLevel();
                 BlockPos pos = base.above(3);
                 level.setBlockAndUpdate(pos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
                 place(level, pos, block.defaultBlockState());
+                placedAtTick = server.getTickCount();
             });
         } else if (ticks == 4) {
             //Open in a later tick so the client already has the block entity (like a real player interaction)
             BlockPos checkPos = base.above(3);
+            //Block updates reach the client at the end of a server tick but an open-screen packet is sent immediately: never use the block in the server
+            // tick it was placed in (a lagging server runs queued tasks back to back), or the menu packet overtakes the block entity
+            int serverTick = client.getSingleplayerServer().getTickCount();
+            if ((placedAtTick < 0 || serverTick < placedAtTick + 2) && waitTicks < 40) {
+                ticks = 3;
+                waitTicks++;
+                return;
+            }
             BlockEntity serverBe = client.getSingleplayerServer().overworld().getBlockEntity(checkPos);
             BlockEntity clientBe = client.level.getBlockEntity(checkPos);
             if (clientBe != null && serverBe != null && (clientBe.getClass() != serverBe.getClass() || clientBe.getBlockState().getBlock() != block)) {
@@ -232,7 +245,8 @@ public final class SmokeWorldDriver {
             boolean opened = client.screen != null && isMekanismScreen(client.screen);
             //The server accepted the interaction: wait for the screen (up to 80 ticks) instead of assuming fixed latency, so a slow server tick cannot make
             // the driver replace the block while the open-screen packet is still in flight
-            if (!opened && lastUseResult != null && lastUseResult.startsWith("CONSUME") && guiWaitTicks < 80) {
+            //Still pending (the server has not run the interaction yet) or accepted: wait for the screen
+            if (!opened && lastUseResult != null && (lastUseResult.isEmpty() || lastUseResult.startsWith("CONSUME")) && guiWaitTicks < 80) {
                 guiWaitTicks++;
                 ticks = 15;
                 return;
