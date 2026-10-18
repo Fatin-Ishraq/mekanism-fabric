@@ -75,6 +75,9 @@ public final class ClientBridge {
                     mekanism.common.Mekanism.logger.info("[Fabric port] Smoke test: resource loading finished, showing {}; stopping client",
                           client.screen.getClass().getSimpleName());
                     logMissingModels(client);
+                    //Force every mixin to apply now so broken injectors fail the smoke test instead of a later play session
+                    org.spongepowered.asm.mixin.MixinEnvironment.getCurrentEnvironment().audit();
+                    mekanism.common.Mekanism.logger.info("[Fabric port] Smoke test: mixin audit complete");
                     client.stop();
                 }
             });
@@ -82,6 +85,15 @@ public final class ClientBridge {
 
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(mekanism.fabric.datamaps.DataMapLoader.SyncPayload.TYPE,
               (payload, context) -> mekanism.fabric.datamaps.DataMapLoader.applySync(payload.data(), context.client().getConnection().registryAccess()));
+
+        net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback.EVENT.register(shaderContext -> {
+            try {
+                modBus.post(new mekanism.neoshim.neoforge.client.event.RegisterShadersEvent(shaderContext));
+            } catch (RuntimeException e) {
+                mekanism.common.Mekanism.logger.error("[Fabric port] Failed to register shaders", e);
+            }
+        });
+        registerFluidRenderHandlers();
 
         // Game-bus bridges
         ClientTickEvents.START_CLIENT_TICK.register(client -> bus.post(new ClientTickEvent.Pre()));
@@ -104,6 +116,17 @@ public final class ClientBridge {
                 }
             }
         });
+        WorldRenderEvents.BLOCK_OUTLINE.register((worldContext, outlineContext) -> {
+            if (Minecraft.getInstance().hitResult instanceof net.minecraft.world.phys.BlockHitResult blockHit) {
+                com.mojang.blaze3d.vertex.PoseStack poseStack = worldContext.matrixStack() != null ? worldContext.matrixStack() : new com.mojang.blaze3d.vertex.PoseStack();
+                return !mekanism.neoshim.neoforge.client.ClientHooks.onDrawHighlight(worldContext.worldRenderer(), worldContext.camera(), blockHit,
+                      worldContext.tickCounter(), poseStack, worldContext.consumers());
+            }
+            return true;
+        });
+        net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.AFTER_INIT.register((client, screen, width, height) ->
+              net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.afterRender(screen).register((s, graphics, mouseX, mouseY, partialTick) ->
+                    bus.post(new mekanism.neoshim.neoforge.client.event.ScreenEvent.Render.Post(s, graphics, mouseX, mouseY, partialTick))));
         WorldRenderEvents.AFTER_ENTITIES.register(context -> postStage(RenderLevelStageEvent.Stage.AFTER_ENTITIES, context));
         WorldRenderEvents.AFTER_TRANSLUCENT.register(context -> postStage(RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS, context));
         WorldRenderEvents.LAST.register(context -> postStage(RenderLevelStageEvent.Stage.AFTER_LEVEL, context));
@@ -118,6 +141,23 @@ public final class ClientBridge {
             RegisterClientReloadListenersEvent reloadListeners = new RegisterClientReloadListenersEvent();
             modBus.post(reloadListeners);
             reloadListeners.getListeners().forEach(resourceManager::registerReloadListener);
+        }
+    }
+
+    /** World rendering of fluids with NeoForge client fluid type extensions (textures + tint). */
+    private static void registerFluidRenderHandlers() {
+        for (net.minecraft.world.level.material.Fluid fluid : net.minecraft.core.registries.BuiltInRegistries.FLUID) {
+            if (!(fluid instanceof mekanism.neoshim.neoforge.fluids.BaseFlowingFluid flowing)) {
+                continue;
+            }
+            mekanism.neoshim.neoforge.client.extensions.common.IClientFluidTypeExtensions extensions =
+                  mekanism.neoshim.neoforge.client.extensions.common.RegisterClientExtensionsEvent.FLUID_TYPES.get(flowing.getFluidType());
+            if (extensions == null || extensions.getStillTexture() == null) {
+                continue;
+            }
+            net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandlerRegistry.INSTANCE.register(fluid,
+                  new net.fabricmc.fabric.api.client.render.fluid.v1.SimpleFluidRenderHandler(extensions.getStillTexture(), extensions.getFlowingTexture(),
+                        extensions.getOverlayTexture(), extensions.getTintColor()));
         }
     }
 

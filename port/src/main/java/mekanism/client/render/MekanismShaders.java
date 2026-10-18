@@ -30,7 +30,7 @@ public class MekanismShaders {
     }
 
     private static void registerShader(RegisterShadersEvent event, ResourceLocation shaderLocation, VertexFormat vertexFormat, ShaderTracker tracker) throws IOException {
-        event.registerShader(new ShaderInstance(event.getResourceProvider(), shaderLocation.toString(), vertexFormat)/*FABRIC: Fabric resolves namespaced shader names*/, tracker::setInstance);
+        event.registerShader(shaderLocation, vertexFormat, tracker::setInstance);//FABRIC: Fabric creates the ShaderInstance from the id (CoreShaderRegistrationCallback)
     }
 
     static class ShaderTracker implements Supplier<ShaderInstance> {

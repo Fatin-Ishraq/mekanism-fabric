@@ -1,28 +1,28 @@
 package mekanism.neoshim.neoforge.client.event;
 
-import java.util.List;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import java.io.IOException;
 import java.util.function.Consumer;
 import mekanism.neoshim.bus.api.Event;
 import mekanism.neoshim.fml.event.IModBusEvent;
+import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback;
 import net.minecraft.client.renderer.ShaderInstance;
-import net.minecraft.server.packs.resources.ResourceProvider;
-import com.mojang.datafixers.util.Pair;
+import net.minecraft.resources.ResourceLocation;
 
+/**
+ * Fired from Fabric's CoreShaderRegistrationCallback. NeoForge's variant takes a pre-built ShaderInstance; on Fabric the shader is created
+ * by Fabric from its id, so callers use {@link #registerShader(ResourceLocation, VertexFormat, Consumer)} (see the //FABRIC edit in
+ * MekanismShaders).
+ */
 public class RegisterShadersEvent extends Event implements IModBusEvent {
 
-    private final ResourceProvider resourceProvider;
-    private final List<Pair<ShaderInstance, Consumer<ShaderInstance>>> shaderList;
+    private final CoreShaderRegistrationCallback.RegistrationContext context;
 
-    public RegisterShadersEvent(ResourceProvider resourceProvider, List<Pair<ShaderInstance, Consumer<ShaderInstance>>> shaderList) {
-        this.resourceProvider = resourceProvider;
-        this.shaderList = shaderList;
+    public RegisterShadersEvent(CoreShaderRegistrationCallback.RegistrationContext context) {
+        this.context = context;
     }
 
-    public ResourceProvider getResourceProvider() {
-        return resourceProvider;
-    }
-
-    public void registerShader(ShaderInstance shaderInstance, Consumer<ShaderInstance> onLoaded) {
-        shaderList.add(Pair.of(shaderInstance, onLoaded));
+    public void registerShader(ResourceLocation id, VertexFormat vertexFormat, Consumer<ShaderInstance> onLoaded) throws IOException {
+        context.register(id, vertexFormat, onLoaded);
     }
 }
