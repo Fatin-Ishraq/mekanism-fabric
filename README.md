@@ -26,8 +26,8 @@ Requirements:
 * [Fabric API](https://modrinth.com/mod/fabric-api)
 * [Forge Config API Port](https://modrinth.com/mod/forge-config-api-port) **21.1.6** or newer (provides Mekanism's config system)
 
-Put `Mekanism-Fabric-Unofficial-*.jar` in your `mods` folder, plus any of the module jars you want (`MekanismGenerators-…`, `MekanismAdditions-…`,
-`MekanismTools-…`); the modules need the main jar. Team Reborn Energy is bundled.
+Put `MekanismFabricated-*.jar` in your `mods` folder. It is a single jar that contains Mekanism, Generators, Additions and Tools. Team Reborn
+Energy is bundled.
 
 Block, item and recipe ids stay in the `mekanism` namespace, so datapacks and scripts written for Mekanism keep working. The Fabric mod id is
 `mekanism_fabric` (it also provides `mekanism`).
@@ -60,7 +60,7 @@ cd port
 ./gradlew build
 ```
 
-The jars are written to `port/build/libs/`.
+The release jar is written to `port/build/release/` (the four individual mod jars it bundles are in `port/build/libs/`).
 
 ## How it is tested
 

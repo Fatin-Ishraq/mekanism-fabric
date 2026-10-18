@@ -416,9 +416,9 @@ productionMods.transitive = false
 ['prodSmokeClient': 'mekanism_fabric.smokeTest', 'prodSmokeWorld': 'mekanism_fabric.smokeWorld'].each { taskName, flag ->
     tasks.register(taskName, net.fabricmc.loom.task.prod.ClientProductionRunTask) {
         group = 'verification'
-        dependsOn('build', bridgeReleaseJars)
-        mods.from(tasks.named('remapJar'))
-        mekModules.each { mods.from(tasks.named("remap${it.capitalize()}Jar")) }
+        dependsOn('bundleReleaseJar')
+        // The single release jar, exactly as published
+        mods.from(layout.buildDirectory.file("release/MekanismFabricated-${project.version}.jar"))
         mods.from(productionMods)
         jvmArgs.add("-D${flag}=true")
         runDir = file("run/${taskName}")
@@ -522,3 +522,41 @@ def checkRemappedImplementations = tasks.register('checkRemappedImplementations'
     }
 }
 tasks.named('check') { dependsOn(checkRemappedImplementations) }
+
+// The published artifact: one jar. Generators, Additions and Tools are nested in the core jar (Fabric jar-in-jar), so they still load as their own mods.
+def bundleReleaseJar = tasks.register('bundleReleaseJar') {
+    group = 'build'
+    description = 'Builds the single release jar (core with the module jars nested)'
+    dependsOn(bridgeReleaseJars)
+    def output = layout.buildDirectory.file("release/MekanismFabricated-${project.version}.jar")
+    outputs.file(output)
+    outputs.upToDateWhen { false }
+    doLast {
+        def core = tasks.named('remapJar').get().archiveFile.get().asFile
+        def modules = mekModules.collect { tasks.named("remap${it.capitalize()}Jar").get().archiveFile.get().asFile }
+        def target = output.get().asFile
+        target.parentFile.mkdirs()
+        new java.util.zip.ZipFile(core).withCloseable { zin ->
+            new java.util.zip.ZipOutputStream(new FileOutputStream(target)).withCloseable { zout ->
+                zin.entries().each { entry ->
+                    zout.putNextEntry(new java.util.zip.ZipEntry(entry.name))
+                    if (entry.name == 'fabric.mod.json') {
+                        def json = new groovy.json.JsonSlurper().parse(zin.getInputStream(entry), 'UTF-8')
+                        json.jars = (json.jars ?: []) + modules.collect { [file: "META-INF/jars/${it.name}".toString()] }
+                        zout.write(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(json)).getBytes('UTF-8'))
+                    } else if (!entry.isDirectory()) {
+                        zout << zin.getInputStream(entry)
+                    }
+                    zout.closeEntry()
+                }
+                modules.each { module ->
+                    zout.putNextEntry(new java.util.zip.ZipEntry("META-INF/jars/${module.name}"))
+                    zout << module.bytes
+                    zout.closeEntry()
+                }
+            }
+        }
+        logger.lifecycle("Release jar: ${target}")
+    }
+}
+tasks.named('build') { dependsOn(bundleReleaseJar) }
