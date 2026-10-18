@@ -29,9 +29,9 @@ repositories {
 
 dependencies {
     //Query the version of GSON and JSpecify used by the version of MC that we are developing for to ensure no extra files have to be downloaded
-    implementation(platform("net.neoforged:minecraft-dependencies:${project.minecraft_version}"))
-    implementation('org.jspecify:jspecify')
-    implementation('com.google.code.gson:gson')
+    //FABRIC: pinned versions instead of NeoForge's minecraft-dependencies platform (not resolvable from the Fabric build)
+    implementation('org.jspecify:jspecify:1.0.0')
+    implementation('com.google.code.gson:gson:2.13.2')
 
     implementation('org.openzen.zencode:JavaAnnotations:0.3.8')
     implementation('com.palantir.javapoet:javapoet:0.14.0')
