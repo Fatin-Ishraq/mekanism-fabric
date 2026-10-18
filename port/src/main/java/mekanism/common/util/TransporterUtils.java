@@ -4,7 +4,6 @@ import mekanism.api.RelativeSide;
 import mekanism.api.text.EnumColor;
 import mekanism.common.capabilities.Capabilities;
 import mekanism.common.content.network.transmitter.LogisticalTransporterBase;
-import mekanism.common.content.transporter.TransporterManager;
 import mekanism.common.content.transporter.TransporterStack;
 import mekanism.common.lib.inventory.IAdvancedTransportEjector;
 import mekanism.common.lib.transmitter.TransmissionType;
@@ -12,13 +11,15 @@ import mekanism.common.tile.interfaces.ISideConfiguration;
 import mekanism.common.tile.transmitter.TileEntityTransmitter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.util.Mth;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import mekanism.neoshim.neoforge.items.IItemHandler;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.TransferPreconditions;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
+import org.joml.Vector3f;
 
 public final class TransporterUtils {
 
@@ -48,6 +49,7 @@ public final class TransporterUtils {
         return Capabilities.ITEM.getCapabilityIfLoaded(level, pos, null, tile, side) != null;
     }
 
+    @Nullable
     public static EnumColor increment(@Nullable EnumColor color) {
         if (color == null) {
             return EnumUtils.COLORS[0];
@@ -57,6 +59,7 @@ public final class TransporterUtils {
         return color.getNext();
     }
 
+    @Nullable
     public static EnumColor decrement(@Nullable EnumColor color) {
         if (color == null) {
             return EnumUtils.COLORS[EnumUtils.COLORS.length - 1];
@@ -64,31 +67,26 @@ public final class TransporterUtils {
         return color.ordinal() == 0 ? null : color.getPrevious();
     }
 
-    public static void drop(LogisticalTransporterBase transporter, TransporterStack stack) {
-        BlockPos blockPos;
-        if (stack.hasPath()) {
-            float[] pos = getStackPosition(transporter, stack, 0);
-            blockPos = transporter.getBlockPos().offset(Mth.floor(pos[0]), Mth.floor(pos[1]), Mth.floor(pos[2]));
-        } else {
-            blockPos = transporter.getBlockPos();
-        }
-        TransporterManager.remove(transporter.getLevel(), stack);
-        InventoryUtils.dropStack(transporter.getLevel(), blockPos, null, stack.itemStack, (level, pos, ignored, item) -> Block.popResource(level, pos, item));
+    public static Vector3f getStackPosition(LogisticalTransporterBase transporter, TransporterStack stack, float partial) {
+        return stack.getSide(transporter)
+              .step()//Note: Direction#step returns a new Vector3f
+              .mul(((stack.progress + partial) / 100F) - 0.5F)
+              .add(0.5F, 0.25F, 0.5F);
     }
 
-    public static float[] getStackPosition(LogisticalTransporterBase transporter, TransporterStack stack, float partial) {
-        Direction side = stack.getSide(transporter);
-        float progress = ((stack.progress + partial) / 100F) - 0.5F;
-        return new float[]{0.5F + side.getStepX() * progress, 0.25F + side.getStepY() * progress, 0.5F + side.getStepZ() * progress};
+    public static boolean canInsert(Level level, BlockPos pos, @Nullable EnumColor color, ItemResource itemType, int itemAmount, Direction side, boolean force,
+          @Nullable TransactionContext transaction) {
+        return canInsert(level, pos, WorldUtils.getTileEntity(level, pos), color, itemType, itemAmount, side, force, transaction);
     }
 
-    public static boolean canInsert(Level level, BlockPos pos, EnumColor color, ItemStack itemStack, Direction side, boolean force) {
-        return canInsert(level, pos, WorldUtils.getTileEntity(level, pos), color, itemStack, side, force);
-    }
-
-    public static boolean canInsert(Level level, BlockPos pos, @Nullable BlockEntity tile, EnumColor color, ItemStack itemStack, Direction side, boolean force) {
-        if (force && tile instanceof IAdvancedTransportEjector sorter) {
-            return sorter.canSendHome(itemStack);
+    public static boolean canInsert(Level level, BlockPos pos, @Nullable BlockEntity tile, @Nullable EnumColor color, ItemResource itemType, int itemAmount, Direction side,
+          boolean force, @Nullable TransactionContext transaction) {
+        TransferPreconditions.checkNonEmptyNonNegative(itemType, itemAmount);
+        if (itemAmount == 0) {
+            //Note: Theoretically this should never be zero when passed, but if it is, just return that it can be inserted as there is nothing to insert
+            return true;
+        } else if (force && tile instanceof IAdvancedTransportEjector sorter) {
+            return sorter.canSendHome(level, itemType, itemAmount, transaction);
         }
         if (!force && tile instanceof ISideConfiguration config && config.getEjector().hasStrictInput()) {
             Direction tileSide = config.getDirection();
@@ -97,16 +95,13 @@ public final class TransporterUtils {
                 return false;
             }
         }
-        IItemHandler inventory = Capabilities.ITEM.getCapabilityIfLoaded(level, pos, null, tile, side.getOpposite());
-        if (inventory != null) {
-            for (int i = 0, slots = inventory.getSlots(); i < slots; i++) {
-                // Simulate insert, this will handle validating the item is valid for the inventory
-                ItemStack rejects = inventory.insertItem(i, itemStack, true);
-                if (TransporterManager.didEmit(itemStack, rejects)) {
-                    return true;
-                }
-            }
+        ResourceHandler<ItemResource> inventory = Capabilities.ITEM.getCapabilityIfLoaded(level, pos, null, tile, side.getOpposite());
+        if (inventory == null) {
+            return false;
         }
-        return false;
+        try (Transaction simulation = Transaction.open(transaction)) {
+            //Simulate insert, this will handle validating the item is valid for the inventory, and that at least some of it can be accepted
+            return inventory.insert(itemType, itemAmount, simulation) > 0;
+        }
     }
 }

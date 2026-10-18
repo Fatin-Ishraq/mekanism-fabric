@@ -2,6 +2,7 @@ package mekanism.common.registries;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
+import java.util.Objects;
 import mekanism.api.functions.ConstantPredicates;
 import mekanism.api.security.IBlockSecurityUtils;
 import mekanism.common.Mekanism;
@@ -12,7 +13,6 @@ import mekanism.common.block.prefab.BlockFactoryMachine.BlockFactory;
 import mekanism.common.capabilities.Capabilities;
 import mekanism.common.content.blocktype.FactoryType;
 import mekanism.common.integration.computer.ComputerCapabilityHelper;
-import mekanism.common.integration.energy.EnergyCompatUtils;
 import mekanism.common.item.block.ItemBlockChemicalTank;
 import mekanism.common.item.block.machine.ItemBlockFactory;
 import mekanism.common.registration.impl.BlockRegistryObject;
@@ -558,8 +558,8 @@ public class MekanismTileEntityTypes {
     }
 
     private static TileEntityTypeRegistryObject<TileEntityUniversalCable> registerCable(DeferredHolder<Block, ?> block) {
-        BlockEntityTypeBuilder<TileEntityUniversalCable> builder = transmitterBuilder(block, TileEntityUniversalCable::new);
-        EnergyCompatUtils.addBlockCapabilities(builder);
+        BlockEntityTypeBuilder<TileEntityUniversalCable> builder = transmitterBuilder(block, TileEntityUniversalCable::new)
+              .with(Capabilities.ENERGY.block(), CapabilityTileEntity.ENERGY_HANDLER_PROVIDER);
         if (Mekanism.hooks.computerCompatEnabled()) {
             ComputerCapabilityHelper.addComputerCapabilities(builder, ConstantPredicates.ALWAYS_TRUE);
         }
@@ -646,12 +646,7 @@ public class MekanismTileEntityTypes {
     public static final TileEntityTypeRegistryObject<TileEntityInductionProvider> ULTIMATE_INDUCTION_PROVIDER = TILE_ENTITY_TYPES.builder(MekanismBlocks.ULTIMATE_INDUCTION_PROVIDER, (pos, state) -> new TileEntityInductionProvider(MekanismBlocks.ULTIMATE_INDUCTION_PROVIDER, pos, state)).build();
 
     public static TileEntityTypeRegistryObject<? extends TileEntityFactory<?>> getFactoryTile(FactoryTier tier, FactoryType type) {
-        return FACTORIES.get(tier, type);
-    }
-
-    @SuppressWarnings("unchecked")
-    public static TileEntityTypeRegistryObject<? extends TileEntityFactory<?>>[] getFactoryTiles() {
-        return FACTORIES.values().toArray(new TileEntityTypeRegistryObject[0]);
+        return Objects.requireNonNull(FACTORIES.get(tier, type));
     }
 
     @FunctionalInterface

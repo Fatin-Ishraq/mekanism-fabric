@@ -3,9 +3,10 @@ package mekanism.common.content.network.transmitter;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import mekanism.api.Chunk3D;
 import mekanism.api.SerializationConstants;
 import mekanism.api.text.EnumColor;
 import mekanism.common.MekanismLang;
@@ -14,25 +15,24 @@ import mekanism.common.lib.transmitter.ConnectionType;
 import mekanism.common.lib.transmitter.DynamicNetwork;
 import mekanism.common.lib.transmitter.TransmissionType;
 import mekanism.common.lib.transmitter.TransmitterNetworkRegistry;
-import mekanism.common.lib.transmitter.acceptor.AbstractAcceptorCache;
+import mekanism.common.lib.transmitter.acceptor.AcceptorCache;
 import mekanism.common.tile.interfaces.ITileWrapper;
 import mekanism.common.tile.transmitter.TileEntityTransmitter;
 import mekanism.common.util.EnumUtils;
-import mekanism.common.util.NBTUtils;
 import mekanism.common.util.WorldUtils;
 import mekanism.common.util.text.BooleanStateDisplay.OnOff;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.GlobalPos;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
 public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEPTOR, NETWORK, TRANSMITTER>,
       TRANSMITTER extends Transmitter<ACCEPTOR, NETWORK, TRANSMITTER>> implements ITileWrapper {
@@ -72,7 +72,7 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
 
     private ConnectionType[] connectionTypes = {ConnectionType.NORMAL, ConnectionType.NORMAL, ConnectionType.NORMAL, ConnectionType.NORMAL, ConnectionType.NORMAL,
                                                 ConnectionType.NORMAL};
-    private final AbstractAcceptorCache<ACCEPTOR, ?> acceptorCache;
+    private final AcceptorCache<ACCEPTOR> acceptorCache;
     public byte currentTransmitterConnections = 0x00;
     protected boolean hasPullSide = false;
 
@@ -81,6 +81,7 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
     protected boolean redstoneReactive;
     private boolean redstonePowered;
     private boolean redstoneSet;
+    @Nullable
     private NETWORK theNetwork = null;
     private boolean orphaned = true;
     private boolean isUpgrading;
@@ -92,9 +93,9 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         Collections.addAll(supportedTransmissionTypes, transmissionTypes);
     }
 
-    protected abstract AbstractAcceptorCache<ACCEPTOR, ?> createAcceptorCache();
+    protected abstract AcceptorCache<ACCEPTOR> createAcceptorCache();
 
-    public AbstractAcceptorCache<ACCEPTOR, ?> getAcceptorCache() {
+    public AcceptorCache<ACCEPTOR> getAcceptorCache() {
         return acceptorCache;
     }
 
@@ -106,14 +107,12 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         return isUpgrading;
     }
 
-    /**
-     * @apiNote Don't use this to directly modify the backing array, use the helper set methods.
-     */
+    /// @apiNote Don't use this to directly modify the backing array, use the helper set methods.
     public ConnectionType[] getConnectionTypesRaw() {
         return connectionTypes;
     }
 
-    public void setConnectionTypesRaw(@NotNull ConnectionType[] connectionTypes) {
+    public void setConnectionTypesRaw(ConnectionType[] connectionTypes) {
         if (this.connectionTypes.length != connectionTypes.length) {
             throw new IllegalArgumentException("Mismatched connection types length");
         }
@@ -121,8 +120,8 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         this.hasPullSide = recalculateHasPull(connectionTypes);
     }
 
-    private boolean recalculateHasPull(@NotNull ConnectionType @NotNull [] connectionTypes) {
-        for (@NotNull ConnectionType connectionType : connectionTypes) {
+    private boolean recalculateHasPull(ConnectionType [] connectionTypes) {
+        for (ConnectionType connectionType : connectionTypes) {
             if (connectionType == ConnectionType.PULL) {
                 return true;
             }
@@ -130,11 +129,11 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         return false;
     }
 
-    public ConnectionType getConnectionTypeRaw(@NotNull Direction side) {
+    public ConnectionType getConnectionTypeRaw(Direction side) {
         return connectionTypes[side.ordinal()];
     }
 
-    public void setConnectionTypeRaw(@NotNull Direction side, @NotNull ConnectionType type) {
+    public void setConnectionTypeRaw(Direction side, ConnectionType type) {
         int index = side.ordinal();
         ConnectionType old = connectionTypes[index];
         if (old != type) {
@@ -157,6 +156,7 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         return transmitterTile.getWorldPositionLong();
     }
 
+    @Nullable
     @Override
     public Level getLevel() {
         return transmitterTile.getLevel();
@@ -167,11 +167,6 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         return transmitterTile.getTileGlobalPos();
     }
 
-    @Override
-    public Chunk3D getTileChunk() {
-        return transmitterTile.getTileChunk();
-    }
-
     public boolean isRemote() {
         return transmitterTile.isRemote();
     }
@@ -180,31 +175,33 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         return (TRANSMITTER) this;
     }
 
-    /**
-     * Gets the network currently in use by this transmitter segment.
-     *
-     * @return network this transmitter is using
-     */
+    /// Gets the network currently in use by this transmitter segment.
+    ///
+    /// @return network this transmitter is using
+    @Nullable
     public NETWORK getTransmitterNetwork() {
         return theNetwork;
     }
 
-    /**
-     * Sets this transmitter segment's network to a new value.
-     *
-     * @param network - network to set to
-     */
-    public void setTransmitterNetwork(NETWORK network) {
+    /// Gets the network currently in use by this transmitter segment.
+    ///
+    /// @return network this transmitter is using
+    public NETWORK getTransmitterNetworkNN() {
+        return Objects.requireNonNull(getTransmitterNetwork());
+    }
+
+    /// Sets this transmitter segment's network to a new value.
+    ///
+    /// @param network network to set to
+    public void setTransmitterNetwork(@Nullable NETWORK network) {
         setTransmitterNetwork(network, true);
     }
 
-    /**
-     * Sets this transmitter segment's network to a new value.
-     *
-     * @param network    - network to set to
-     * @param requestNow - Force a request now if not the return value will be if a request is needed
-     */
-    public boolean setTransmitterNetwork(NETWORK network, boolean requestNow) {
+    /// Sets this transmitter segment's network to a new value.
+    ///
+    /// @param network    network to set to
+    /// @param requestNow Force a request now if not the return value will be if a request is needed
+    public boolean setTransmitterNetwork(@Nullable NETWORK network, boolean requestNow) {
         if (theNetwork == network) {
             return false;
         }
@@ -251,11 +248,9 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         orphaned = nowOrphaned;
     }
 
-    /**
-     * Get the transmitter's transmission types
-     *
-     * @return TransmissionType this transmitter uses
-     */
+    /// Get the transmitter's transmission types
+    ///
+    /// @return TransmissionType this transmitter uses
     public Set<TransmissionType> getSupportedTransmissionTypes() {
         return supportedTransmissionTypes;
     }
@@ -287,9 +282,7 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         return false;
     }
 
-    /**
-     * @apiNote Only call this from the server side
-     */
+    /// @apiNote Only call this from the server side
     public byte getPossibleTransmitterConnections() {
         byte connections = 0x00;
         if (isRedstoneActivated()) {
@@ -307,9 +300,7 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         return connections;
     }
 
-    /**
-     * @apiNote Only call this from the server side
-     */
+    /// @apiNote Only call this from the server side
     private boolean getPossibleAcceptorConnection(Direction side, boolean markDirty) {
         if (isRedstoneActivated()) {
             return false;
@@ -326,9 +317,7 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         return false;
     }
 
-    /**
-     * @apiNote Only call this from the server side
-     */
+    /// @apiNote Only call this from the server side
     private boolean getPossibleTransmitterConnection(Direction side) {
         if (isRedstoneActivated()) {
             return false;
@@ -337,9 +326,7 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         return tile != null && isValidTransmitter(tile, side);
     }
 
-    /**
-     * @apiNote Only call this from the server side
-     */
+    /// @apiNote Only call this from the server side
     public byte getPossibleAcceptorConnections() {
         byte connections = 0x00;
         if (isRedstoneActivated()) {
@@ -384,9 +371,7 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         return getConnectionTypeRaw(side).canSendTo();
     }
 
-    /**
-     * @apiNote Only call this from the server side
-     */
+    /// @apiNote Only call this from the server side
     protected boolean isValidAcceptor(@Nullable BlockEntity tile, Direction side) {
         //If it isn't a transmitter or the transmission type is different from the one the transmitter has
         if (!(tile instanceof TileEntityTransmitter transmitter) || !supportsTransmissionType(transmitter)) {
@@ -427,38 +412,32 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         return true;
     }
 
-    /**
-     * Only call on the server
-     */
+    /// Only call on the server
     public void requestsUpdate() {
         getTransmitterTile().sendUpdatePacket();
     }
 
-    @NotNull
-    public CompoundTag getReducedUpdateTag(@NotNull HolderLookup.Provider provider, CompoundTag updateTag) {
-        updateTag.putByte(SerializationConstants.CURRENT_CONNECTIONS, currentTransmitterConnections);
-        updateTag.putByte(SerializationConstants.CURRENT_ACCEPTORS, acceptorCache.currentAcceptorConnections);
-        updateTag.putIntArray(SerializationConstants.CONNECTION, getRawConnections());
+    public void writeReducedUpdatedTag(ValueOutput output) {
+        output.putByte(SerializationConstants.CURRENT_CONNECTIONS, currentTransmitterConnections);
+        output.putByte(SerializationConstants.CURRENT_ACCEPTORS, acceptorCache.currentAcceptorConnections);
+        output.putIntArray(SerializationConstants.CONNECTION, getRawConnections());
         //Transmitter
         if (hasTransmitterNetwork()) {
-            updateTag.putUUID(SerializationConstants.NETWORK, getTransmitterNetwork().getUUID());
+            output.store(SerializationConstants.NETWORK, UUIDUtil.CODEC, getTransmitterNetworkNN().getUUID());
         }
-        return updateTag;
     }
 
-    /**
-     * @return true if the model data was changed by this update
-     */
-    public boolean handleUpdateTag(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider provider) {
+    /// @return true if the model data was changed by this update
+    public boolean handleUpdateTag(ValueInput input) {
         boolean refreshModelData = false;
         ConnectionType[] oldConnectionData = new ConnectionType[EnumUtils.DIRECTIONS.length];
         for (Direction side : EnumUtils.DIRECTIONS) {
             oldConnectionData[side.ordinal()] = getConnectionType(side);
         }
 
-        NBTUtils.setByteIfPresent(tag, SerializationConstants.CURRENT_CONNECTIONS, connections -> currentTransmitterConnections = connections);
-        NBTUtils.setByteIfPresent(tag, SerializationConstants.CURRENT_ACCEPTORS, acceptors -> acceptorCache.currentAcceptorConnections = acceptors);
-        readRawConnections(tag);
+        currentTransmitterConnections = input.getByteOr(SerializationConstants.CURRENT_CONNECTIONS, currentTransmitterConnections);
+        acceptorCache.currentAcceptorConnections = input.getByteOr(SerializationConstants.CURRENT_ACCEPTORS, acceptorCache.currentAcceptorConnections);
+        readRawConnections(input);
 
         for (Direction side : EnumUtils.DIRECTIONS) {
             //If the visible connection data changed, mark that we need to update the model data
@@ -469,9 +448,10 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         }
 
         //Transmitter
-        if (tag.hasUUID(SerializationConstants.NETWORK)) {
-            UUID networkID = tag.getUUID(SerializationConstants.NETWORK);
-            if (hasTransmitterNetwork() && getTransmitterNetwork().getUUID().equals(networkID)) {
+        Optional<UUID> optionalNetworkID = input.read(SerializationConstants.NETWORK, UUIDUtil.CODEC);
+        if (optionalNetworkID.isPresent()) {
+            UUID networkID = optionalNetworkID.get();
+            if (hasTransmitterNetwork() && getTransmitterNetworkNN().getUUID().equals(networkID)) {
                 //Nothing needs to be done to update the client network
                 return refreshModelData;
             }
@@ -480,7 +460,7 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
                 NETWORK network = createEmptyNetworkWithID(networkID);
                 network.register();
                 setTransmitterNetwork(network);
-                handleContentsUpdateTag(network, tag, provider);
+                handleContentsUpdateTag(network, input);
             } else {
                 //TODO: Validate network type?
                 updateClientNetwork((NETWORK) clientNetwork);
@@ -491,28 +471,26 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         return refreshModelData;
     }
 
-    protected void updateClientNetwork(@NotNull NETWORK network) {
+    protected void updateClientNetwork(NETWORK network) {
         network.register();
         setTransmitterNetwork(network);
     }
 
-    protected void handleContentsUpdateTag(@NotNull NETWORK network, @NotNull CompoundTag tag, @NotNull HolderLookup.Provider provider) {
+    protected void handleContentsUpdateTag(NETWORK network, ValueInput input) {
     }
 
-    public void read(HolderLookup.Provider provider, @NotNull CompoundTag nbtTags) {
-        redstoneReactive = nbtTags.getBoolean(SerializationConstants.REDSTONE);
-        NBTUtils.setByteIfPresent(nbtTags, SerializationConstants.CURRENT_CONNECTIONS, connections -> currentTransmitterConnections = connections);
-        NBTUtils.setByteIfPresent(nbtTags, SerializationConstants.CURRENT_ACCEPTORS, acceptors -> acceptorCache.currentAcceptorConnections = acceptors);
-        readRawConnections(nbtTags);
+    public void read(ValueInput input) {
+        redstoneReactive = input.getBooleanOr(SerializationConstants.REDSTONE, redstoneReactive);
+        currentTransmitterConnections = input.getByteOr(SerializationConstants.CURRENT_CONNECTIONS, currentTransmitterConnections);
+        acceptorCache.currentAcceptorConnections = input.getByteOr(SerializationConstants.CURRENT_ACCEPTORS, acceptorCache.currentAcceptorConnections);
+        readRawConnections(input);
     }
 
-    @NotNull
-    public CompoundTag write(HolderLookup.Provider provider, @NotNull CompoundTag nbtTags) {
-        nbtTags.putBoolean(SerializationConstants.REDSTONE, redstoneReactive);
-        nbtTags.putByte(SerializationConstants.CURRENT_CONNECTIONS, currentTransmitterConnections);
-        nbtTags.putByte(SerializationConstants.CURRENT_ACCEPTORS, acceptorCache.currentAcceptorConnections);
-        nbtTags.putIntArray(SerializationConstants.CONNECTION, getRawConnections());
-        return nbtTags;
+    public void write(ValueOutput output) {
+        output.putBoolean(SerializationConstants.REDSTONE, redstoneReactive);
+        output.putByte(SerializationConstants.CURRENT_CONNECTIONS, currentTransmitterConnections);
+        output.putByte(SerializationConstants.CURRENT_ACCEPTORS, acceptorCache.currentAcceptorConnections);
+        output.putIntArray(SerializationConstants.CONNECTION, getRawConnections());
     }
 
     private int[] getRawConnections() {
@@ -523,9 +501,10 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         return raw;
     }
 
-    private void readRawConnections(CompoundTag tag) {
-        if (tag.contains(SerializationConstants.CONNECTION, Tag.TAG_INT_ARRAY)) {
-            int[] raw = tag.getIntArray(SerializationConstants.CONNECTION);
+    private void readRawConnections(ValueInput input) {
+        Optional<int[]> optionalRaw = input.getIntArray(SerializationConstants.CONNECTION);
+        if (optionalRaw.isPresent()) {
+            int[] raw = optionalRaw.get();
             for (int i = 0; i < raw.length && i < EnumUtils.DIRECTIONS.length; i++) {
                 setConnectionTypeRaw(EnumUtils.DIRECTIONS[i], ConnectionType.BY_ID.apply(raw[i]));
             }
@@ -548,9 +527,7 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         }
     }
 
-    /**
-     * Assumes that {@link #handlesRedstone()} is {@code true}.
-     */
+    /// Assumes that [#handlesRedstone()] is `true`.
     private void setRedstoneState() {
         redstonePowered = redstoneReactive && transmitterTile.hasLevel() && WorldUtils.isGettingPowered(getLevel(), getBlockPos());
         redstoneSet = true;
@@ -587,9 +564,7 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         }
     }
 
-    /**
-     * Used by the network's acceptor cache to refresh and sync acceptor changes before actually querying what the acceptor on a given side is.
-     */
+    /// Used by the network's acceptor cache to refresh and sync acceptor changes before actually querying what the acceptor on a given side is.
     public void refreshAcceptorConnections(Direction side) {
         if (!isRemote()) {
             //Note: We don't need to mark the acceptor as dirty here as it already is
@@ -627,11 +602,9 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         }
     }
 
-    /**
-     * @param newlyEnabledTransmitters The transmitters that are now enabled and were not before.
-     *
-     * @apiNote Only call this from the server side
-     */
+    /// @param newlyEnabledTransmitters The transmitters that are now enabled and were not before.
+    ///
+    /// @apiNote Only call this from the server side
     protected void recheckConnections(byte newlyEnabledTransmitters) {
         if (!hasTransmitterNetwork()) {
             //If we don't have a transmitter network then recheck connection status both ways if the other tile is also a transmitter
@@ -650,11 +623,9 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         }
     }
 
-    /**
-     * @param side The side that a transmitter is now enabled on after having been disabled.
-     *
-     * @apiNote Only call this from the server side
-     */
+    /// @param side The side that a transmitter is now enabled on after having been disabled.
+    ///
+    /// @apiNote Only call this from the server side
     protected void recheckConnection(Direction side) {
     }
 
@@ -666,7 +637,7 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         getTransmitterTile().setChanged();
     }
 
-    public void onNeighborBlockChange(Direction side) {
+    public void onNeighborBlockChange(@Nullable Direction side) {
         if (handlesRedstone() && redstoneReactive) {
             //If our tile can handle redstone, and we are redstone reactive we need to recheck all connections
             // as the power might have changed, and we may have to update our own visuals
@@ -675,7 +646,11 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
             //If we can't handle redstone, just refresh the side the connection changed on so that if a transmitter is removed
             // or is set to none then we stop trying to be connected to it
             //TODO - 1.20.2: See if we can come up with a better way to handle this as there are definitely better ways
-            refreshConnections(side);
+            if (side == null) {//TODO - 26.1: Re-evaluate
+                refreshConnections();
+            } else {
+                refreshConnections(side);
+            }
         }
     }
 
@@ -689,7 +664,7 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
 
     public void markDirtyAcceptor(Direction side) {
         if (hasTransmitterNetwork()) {
-            getTransmitterNetwork().acceptorChanged(getTransmitter(), side);
+            getTransmitterNetworkNN().acceptorChanged(getTransmitter(), side);
         }
     }
 
@@ -711,12 +686,12 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         return InteractionResult.PASS;
     }
 
-    public InteractionResult onRightClick(Player player, Direction side) {
+    public InteractionResult onRightClick(Level level, Player player, Direction side) {
         if (handlesRedstone()) {
             redstoneReactive = !redstoneReactive;
             refreshConnections();
             notifyTileChange();
-            player.displayClientMessage(MekanismLang.REDSTONE_SENSITIVITY.translateColored(EnumColor.GRAY, EnumColor.INDIGO, OnOff.of(redstoneReactive)), true);
+            player.sendOverlayMessage(MekanismLang.REDSTONE_SENSITIVITY.translateColored(EnumColor.GRAY, EnumColor.INDIGO, OnOff.of(redstoneReactive)));
         }
         return InteractionResult.SUCCESS;
     }
@@ -727,15 +702,15 @@ public abstract class Transmitter<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEP
         WorldUtils.notifyLoadedNeighborsOfTileChange(getLevel(), getBlockPos());
     }
 
-    public abstract void takeShare();
+    public abstract void takeShare(@Nullable TransactionContext transaction);
 
-    public void validateAndTakeShare() {
-        takeShare();
+    public void validateAndTakeShare(@Nullable TransactionContext transaction) {
+        takeShare(transaction);
     }
 
     public void startUpgrading() {
         isUpgrading = true;
-        takeShare();
+        takeShare(null);
         setTransmitterNetwork(null);
     }
 }

@@ -1,9 +1,5 @@
 package mekanism.common.tile.transmitter;
 
-import java.util.Collections;
-import java.util.List;
-import mekanism.api.heat.IHeatCapacitor;
-import mekanism.api.heat.IMekanismHeatHandler;
 import mekanism.api.tier.BaseTier;
 import mekanism.common.block.states.BlockStateHelper;
 import mekanism.common.block.states.TransmitterType;
@@ -17,33 +13,21 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 public class TileEntityThermodynamicConductor extends TileEntityTransmitter {
 
-    private final HeatHandlerManager heatHandlerManager;
-
     public TileEntityThermodynamicConductor(Holder<Block> blockProvider, BlockPos pos, BlockState state) {
         super(blockProvider, pos, state);
-        addCapabilityResolver(heatHandlerManager = new HeatHandlerManager(direction -> {
+        addCapabilityResolver(new HeatHandlerManager(direction -> {
             ThermodynamicConductor conductor = getTransmitter();
+            //TODO - 26.1 (heat): Should we make this a full on anonymous class and implement canInsert/canExtract? The fact that we check this stuff for exposing the cap
+            // makes me think that we should, but in some ways it would also make sense to expose it on all sides regardless?
             if (direction != null && (conductor.getConnectionTypeRaw(direction) == ConnectionType.NONE) || conductor.isRedstoneActivated()) {
                 //If we actually have a side, and our connection type on that side is none, or we are currently activated by redstone,
                 // then return that we have no capacitors
-                return Collections.emptyList();
+                return null;
             }
-            return conductor.getHeatCapacitors(direction);
-        }, new IMekanismHeatHandler() {
-            @NotNull
-            @Override
-            public List<IHeatCapacitor> getHeatCapacitors(@Nullable Direction side) {
-                return heatHandlerManager.getContainers(side);
-            }
-
-            @Override
-            public void onContentsChanged() {
-            }
+            return conductor.getHeatCapacitor(direction);
         }));
     }
 
@@ -62,9 +46,8 @@ public class TileEntityThermodynamicConductor extends TileEntityTransmitter {
         return TransmitterType.THERMODYNAMIC_CONDUCTOR;
     }
 
-    @NotNull
     @Override
-    protected BlockState upgradeResult(@NotNull BlockState current, @NotNull BaseTier tier) {
+    protected BlockState upgradeResult(BlockState current, BaseTier tier) {
         return BlockStateHelper.copyStateData(current, switch (tier) {
             case BASIC -> MekanismBlocks.BASIC_THERMODYNAMIC_CONDUCTOR;
             case ADVANCED -> MekanismBlocks.ADVANCED_THERMODYNAMIC_CONDUCTOR;
@@ -75,7 +58,7 @@ public class TileEntityThermodynamicConductor extends TileEntityTransmitter {
     }
 
     @Override
-    public void sideChanged(@NotNull Direction side, @NotNull ConnectionType old, @NotNull ConnectionType type) {
+    public void sideChanged(Direction side, ConnectionType old, ConnectionType type) {
         super.sideChanged(side, old, type);
         if (type == ConnectionType.NONE) {
             //We no longer have a capability, invalidate it, which will also notify the level

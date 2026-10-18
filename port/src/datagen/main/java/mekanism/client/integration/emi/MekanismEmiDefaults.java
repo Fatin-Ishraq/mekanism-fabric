@@ -2,7 +2,6 @@ package mekanism.client.integration.emi;
 
 import java.util.concurrent.CompletableFuture;
 import mekanism.api.Upgrade;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.text.EnumColor;
 import mekanism.api.tier.BaseTier;
 import mekanism.client.recipe_viewer.recipe.SPSRecipeViewerRecipe;
@@ -17,16 +16,15 @@ import mekanism.common.tier.FactoryTier;
 import mekanism.common.util.EnumUtils;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
-import mekanism.neoshim.neoforge.common.data.ExistingFileHelper;
 import mekanism.neoshim.neoforge.registries.DeferredHolder;
 
-@NothingNullByDefault
 public class MekanismEmiDefaults extends BaseEmiDefaults {
 
-    public MekanismEmiDefaults(PackOutput output, ExistingFileHelper existingFileHelper, CompletableFuture<HolderLookup.Provider> registries) {
-        super(output, existingFileHelper, registries, Mekanism.MODID);
+    public MekanismEmiDefaults(PackOutput output, ResourceManager serverResources, CompletableFuture<HolderLookup.Provider> registries) {
+        super(output, serverResources, registries, Mekanism.MODID);
     }
 
     @Override

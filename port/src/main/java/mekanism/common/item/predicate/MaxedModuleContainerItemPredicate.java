@@ -8,14 +8,31 @@ import mekanism.api.gear.IModule;
 import mekanism.api.gear.IModuleContainer;
 import mekanism.api.gear.IModuleHelper;
 import mekanism.api.gear.ModuleData;
-import net.minecraft.advancements.critereon.ItemSubPredicate;
+import mekanism.common.content.gear.IModuleContainerItem;
+import mekanism.common.content.gear.ModuleHelper;
+import mekanism.common.registration.impl.ItemRegistryObject;
+import net.minecraft.advancements.criterion.DataComponentMatchers;
+import net.minecraft.advancements.criterion.ItemPredicate;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.core.component.predicates.DataComponentPredicate;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
 
-public class MaxedModuleContainerItemPredicate implements ItemSubPredicate {
+public class MaxedModuleContainerItemPredicate implements DataComponentPredicate {
+
+    public static <T extends Item & IModuleContainerItem> ItemPredicate build(HolderLookup.Provider registry, ItemRegistryObject<T> item) {
+        return ItemPredicate.Builder.item()
+              .of(registry.lookupOrThrow(Registries.ITEM), item)
+              .withComponents(
+                    DataComponentMatchers.Builder.components()
+                          .partial(TYPE, new MaxedModuleContainerItemPredicate(item))
+                          .build()
+              )
+              .build();
+    }
 
     public static final Codec<MaxedModuleContainerItemPredicate> CODEC = BuiltInRegistries.ITEM.holderByNameCodec().comapFlatMap(item -> {
         if (IModuleHelper.INSTANCE.isModuleContainer(item)) {
@@ -23,7 +40,7 @@ public class MaxedModuleContainerItemPredicate implements ItemSubPredicate {
         }
         return DataResult.error(() -> "Specified item is not a module container item.");
     }, pred -> pred.item).fieldOf(SerializationConstants.ITEM).codec();
-    public static final ItemSubPredicate.Type<MaxedModuleContainerItemPredicate> TYPE = new ItemSubPredicate.Type<>(CODEC);
+    public static final DataComponentPredicate.Type<MaxedModuleContainerItemPredicate> TYPE = new ConcreteType<>(CODEC);
 
     private final Set<ModuleData<?>> supportedModules;
     private final Holder<Item> item;
@@ -34,17 +51,15 @@ public class MaxedModuleContainerItemPredicate implements ItemSubPredicate {
     }
 
     @Override
-    public boolean matches(@NotNull ItemStack stack) {
-        if (stack.is(item)) {
-            IModuleContainer container = IModuleHelper.INSTANCE.getModuleContainer(stack);
-            if (container != null && container.moduleTypes().containsAll(supportedModules)) {
-                for (IModule<?> module : container.modules()) {
-                    if (module.getInstalledCount() != module.getUntypedData().getMaxStackSize()) {
-                        return false;
-                    }
+    public boolean matches(DataComponentGetter stack) {
+        IModuleContainer container = ModuleHelper.get().getModuleContainerUnsafe(stack);
+        if (container.moduleTypes().containsAll(supportedModules)) {
+            for (IModule<?> module : container.modules()) {
+                if (module.getInstalledCount() != module.getUntypedData().getMaxStackSize()) {
+                    return false;
                 }
-                return true;
             }
+            return true;
         }
         return false;
     }

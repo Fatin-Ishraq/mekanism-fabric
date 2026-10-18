@@ -13,28 +13,26 @@ import net.minecraft.client.sounds.WeighedSoundEvents;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.player.Player;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public abstract class PlayerSound extends AbstractTickableSoundInstance {
 
-    @NotNull
     private final WeakReference<Player> playerReference;
     private final int subtitleFrequency;
     private float lastX;
     private float lastY;
     private float lastZ;
 
-    private float fadeUpStep = 0.1f;
-    private float fadeDownStep = 0.1f;
+    private float fadeUpStep = 0.1F;
+    private float fadeDownStep = 0.1F;
     private int consecutiveTicks;
 
-    public PlayerSound(@NotNull Player player, @NotNull SoundEventRegistryObject<?> sound) {
+    public PlayerSound(Player player, SoundEventRegistryObject<?> sound) {
         this(player, sound.get(), 3 * SharedConstants.TICKS_PER_SECOND);
         //Set it to repeat the subtitle every 3 seconds the sound is constantly playing
     }
 
-    public PlayerSound(@NotNull Player player, @NotNull SoundEvent sound, int subtitleFrequency) {
+    public PlayerSound(Player player, SoundEvent sound, int subtitleFrequency) {
         super(sound, SoundSource.PLAYERS, player.level().getRandom());
         this.playerReference = new WeakReference<>(player);
         this.subtitleFrequency = subtitleFrequency;
@@ -43,10 +41,7 @@ public abstract class PlayerSound extends AbstractTickableSoundInstance {
         this.lastZ = (float) player.getZ();
         this.looping = true;
         this.delay = 0;
-
-        // N.B. the volume must be > 0 on first time it's processed by sound system or else it will not
-        // get registered for tick events.
-        this.volume = 0.1F;
+        this.volume = 0;
     }
 
     @Nullable
@@ -99,7 +94,7 @@ public abstract class PlayerSound extends AbstractTickableSoundInstance {
             return;
         }
 
-        if (shouldPlaySound(player) && player.level().tickRateManager().runsNormally()) {
+        if (shouldPlaySound(player) && sound != null && player.level().tickRateManager().runsNormally()) {
             if (volume < 1.0F) {
                 // If we weren't max volume, start fading up
                 volume = Math.min(1.0F, volume + fadeUpStep);
@@ -127,7 +122,7 @@ public abstract class PlayerSound extends AbstractTickableSoundInstance {
         }
     }
 
-    public abstract boolean shouldPlaySound(@NotNull Player player);
+    public abstract boolean shouldPlaySound(Player player);
 
     @Override
     public float getVolume() {

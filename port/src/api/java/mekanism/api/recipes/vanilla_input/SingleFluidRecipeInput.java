@@ -1,14 +1,11 @@
 package mekanism.api.recipes.vanilla_input;
 
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Simple implementation of a recipe input of one fluid.
- *
- * @since 10.6.0
- */
-@NothingNullByDefault
+/// Simple implementation of a recipe input of one fluid.
+///
+/// @since 10.6.0
 public record SingleFluidRecipeInput(FluidStack fluid) implements FluidRecipeInput {
 
     @Override
@@ -30,7 +27,7 @@ public record SingleFluidRecipeInput(FluidStack fluid) implements FluidRecipeInp
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (o == this) {
             return true;
         } else if (o == null || getClass() != o.getClass()) {
@@ -42,6 +39,6 @@ public record SingleFluidRecipeInput(FluidStack fluid) implements FluidRecipeInp
     @Override
     public int hashCode() {
         int hash = FluidStack.hashFluidAndComponents(fluid);
-        return 31 * hash + fluid.getAmount();
+        return 31 * hash + fluid.amount();
     }
 }

@@ -13,18 +13,18 @@ import mekanism.common.lib.inventory.Finder;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public class SorterItemStackFilter extends SorterFilter<SorterItemStackFilter> implements IItemStackFilter<SorterItemStackFilter> {
 
     public static final MapCodec<SorterItemStackFilter> CODEC = RecordCodecBuilder.mapCodec(instance -> baseSorterCodec(instance)
-          .and(ItemStack.SINGLE_ITEM_CODEC.fieldOf(SerializationConstants.TARGET_STACK).forGetter(SorterItemStackFilter::getItemStack))
+          .and(ItemResource.OPTIONAL_CODEC.fieldOf(SerializationConstants.TARGET_STACK).forGetter(SorterItemStackFilter::getItemType))
           .and(Codec.BOOL.optionalFieldOf(SerializationConstants.FUZZY, false).forGetter(filter -> filter.fuzzyMode))
           .apply(instance, SorterItemStackFilter::new));
     public static final StreamCodec<RegistryFriendlyByteBuf, SorterItemStackFilter> STREAM_CODEC = StreamCodec.composite(
           baseSorterStreamCodec(SorterItemStackFilter::new), Function.identity(),
-          ItemStack.OPTIONAL_STREAM_CODEC, SorterItemStackFilter::getItemStack,
+          ItemResource.STREAM_CODEC, SorterItemStackFilter::getItemType,
           ByteBufCodecs.BOOL, filter -> filter.fuzzyMode,
           (filter, itemType, fuzzyMode) -> {
               filter.itemType = itemType;
@@ -33,14 +33,14 @@ public class SorterItemStackFilter extends SorterFilter<SorterItemStackFilter> i
           }
     );
 
-    private ItemStack itemType = ItemStack.EMPTY;
+    private ItemResource itemType = ItemResource.EMPTY;
     public boolean fuzzyMode;
 
     public SorterItemStackFilter() {
     }
 
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
-    protected SorterItemStackFilter(boolean enabled, boolean allowDefault, boolean sizeMode, int min, int max, Optional<EnumColor> color, ItemStack itemType, boolean fuzzyMode) {
+    protected SorterItemStackFilter(boolean enabled, boolean allowDefault, boolean sizeMode, int min, int max, Optional<EnumColor> color, ItemResource itemType, boolean fuzzyMode) {
         super(enabled, allowDefault, sizeMode, min, max, color.orElse(null));
         this.itemType = itemType;
         this.fuzzyMode = fuzzyMode;
@@ -48,13 +48,13 @@ public class SorterItemStackFilter extends SorterFilter<SorterItemStackFilter> i
 
     public SorterItemStackFilter(SorterItemStackFilter filter) {
         super(filter);
-        itemType = filter.itemType.copy();
+        itemType = filter.itemType;
         fuzzyMode = filter.fuzzyMode;
     }
 
     @Override
-    public Finder getFinder() {
-        return fuzzyMode ? Finder.item(itemType) : Finder.strict(itemType);
+    public boolean test(ItemResource toCheck) {
+        return fuzzyMode ? Finder.item(itemType, toCheck) : itemType.equals(toCheck);
     }
 
     @Override
@@ -66,7 +66,7 @@ public class SorterItemStackFilter extends SorterFilter<SorterItemStackFilter> i
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) {
             return true;
         } else if (o == null || getClass() != o.getClass() || !super.equals(o)) {
@@ -75,9 +75,9 @@ public class SorterItemStackFilter extends SorterFilter<SorterItemStackFilter> i
         SorterItemStackFilter other = (SorterItemStackFilter) o;
         if (fuzzyMode == other.fuzzyMode) {
             if (fuzzyMode) {
-                return itemType.is(other.itemType.getItemHolder());
+                return itemType.is(other.itemType.typeHolder());
             }
-            return ItemStack.isSameItemSameComponents(itemType, other.itemType);
+            return itemType.equals(other.itemType);
         }
         return false;
     }
@@ -92,14 +92,13 @@ public class SorterItemStackFilter extends SorterFilter<SorterItemStackFilter> i
         return FilterType.SORTER_ITEMSTACK_FILTER;
     }
 
-    @NotNull
     @Override
-    public ItemStack getItemStack() {
+    public ItemResource getItemType() {
         return itemType;
     }
 
     @Override
-    public void setItemStack(@NotNull ItemStack stack) {
-        itemType = stack;
+    public void setItemType(ItemResource itemType) {
+        this.itemType = itemType;
     }
 }

@@ -8,29 +8,31 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import mekanism.api.text.IHasTextComponent;
 import mekanism.api.text.IHasTranslationKey;
-import mekanism.common.attachments.IAttachmentAware;
-import mekanism.common.attachments.containers.ContainerType;
-import mekanism.common.attachments.containers.creator.IContainerCreator;
+import mekanism.common.component.IComponentAware;
+import mekanism.common.component.containers.creator.IContainerCreator;
+import mekanism.common.component.containers.type.CapableContainerType;
+import mekanism.common.component.containers.type.IContainerType;
 import mekanism.common.capabilities.ICapabilityAware;
 import mekanism.common.config.IMekanismConfig;
 import mekanism.common.registration.MekanismDeferredHolder;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.level.ItemLike;
 import mekanism.neoshim.bus.api.IEventBus;
 import mekanism.neoshim.neoforge.capabilities.RegisterCapabilitiesEvent;
-import mekanism.neoshim.neoforge.common.util.INBTSerializable;
+import mekanism.neoshim.neoforge.common.util.ValueIOSerializable;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
 import org.jetbrains.annotations.ApiStatus.Internal;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class ItemRegistryObject<ITEM extends Item> extends MekanismDeferredHolder<Item, ITEM> implements ItemLike, IHasTextComponent, IHasTranslationKey {
 
     @Nullable
-    private Map<ContainerType<?, ?, ?>, Supplier<? extends IContainerCreator<?, ?>>> defaultCreators;
+    private Map<IContainerType<?, ?>, Supplier<? extends IContainerCreator<?, ?>>> defaultCreators;
     @Nullable
     private List<Consumer<RegisterCapabilitiesEvent>> containerCapabilities;
 
@@ -38,12 +40,20 @@ public class ItemRegistryObject<ITEM extends Item> extends MekanismDeferredHolde
         super(key);
     }
 
-    @NotNull
     @Override
     public ITEM asItem() {
         return value();
     }
 
+    public ItemStackTemplate asTemplate() {
+        return asTemplate(1);
+    }
+
+    public ItemStackTemplate asTemplate(int count) {
+        return new ItemStackTemplate(value(), count);
+    }
+
+    //TODO - 26.1: Re-evaluate asStack usages, as maybe most are gone by the time datagen is converted to asTemplate?
     public ItemStack asStack() {
         return asStack(1);
     }
@@ -52,21 +62,27 @@ public class ItemRegistryObject<ITEM extends Item> extends MekanismDeferredHolde
         return new ItemStack(value(), count);
     }
 
-    @NotNull
+    public ItemResource asResource() {
+        return ItemResource.of((Holder<Item>) this);
+    }
+
+    public boolean is(ItemResource resource) {
+        return resource.is(get());
+    }
+
     @Override
     public String getTranslationKey() {
         return value().getDescriptionId();
     }
 
-    @NotNull
     @Override
     public Component getTextComponent() {
-        return value().getDescription();
+        return value().getName(asStack());
     }
 
     @Internal
-    public <CONTAINER extends INBTSerializable<CompoundTag>> ItemRegistryObject<ITEM> addAttachmentOnlyContainers(ContainerType<CONTAINER, ?, ?> containerType,
-          Supplier<IContainerCreator<? extends CONTAINER, ?>> defaultCreator) {
+    public <CONTAINER extends ValueIOSerializable> ItemRegistryObject<ITEM> addAttachmentOnlyContainers(IContainerType<CONTAINER, ?> containerType,
+          Supplier<IContainerCreator<CONTAINER, ?>> defaultCreator) {
         if (defaultCreators == null) {
             //In case any containers have deps on others make this linked even though it really shouldn't matter
             // as nothing should be trying to construct the containers between register calls
@@ -79,18 +95,18 @@ public class ItemRegistryObject<ITEM extends Item> extends MekanismDeferredHolde
     }
 
     @Internal
-    public <CONTAINER extends INBTSerializable<CompoundTag>> ItemRegistryObject<ITEM> addAttachedContainerCapabilities(ContainerType<CONTAINER, ?, ?> containerType,
-          Supplier<IContainerCreator<? extends CONTAINER, ?>> defaultCreator, IMekanismConfig... requiredConfigs) {
+    public <CONTAINER extends ValueIOSerializable> ItemRegistryObject<ITEM> addAttachedContainerCapabilities(CapableContainerType<CONTAINER, ?, ?> containerType,
+          Supplier<IContainerCreator<CONTAINER, ?>> defaultCreator, IMekanismConfig... requiredConfigs) {
         addAttachmentOnlyContainers(containerType, defaultCreator);
         return addContainerCapability(containerType, requiredConfigs);
     }
 
     @Internal
-    private ItemRegistryObject<ITEM> addContainerCapability(ContainerType<?, ?, ?> containerType, IMekanismConfig... requiredConfigs) {
+    private ItemRegistryObject<ITEM> addContainerCapability(CapableContainerType<?, ?, ?> containerType, IMekanismConfig... requiredConfigs) {
         if (containerCapabilities == null) {
             containerCapabilities = new ArrayList<>();
         }
-        containerCapabilities.add(event -> containerType.registerItemCapabilities(event, get(), false, requiredConfigs));
+        containerCapabilities.add(event -> containerType.registerItemCapabilities(event, get(), requiredConfigs));
         return this;
     }
 
@@ -112,11 +128,11 @@ public class ItemRegistryObject<ITEM extends Item> extends MekanismDeferredHolde
     @SuppressWarnings({"unchecked", "rawtypes"})
     void attachDefaultContainers(IEventBus eventBus) {
         ITEM item = get();
-        if (item instanceof IAttachmentAware attachmentAware) {
-            attachmentAware.attachAttachments(eventBus);
+        if (item instanceof IComponentAware attachmentAware) {
+            attachmentAware.addComponents(eventBus);
         }
         if (defaultCreators != null) {
-            for (Map.Entry<ContainerType<?, ?, ?>, Supplier<? extends IContainerCreator<?, ?>>> entry : defaultCreators.entrySet()) {
+            for (Map.Entry<IContainerType<?, ?>, Supplier<? extends IContainerCreator<?, ?>>> entry : defaultCreators.entrySet()) {
                 //Note: We pass null for the event bus to not expose this attachment as a capability
                 entry.getKey().addDefaultCreators(null, item, (Supplier) entry.getValue());
             }

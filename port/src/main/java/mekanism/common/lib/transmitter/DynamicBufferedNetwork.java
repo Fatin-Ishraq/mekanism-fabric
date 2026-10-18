@@ -6,21 +6,25 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import mekanism.api.IContentsListener;
+import mekanism.api.math.MathUtils;
 import mekanism.common.content.network.transmitter.BufferedTransmitter;
 import mekanism.common.lib.math.Range3D;
 import mekanism.common.util.WorldUtils;
 import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import mekanism.neoshim.bus.api.Event;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
 public abstract class DynamicBufferedNetwork<ACCEPTOR, NETWORK extends DynamicBufferedNetwork<ACCEPTOR, NETWORK, BUFFER, TRANSMITTER>, BUFFER,
-      TRANSMITTER extends BufferedTransmitter<ACCEPTOR, NETWORK, BUFFER, TRANSMITTER>> extends DynamicNetwork<ACCEPTOR, NETWORK, TRANSMITTER> {
+      TRANSMITTER extends BufferedTransmitter<ACCEPTOR, NETWORK, BUFFER, TRANSMITTER>> extends DynamicNetwork<ACCEPTOR, NETWORK, TRANSMITTER> implements IContentsListener {
 
     protected final LongSet chunks = new LongOpenHashSet();
     @Nullable
-    protected Range3D packetRange;
+    private Range3D packetRange;
     protected long capacity;
     protected boolean needsUpdate;
     private boolean forceScaleUpdate;
@@ -38,7 +42,7 @@ public abstract class DynamicBufferedNetwork<ACCEPTOR, NETWORK extends DynamicBu
     public void onUpdate() {
         super.onUpdate();
         float scale = computeContentScale();
-        if (scale != currentScale) {
+        if (!Mth.equal(scale, currentScale)) {
             currentScale = scale;
             needsUpdate = true;
         }
@@ -56,10 +60,13 @@ public abstract class DynamicBufferedNetwork<ACCEPTOR, NETWORK extends DynamicBu
     @Override
     protected void addTransmitterFromCommit(TRANSMITTER transmitter) {
         super.addTransmitterFromCommit(transmitter);
-        chunks.add(ChunkPos.asLong(transmitter.getBlockPos()));
+        chunks.add(ChunkPos.pack(transmitter.getBlockPos()));
         //Update the capacity here, to make sure that we can actually absorb the buffer properly
-        updateCapacity(transmitter);
-        absorbBuffer(transmitter);
+        capacity = MathUtils.addClamped(capacity, transmitter.getCapacity());
+        try (Transaction transaction = Transaction.openRoot()) {
+            absorbBuffer(transmitter, transaction);
+            transaction.commit();
+        }
     }
 
     @Override
@@ -90,7 +97,15 @@ public abstract class DynamicBufferedNetwork<ACCEPTOR, NETWORK extends DynamicBu
         //Clamp the new buffer
         clampBuffer();
         //Update all shares
-        updateSaveShares(triggerTransmitter);
+        try (Transaction transaction = Transaction.openRoot()) {
+            updateSaveShares(triggerTransmitter, transaction);
+            transaction.commit();
+        }
+    }
+
+    @Override
+    public void onContentsChanged() {
+        markDirty();
     }
 
     @Override
@@ -102,28 +117,14 @@ public abstract class DynamicBufferedNetwork<ACCEPTOR, NETWORK extends DynamicBu
 
     protected abstract void forceScaleUpdate();
 
-    @NotNull
     public abstract BUFFER getBuffer();
 
-    public abstract void absorbBuffer(TRANSMITTER transmitter);
+    public abstract void absorbBuffer(TRANSMITTER transmitter, TransactionContext transaction);
 
     public abstract void clampBuffer();
 
     public boolean isCompatibleWith(NETWORK other) {
         return true;
-    }
-
-    /**
-     * @param transmitter The transmitter that was added
-     */
-    protected synchronized void updateCapacity(TRANSMITTER transmitter) {
-        long transmitterCapacity = transmitter.getCapacity();
-        if (transmitterCapacity > Long.MAX_VALUE - capacity) {
-            //Ensure we don't overflow
-            capacity = Long.MAX_VALUE;
-        } else {
-            capacity += transmitterCapacity;
-        }
     }
 
     public synchronized void updateCapacity() {
@@ -152,10 +153,10 @@ public abstract class DynamicBufferedNetwork<ACCEPTOR, NETWORK extends DynamicBu
         return getCapacity();
     }
 
-    protected void updateSaveShares(@Nullable TRANSMITTER triggerTransmitter) {
+    protected void updateSaveShares(@Nullable TRANSMITTER triggerTransmitter, TransactionContext transaction) {
     }
 
-    public final void validateSaveShares(@NotNull TRANSMITTER triggerTransmitter) {
+    public final void validateSaveShares(TRANSMITTER triggerTransmitter, @Nullable TransactionContext transaction) {
         if (world == null) {
             //If the world is null, try falling back to the trigger transmitter's world.
             // Note: This also in theory could be null, so we double-check it is not before grabbing the game time
@@ -163,12 +164,15 @@ public abstract class DynamicBufferedNetwork<ACCEPTOR, NETWORK extends DynamicBu
         }
         if (world != null && world.getGameTime() != lastSaveShareWriteTime) {
             lastSaveShareWriteTime = world.getGameTime();
-            updateSaveShares(triggerTransmitter);
+            try (Transaction subTransaction = Transaction.open(transaction)) {
+                updateSaveShares(triggerTransmitter, subTransaction);
+                subTransaction.commit();
+            }
         }
     }
 
     public void markDirty() {
-        if (world != null && !world.isClientSide && world.getGameTime() != lastMarkDirtyTime) {
+        if (world != null && !world.isClientSide() && world.getGameTime() != lastMarkDirtyTime) {
             lastMarkDirtyTime = world.getGameTime();
             for (LongIterator iterator = chunks.iterator(); iterator.hasNext(); ) {
                 long chunk = iterator.nextLong();
@@ -177,6 +181,7 @@ public abstract class DynamicBufferedNetwork<ACCEPTOR, NETWORK extends DynamicBu
         }
     }
 
+    @Nullable
     public Range3D getPacketRange() {
         if (packetRange == null) {
             packetRange = genPacketRange();
@@ -184,6 +189,7 @@ public abstract class DynamicBufferedNetwork<ACCEPTOR, NETWORK extends DynamicBu
         return packetRange;
     }
 
+    @Nullable
     private Range3D genPacketRange() {
         if (isEmpty()) {
             deregister();

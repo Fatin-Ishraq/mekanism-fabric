@@ -1,6 +1,6 @@
 package mekanism.client.gui.element.window;
 
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import mekanism.api.text.EnumColor;
@@ -14,6 +14,7 @@ import mekanism.client.gui.element.custom.GuiEntityPreview;
 import mekanism.client.gui.element.text.BackgroundType;
 import mekanism.client.gui.element.text.GuiTextField;
 import mekanism.client.gui.tooltip.TooltipUtils;
+import mekanism.common.Mekanism;
 import mekanism.common.MekanismLang;
 import mekanism.common.inventory.container.SelectedWindowData.WindowType;
 import mekanism.common.lib.Color;
@@ -21,22 +22,22 @@ import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
 import mekanism.common.util.text.InputValidator;
 import mekanism.common.util.text.TextUtils;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.CommonColors;
 import net.minecraft.world.entity.LivingEntity;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.joml.Matrix4f;
-import org.lwjgl.glfw.GLFW;
+import org.jspecify.annotations.Nullable;
 
 public class GuiColorWindow extends GuiWindow {
 
-    public static final ResourceLocation TRANSPARENCY_GRID = MekanismUtils.getResource(ResourceType.GUI, "transparency_grid.png");
-    private static final ResourceLocation HUE_PICKER = MekanismUtils.getResource(ResourceType.GUI, "color_picker.png");
+    //TODO - 26.1: confirm tile blit works
+    public static final Identifier TRANSPARENCY_GRID = Mekanism.rl("transparency_grid");
+    private static final Identifier HUE_PICKER = MekanismUtils.getResource(ResourceType.GUI, "color_picker.png");
     private static final int S_TILES = 10, V_TILES = 10;
 
     private final GuiTextField textField;
@@ -86,9 +87,9 @@ public class GuiColorWindow extends GuiWindow {
               .setPasteTransformer(text -> text.replace(" ", ""))
               .setBackground(BackgroundType.ELEMENT_HOLDER)
               .setMaxLength(this.handlesAlpha ? 15 : 11);
-        addChild(new TranslationButton(gui, relativeX + 98 + extraWidth, relativeY + height - 21, 54, 14, MekanismLang.BUTTON_CONFIRM, (element, mouseX, mouseY) -> {
+        addChild(new TranslationButton(gui, relativeX + 98 + extraWidth, relativeY + height - 21, 54, 14, MekanismLang.BUTTON_CONFIRM, (element, event, isDoubleClick) -> {
             callback.accept(getColor());
-            return close(element, mouseX, mouseY);
+            return close(element, event, isDoubleClick);
         }));
 
         if (armorPreview != null) {
@@ -120,14 +121,14 @@ public class GuiColorWindow extends GuiWindow {
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         drawTitleText(guiGraphics, MekanismLang.COLOR_PICKER.translate(), 6);
         ILangEntry entry = handlesAlpha ? MekanismLang.RGBA : MekanismLang.RGB;
         drawScrollingString(guiGraphics, entry.translate(), 2, height - 18, TextAlignment.RIGHT, titleTextColor(), textField.getRelativeX() - relativeX - 2, 2, false);
     }
 
-    private void drawTiledGradient(GuiGraphics guiGraphics, int x, int y, int width, int height) {
+    private void drawTiledGradient(GuiGraphicsExtractor guiGraphics, int x, int y, int width, int height) {
         int tileWidth = Math.round((float) width / S_TILES);
         int tileHeight = Math.round((float) height / V_TILES);
         for (int i = 0; i < 10; i++) {
@@ -140,20 +141,17 @@ public class GuiColorWindow extends GuiWindow {
         }
     }
 
-    //Based on GuiGraphics#fillGradient
-    private void drawGradient(GuiGraphics guiGraphics, int x, int y, int width, int height, Color tl, Color tr, Color bl, Color br) {
-        VertexConsumer buffer = guiGraphics.bufferSource().getBuffer(RenderType.gui());
+    //Based on GuiGraphicsExtractor#fillGradient
+    private void drawGradient(GuiGraphicsExtractor guiGraphics, int x, int y, int width, int height, Color tl, Color tr, Color bl, Color br) {
+        //TODO - 26.1 GUI rendering
+        /*VertexConsumer buffer = guiGraphics.bufferSource().getBuffer(RenderType.gui());
         Matrix4f matrix4f = guiGraphics.pose().last().pose();
-        buffer.addVertex(matrix4f, x, y + height, 0)
-              .setColor(bl.r(), bl.g(), bl.b(), bl.a());
-        buffer.addVertex(matrix4f, x + width, y + height, 0)
-              .setColor(br.r(), br.g(), br.b(), br.a());
-        buffer.addVertex(matrix4f, x + width, y, 0)
-              .setColor(tr.r(), tr.g(), tr.b(), tr.a());
-        buffer.addVertex(matrix4f, x, y, 0)
-              .setColor(tl.r(), tl.g(), tl.b(), tl.a());
+        buffer.addVertex(matrix4f, x, y + height, 0).setColor(bl.argb());
+        buffer.addVertex(matrix4f, x + width, y + height, 0).setColor(br.argb());
+        buffer.addVertex(matrix4f, x + width, y, 0).setColor(tr.argb());
+        buffer.addVertex(matrix4f, x, y, 0).setColor(tl.argb());
         //Note: This technically should probably be flushIfUnmanaged, but I believe we are always unmanaged here, so it is not worth ATing the method to call it
-        guiGraphics.flush();
+        guiGraphics.flush();*/
     }
 
     private void updateTextFromColor() {
@@ -204,28 +202,28 @@ public class GuiColorWindow extends GuiWindow {
         return val >= 0 && val <= 255;
     }
 
-    private void drawColorBar(GuiGraphics guiGraphics, int x, int y, int width, int height) {
+    private void drawColorBar(GuiGraphicsExtractor guiGraphics, int x, int y, int width, int height) {
         for (int i = 0; i < width; i++) {
             GuiUtils.fill(guiGraphics, x + i, y, 1, height, Color.hsv(((float) i / width) * 360F, 1, 1).argb());
         }
     }
 
-    private void drawAlphaBar(GuiGraphics guiGraphics, int x, int y, int width, int height) {
+    private void drawAlphaBar(GuiGraphicsExtractor guiGraphics, int x, int y, int width, int height) {
         Color hsv = Color.hsv(hue, saturation, value);
         for (int i = 0; i < width; i++) {
             GuiUtils.fill(guiGraphics, x + i, y, 1, height, hsv.alpha((float) i / width).argb());
         }
     }
 
-    private void drawTransparencyGrid(GuiGraphics guiGraphics, int x, int y, int width, int height) {
+    private void drawTransparencyGrid(GuiGraphicsExtractor guiGraphics, int x, int y, int width, int height) {
         if (handlesAlpha) {
-            guiGraphics.blit(TRANSPARENCY_GRID, x, y, 0, 0, width, height);
+            guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, TRANSPARENCY_GRID, x, y, width, height);
         }
     }
 
     @Override
-    public boolean charTyped(char c, int keyCode) {
-        boolean ret = super.charTyped(c, keyCode);
+    public boolean charTyped(CharacterEvent event) {
+        boolean ret = super.charTyped(event);
         if (textField.canWrite()) {
             updateColorFromText();
         }
@@ -233,11 +231,11 @@ public class GuiColorWindow extends GuiWindow {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        boolean ret = super.keyPressed(keyCode, scanCode, modifiers);
+    public boolean keyPressed(KeyEvent event) {
+        boolean ret = super.keyPressed(event);
         if (textField.canWrite()) {
             //Update color if the key caused a change to the text contents
-            if (Screen.isPaste(keyCode) || Screen.isCut(keyCode) || keyCode == GLFW.GLFW_KEY_BACKSPACE || keyCode == GLFW.GLFW_KEY_DELETE) {
+            if (event.isPaste() || event.isCut() || event.key() == InputConstants.KEY_BACKSPACE || event.key() == InputConstants.KEY_DELETE) {
                 updateColorFromText();
             }
         }
@@ -272,7 +270,7 @@ public class GuiColorWindow extends GuiWindow {
         }
 
         @Override
-        public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+        public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
             super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
             drawTransparencyGrid(guiGraphics, relativeX, relativeY, width, height);
             Color c = getColor();
@@ -289,17 +287,17 @@ public class GuiColorWindow extends GuiWindow {
         protected abstract void set(double mouseX, double mouseY);
 
         @Override
-        public void onClick(double mouseX, double mouseY, int button) {
-            super.onClick(mouseX, mouseY, button);
-            set(mouseX, mouseY);
+        public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
+            super.onClick(event, isDoubleClick);
+            set(event.x(), event.y());
             setDragging(true);
         }
 
         @Override
-        public void onDrag(double mouseX, double mouseY, double deltaX, double deltaY) {
-            super.onDrag(mouseX, mouseY, deltaX, deltaY);
+        protected void onDrag(MouseButtonEvent event, double deltaX, double deltaY) {
+            super.onDrag(event, deltaX, deltaY);
             if (isDragging()) {
-                set(mouseX, mouseY);
+                set(event.x(), event.y());
             }
         }
     }
@@ -311,12 +309,12 @@ public class GuiColorWindow extends GuiWindow {
         }
 
         @Override
-        public void renderBackgroundOverlay(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        public void renderBackgroundOverlay(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
             super.renderBackgroundOverlay(guiGraphics, mouseX, mouseY);
             drawTiledGradient(guiGraphics, relativeX, relativeY, width, height);
             int posX = relativeX + Math.round(GuiColorWindow.this.saturation * width) - 2;
             int posY = relativeY + Math.round((1 - GuiColorWindow.this.value) * height) - 2;
-            GuiUtils.drawOutline(guiGraphics, posX, posY, 5, 5, 0xFFFFFFFF);
+            GuiUtils.drawOutline(guiGraphics, posX, posY, 5, 5, CommonColors.WHITE);
             //Fill the selection in without taking alpha into account
             GuiUtils.fill(guiGraphics, posX + 1, posY + 1, 3, 3, getColor().alpha(1.0).argb());
         }
@@ -324,9 +322,9 @@ public class GuiColorWindow extends GuiWindow {
         @Override
         protected void set(double mouseX, double mouseY) {
             float newS = (float) (mouseX - getX()) / width;
-            GuiColorWindow.this.saturation = Mth.clamp(newS, 0, 1);
+            GuiColorWindow.this.saturation = Math.clamp(newS, 0, 1);
             float newV = (float) (mouseY - getY()) / height;
-            GuiColorWindow.this.value = 1 - Mth.clamp(newV, 0, 1);
+            GuiColorWindow.this.value = 1 - Math.clamp(newV, 0, 1);
             updateTextFromColor();
             updateArmorPreview();
         }
@@ -339,12 +337,12 @@ public class GuiColorWindow extends GuiWindow {
         }
 
         @Override
-        public void renderBackgroundOverlay(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        public void renderBackgroundOverlay(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
             super.renderBackgroundOverlay(guiGraphics, mouseX, mouseY);
             drawColorBar(guiGraphics, relativeX, relativeY, width, height);
             //Draw selector
             int posX = Math.round((GuiColorWindow.this.hue / 360F) * (width - 3));
-            guiGraphics.blit(HUE_PICKER, relativeX - 2 + posX, relativeY - 2, 0, 0, 7, 12, 12, 12);
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, HUE_PICKER, relativeX - 2 + posX, relativeY - 2, 0, 0, 7, 12, 12, 12);
             //Note: This is needed as we want to draw same color in all three pixels instead of each having their own
             GuiUtils.fill(guiGraphics, relativeX + posX, relativeY, 3, 8, Color.hsv(GuiColorWindow.this.hue, 1, 1).argb());
         }
@@ -352,7 +350,7 @@ public class GuiColorWindow extends GuiWindow {
         @Override
         protected void set(double mouseX, double mouseY) {
             float val = (float) (mouseX - getX()) / width;
-            GuiColorWindow.this.hue = Mth.clamp(val, 0, 1) * 360F;
+            GuiColorWindow.this.hue = Math.clamp(val, 0, 1) * 360F;
             updateTextFromColor();
             updateArmorPreview();
         }
@@ -365,20 +363,20 @@ public class GuiColorWindow extends GuiWindow {
         }
 
         @Override
-        public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+        public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
             super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
             //Draw transparency checkerboard
             drawTransparencyGrid(guiGraphics, relativeX, relativeY, width, height);
         }
 
         @Override
-        public void renderBackgroundOverlay(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        public void renderBackgroundOverlay(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
             super.renderBackgroundOverlay(guiGraphics, mouseX, mouseY);
             //Draw alpha bar
             drawAlphaBar(guiGraphics, relativeX, relativeY, width, height);
             //Draw selector
             int posX = Math.round(GuiColorWindow.this.alpha * (width - 3));
-            guiGraphics.blit(HUE_PICKER, relativeX - 2 + posX, relativeY - 2, 0, 0, 7, 12, 12, 12);
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, HUE_PICKER, relativeX - 2 + posX, relativeY - 2, 0, 0, 7, 12, 12, 12);
             //Note: This is needed as we want to draw same color in all three pixels instead of each having their own
             //Draw transparency checkerboard on the selector
             drawTransparencyGrid(guiGraphics, relativeX + posX, relativeY, 3, 8);
@@ -388,7 +386,7 @@ public class GuiColorWindow extends GuiWindow {
         @Override
         protected void set(double mouseX, double mouseY) {
             float val = (float) (mouseX - getX()) / width;
-            GuiColorWindow.this.alpha = Mth.clamp(val, 0, 1);
+            GuiColorWindow.this.alpha = Math.clamp(val, 0, 1);
             updateTextFromColor();
             updateArmorPreview();
         }

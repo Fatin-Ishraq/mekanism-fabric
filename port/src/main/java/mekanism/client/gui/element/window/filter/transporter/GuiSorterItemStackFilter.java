@@ -8,8 +8,8 @@ import mekanism.common.MekanismLang;
 import mekanism.common.content.transporter.SorterItemStackFilter;
 import mekanism.common.tile.TileEntityLogisticalSorter;
 import mekanism.common.util.text.BooleanStateDisplay.OnOff;
-import net.minecraft.client.gui.GuiGraphics;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import org.jspecify.annotations.Nullable;
 
 public class GuiSorterItemStackFilter extends GuiItemStackFilter<SorterItemStackFilter, TileEntityLogisticalSorter> implements GuiSorterFilterHelper {
 
@@ -21,7 +21,9 @@ public class GuiSorterItemStackFilter extends GuiItemStackFilter<SorterItemStack
         return new GuiSorterItemStackFilter(gui, (gui.getXSize() - SORTER_FILTER_WIDTH) / 2, 30, tile, filter);
     }
 
+    @Nullable
     private GuiTextField minField;
+    @Nullable
     private GuiTextField maxField;
 
     private GuiSorterItemStackFilter(IGuiWrapper gui, int x, int y, TileEntityLogisticalSorter tile, @Nullable SorterItemStackFilter origFilter) {
@@ -40,7 +42,7 @@ public class GuiSorterItemStackFilter extends GuiItemStackFilter<SorterItemStack
             minField = min;
             maxField = max;
         });
-        addChild(new MekanismImageButton(gui(), relativeX + 148, relativeY + 68, 11, 14, getButtonLocation("fuzzy"), (element, mouseX, mouseY) -> {
+        addChild(new MekanismImageButton(gui(), relativeX + 148, relativeY + 68, 11, 14, getButtonLocation("fuzzy"), (_, _, _) -> {
             filter.fuzzyMode = !filter.fuzzyMode;
             return true;
         })).setTooltip(MekanismLang.FUZZY_MODE);
@@ -57,7 +59,7 @@ public class GuiSorterItemStackFilter extends GuiItemStackFilter<SorterItemStack
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         renderSorterForeground(guiGraphics);
         drawScrollingString(guiGraphics, OnOff.of(filter.fuzzyMode).getTextComponent(), 159, 71, TextAlignment.LEFT, titleTextColor(), width - 159, 2, false);

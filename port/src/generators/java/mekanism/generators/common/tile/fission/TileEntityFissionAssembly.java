@@ -5,7 +5,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import mekanism.neoshim.neoforge.client.model.data.ModelProperty;
+import mekanism.neoshim.neoforge.model.data.ModelProperty;
 
 //TODO: Eventually make use of the commented out code in this class which is required to get model data working properly for use of the FuelAssemblyBakedModel
 public class TileEntityFissionAssembly extends TileEntityInternalMultiblock {
@@ -45,7 +45,6 @@ public class TileEntityFissionAssembly extends TileEntityInternalMultiblock {
         }
     }
 
-    @NotNull
     @Override
     public ModelData getModelData() {
         UUID multiblockUUID = getMultiblockUUID();

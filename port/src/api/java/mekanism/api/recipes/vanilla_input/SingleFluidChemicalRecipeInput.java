@@ -1,15 +1,12 @@
 package mekanism.api.recipes.vanilla_input;
 
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.chemical.ChemicalStack;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Simple implementation of a recipe input of one fluid and one chemical.
- *
- * @since 10.6.0
- */
-@NothingNullByDefault
+/// Simple implementation of a recipe input of one fluid and one chemical.
+///
+/// @since 10.6.0
 public record SingleFluidChemicalRecipeInput(FluidStack fluid, ChemicalStack chemical) implements FluidChemicalRecipeInput {
 
     @Override
@@ -39,7 +36,7 @@ public record SingleFluidChemicalRecipeInput(FluidStack fluid, ChemicalStack che
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (o == this) {
             return true;
         } else if (o == null || getClass() != o.getClass()) {
@@ -53,7 +50,7 @@ public record SingleFluidChemicalRecipeInput(FluidStack fluid, ChemicalStack che
     public int hashCode() {
         int hash = chemical.hashCode();
         hash = 31 * hash + FluidStack.hashFluidAndComponents(fluid);
-        hash = 31 * hash + fluid.getAmount();
+        hash = 31 * hash + fluid.amount();
         return hash;
     }
 }

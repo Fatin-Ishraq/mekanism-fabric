@@ -1,5 +1,6 @@
 package mekanism.client.gui.element.tab;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.EnumMap;
 import java.util.Map;
 import mekanism.client.SpecialColors;
@@ -15,16 +16,17 @@ import mekanism.common.tile.interfaces.IFluidContainerManager;
 import mekanism.common.tile.interfaces.IFluidContainerManager.ContainerEditMode;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.resources.ResourceLocation;
-import org.lwjgl.glfw.GLFW;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
+import net.minecraft.resources.Identifier;
 
 public class GuiContainerEditModeTab<TILE extends TileEntityMekanism & IFluidContainerManager> extends GuiInsetElement<TILE> {
 
-    private static final ResourceLocation BOTH = MekanismUtils.getResource(ResourceType.GUI, "container_edit_mode_both.png");
-    private static final ResourceLocation FILL = MekanismUtils.getResource(ResourceType.GUI, "container_edit_mode_fill.png");
-    private static final ResourceLocation EMPTY = MekanismUtils.getResource(ResourceType.GUI, "container_edit_mode_empty.png");
+    private static final Identifier BOTH = MekanismUtils.getResource(ResourceType.GUI, "container_edit_mode_both.png");
+    private static final Identifier FILL = MekanismUtils.getResource(ResourceType.GUI, "container_edit_mode_fill.png");
+    private static final Identifier EMPTY = MekanismUtils.getResource(ResourceType.GUI, "container_edit_mode_empty.png");
 
     private final Map<ContainerEditMode, Tooltip> tooltips = new EnumMap<>(ContainerEditMode.class);
 
@@ -33,7 +35,7 @@ public class GuiContainerEditModeTab<TILE extends TileEntityMekanism & IFluidCon
     }
 
     @Override
-    protected ResourceLocation getOverlay() {
+    protected Identifier getOverlay() {
         return switch (dataSource.getContainerEditMode()) {
             case FILL -> FILL;
             case EMPTY -> EMPTY;
@@ -47,17 +49,17 @@ public class GuiContainerEditModeTab<TILE extends TileEntityMekanism & IFluidCon
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY, int button) {
-        PacketUtils.sendToServer(new PacketGuiInteract(button == GLFW.GLFW_MOUSE_BUTTON_LEFT ? GuiInteraction.NEXT_MODE : GuiInteraction.PREVIOUS_MODE, dataSource));
+    public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
+        PacketUtils.sendToServer(new PacketGuiInteract(event.button() == InputConstants.MOUSE_BUTTON_LEFT ? GuiInteraction.NEXT_MODE : GuiInteraction.PREVIOUS_MODE, dataSource));
     }
 
     @Override
-    public boolean isValidClickButton(int button) {
-        return button == GLFW.GLFW_MOUSE_BUTTON_LEFT || button == GLFW.GLFW_MOUSE_BUTTON_RIGHT;
+    public boolean isValidClickButton(MouseButtonInfo buttonInfo) {
+        return buttonInfo.button() == InputConstants.MOUSE_BUTTON_LEFT || buttonInfo.button() == InputConstants.MOUSE_BUTTON_RIGHT;
     }
 
     @Override
-    protected void colorTab(GuiGraphics guiGraphics) {
-        MekanismRenderer.color(guiGraphics, SpecialColors.TAB_CONTAINER_EDIT_MODE);
+    protected int getTabColor(GuiGraphicsExtractor guiGraphics) {
+        return MekanismRenderer.color(SpecialColors.TAB_CONTAINER_EDIT_MODE);
     }
 }

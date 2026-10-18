@@ -1,5 +1,6 @@
 package mekanism.client.gui.element.tab;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.EnumMap;
 import java.util.Map;
 import mekanism.client.SpecialColors;
@@ -14,17 +15,17 @@ import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.tile.interfaces.IRedstoneControl.RedstoneControl;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
-import org.lwjgl.glfw.GLFW;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
+import net.minecraft.resources.Identifier;
 
 public class GuiRedstoneControlTab extends GuiInsetElement<TileEntityMekanism> {
 
-    private static final ResourceLocation DISABLED = MekanismUtils.getResource(ResourceType.GUI, "redstone_control_disabled.png");
-    private static final ResourceLocation HIGH = MekanismUtils.getResource(ResourceType.GUI, "redstone_control_high.png");
-    private static final ResourceLocation LOW = MekanismUtils.getResource(ResourceType.GUI, "redstone_control_low.png");
+    private static final Identifier DISABLED = MekanismUtils.getResource(ResourceType.GUI, "redstone_control_disabled.png");
+    private static final Identifier HIGH = MekanismUtils.getResource(ResourceType.GUI, "redstone_control_high.png");
+    private static final Identifier LOW = MekanismUtils.getResource(ResourceType.GUI, "redstone_control_low.png");
 
     private final Map<RedstoneControl, Tooltip> tooltips = new EnumMap<>(RedstoneControl.class);
 
@@ -38,18 +39,18 @@ public class GuiRedstoneControlTab extends GuiInsetElement<TileEntityMekanism> {
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY, int button) {
-        PacketUtils.sendToServer(new PacketGuiInteract(button == GLFW.GLFW_MOUSE_BUTTON_LEFT ? GuiInteraction.NEXT_REDSTONE_CONTROL
-                                                                                             : GuiInteraction.PREVIOUS_REDSTONE_CONTROL, dataSource));
+    public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
+        PacketUtils.sendToServer(new PacketGuiInteract(event.button() == InputConstants.MOUSE_BUTTON_LEFT ? GuiInteraction.NEXT_REDSTONE_CONTROL
+                                                                                                          : GuiInteraction.PREVIOUS_REDSTONE_CONTROL, dataSource));
     }
 
     @Override
-    public boolean isValidClickButton(int button) {
-        return button == GLFW.GLFW_MOUSE_BUTTON_LEFT || button == GLFW.GLFW_MOUSE_BUTTON_RIGHT;
+    public boolean isValidClickButton(MouseButtonInfo buttonInfo) {
+        return buttonInfo.button() == InputConstants.MOUSE_BUTTON_LEFT || buttonInfo.button() == InputConstants.MOUSE_BUTTON_RIGHT;
     }
 
     @Override
-    protected ResourceLocation getOverlay() {
+    protected Identifier getOverlay() {
         return switch (dataSource.getControlType()) {
             case HIGH -> HIGH;
             case LOW -> LOW;
@@ -58,14 +59,15 @@ public class GuiRedstoneControlTab extends GuiInsetElement<TileEntityMekanism> {
     }
 
     @Override
-    protected void colorTab(GuiGraphics guiGraphics) {
-        MekanismRenderer.color(guiGraphics, SpecialColors.TAB_REDSTONE_CONTROL);
+    protected int getTabColor(GuiGraphicsExtractor guiGraphics) {
+        return MekanismRenderer.color(SpecialColors.TAB_REDSTONE_CONTROL);
     }
 
     @Override
-    protected void drawBackgroundOverlay(@NotNull GuiGraphics guiGraphics) {
+    protected void drawBackgroundOverlay(GuiGraphicsExtractor guiGraphics) {
         if (dataSource.getControlType() == RedstoneControl.PULSE) {
-            guiGraphics.blit(getButtonX() + 1, getButtonY() + 1, 0, innerWidth - 2, innerHeight - 2, MekanismRenderer.redstonePulse);
+            //TODO - 26.1: figure out the rest of the params
+            //guiGraphics.blit(RenderPipelines.GUI, MekanismRenderer.REDSTONE_PULSE_ID, getButtonX() + 1, getButtonY() + 1, 0, innerWidth - 2, innerHeight - 2);
         } else {
             super.drawBackgroundOverlay(guiGraphics);
         }

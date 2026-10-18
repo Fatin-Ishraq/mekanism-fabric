@@ -2,8 +2,7 @@ package mekanism.client.recipe_viewer.jei.machine;
 
 import java.util.ArrayList;
 import java.util.List;
-import mekanism.api.chemical.ChemicalStack;
-import mekanism.api.functions.ConstantPredicates;
+import mekanism.api.chemical.ChemicalStackTemplate;
 import mekanism.api.recipes.PressurizedReactionRecipe;
 import mekanism.api.recipes.PressurizedReactionRecipe.PressurizedReactionRecipeOutput;
 import mekanism.client.gui.element.bar.GuiVerticalPowerBar;
@@ -24,10 +23,10 @@ import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
 import mezz.jei.api.helpers.IGuiHelper;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.RecipeIngredientRole;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.util.context.ContextMap;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.crafting.RecipeHolder;
-import org.jetbrains.annotations.NotNull;
 
 public class PressurizedReactionRecipeCategory extends HolderRecipeCategory<PressurizedReactionRecipe> {
 
@@ -54,7 +53,7 @@ public class PressurizedReactionRecipeCategory extends HolderRecipeCategory<Pres
     }
 
     @Override
-    protected void renderElements(RecipeHolder<PressurizedReactionRecipe> recipeHolder, IRecipeSlotsView recipeSlotsView, GuiGraphics guiGraphics, int x, int y) {
+    protected void renderElements(RecipeHolder<PressurizedReactionRecipe> recipeHolder, IRecipeSlotsView recipeSlotsView, GuiGraphicsExtractor guiGraphics, int x, int y) {
         super.renderElements(recipeHolder, recipeSlotsView, guiGraphics, x, y);
         if (recipeSlotsView.findSlotByName(OUTPUT_CHEMICAL).isEmpty()) {
             //If we don't have an output chemical at all for this recipe, draw the bar overlay manually
@@ -63,22 +62,27 @@ public class PressurizedReactionRecipeCategory extends HolderRecipeCategory<Pres
     }
 
     @Override
-    public void setRecipe(@NotNull IRecipeLayoutBuilder builder, RecipeHolder<PressurizedReactionRecipe> recipeHolder, @NotNull IFocusGroup focusGroup) {
+    public void setRecipe(IRecipeLayoutBuilder builder, RecipeHolder<PressurizedReactionRecipe> recipeHolder, IFocusGroup focusGroup) {
         PressurizedReactionRecipe recipe = recipeHolder.value();
-        initItem(builder, RecipeIngredientRole.INPUT, inputItem, recipe.getInputSolid().getRepresentations());
-        initFluid(builder, RecipeIngredientRole.INPUT, inputFluid, recipe.getInputFluid().getRepresentations());
-        initChemical(builder, RecipeIngredientRole.INPUT, inputChemical, recipe.getInputChemical().getRepresentations());
-        List<ItemStack> itemOutputs = new ArrayList<>();
-        List<ChemicalStack> chemicalOutputs = new ArrayList<>();
+        ContextMap slotDisplayContext = getSlotDisplayContext();
+        initItem(builder, RecipeIngredientRole.INPUT, inputItem, recipe.getInputSolid().getRepresentations(slotDisplayContext));
+        initFluid(builder, RecipeIngredientRole.INPUT, inputFluid, recipe.getInputFluid().getRepresentations(slotDisplayContext));
+        initChemical(builder, RecipeIngredientRole.INPUT, inputChemical, recipe.getInputChemical().getRepresentations(slotDisplayContext));
+        List<ItemStackTemplate> itemOutputs = new ArrayList<>();
+        List<ChemicalStackTemplate> chemicalOutputs = new ArrayList<>();
         for (PressurizedReactionRecipeOutput output : recipe.getOutputDefinition()) {
-            itemOutputs.add(output.item());
-            chemicalOutputs.add(output.chemical());
+            if (output.item() != null) {
+                itemOutputs.add(output.item());
+            }
+            if (output.chemical() != null) {
+                chemicalOutputs.add(output.chemical());
+            }
         }
-        if (!itemOutputs.stream().allMatch(ConstantPredicates.ITEM_EMPTY)) {
-            initItem(builder, RecipeIngredientRole.OUTPUT, outputItem, itemOutputs);
+        if (!itemOutputs.isEmpty()) {
+            initItem(builder, outputItem, itemOutputs);
         }
-        if (!chemicalOutputs.stream().allMatch(ConstantPredicates.CHEMICAL_EMPTY)) {
-            initChemical(builder, RecipeIngredientRole.OUTPUT, outputChemical, chemicalOutputs)
+        if (!chemicalOutputs.isEmpty()) {
+            initChemical(builder, outputChemical, chemicalOutputs)
                   .setSlotName(OUTPUT_CHEMICAL);
         }
     }

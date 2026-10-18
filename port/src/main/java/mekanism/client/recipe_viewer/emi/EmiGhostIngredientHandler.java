@@ -9,14 +9,14 @@ import mekanism.client.gui.GuiMekanism;
 import mekanism.client.gui.GuiUtils;
 import mekanism.client.recipe_viewer.GhostIngredientHandler;
 import mekanism.client.recipe_viewer.interfaces.IRecipeViewerGhostTarget.IGhostIngredientConsumer;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.material.Fluid;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
 import mekanism.neoshim.neoforge.fluids.FluidType;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class EmiGhostIngredientHandler implements EmiDragDropHandler<Screen> {
 
@@ -31,7 +31,7 @@ public class EmiGhostIngredientHandler implements EmiDragDropHandler<Screen> {
     }
 
     @Override
-    public void render(Screen screen, EmiIngredient dragged, GuiGraphics graphics, int mouseX, int mouseY, float delta) {
+    public void render(Screen screen, EmiIngredient dragged, GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         for (EmiTarget target : getTargets(screen, dragged)) {
             GuiUtils.fill(graphics, target.area.getX(), target.area.getY(), target.area.getWidth(), target.area.getHeight(), 0x8822BB33);
         }

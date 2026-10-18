@@ -1,7 +1,6 @@
 package mekanism.common.content.gear.mekasuit;
 
 import java.util.function.Consumer;
-import mekanism.api.annotations.ParametersAreNotNullByDefault;
 import mekanism.api.gear.ICustomModule;
 import mekanism.api.gear.IHUDElement;
 import mekanism.api.gear.IModule;
@@ -9,52 +8,81 @@ import mekanism.api.gear.IModuleContainer;
 import mekanism.api.gear.IModuleHelper;
 import mekanism.api.math.MathUtils;
 import mekanism.common.capabilities.Capabilities;
+import mekanism.common.capabilities.proxy.AutomatedResourceHandler;
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.registries.MekanismFluids;
+import mekanism.common.util.ItemAccessUtils;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
-import mekanism.common.util.StorageUtils;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import mekanism.neoshim.neoforge.fluids.FluidStack;
-import mekanism.neoshim.neoforge.fluids.capability.IFluidHandler.FluidAction;
-import mekanism.neoshim.neoforge.fluids.capability.IFluidHandlerItem;
+import net.minecraft.world.food.FoodConstants;
+import net.minecraft.world.item.Item;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.fluid.FluidResource;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
 
-@ParametersAreNotNullByDefault
 public class ModuleNutritionalInjectionUnit implements ICustomModule<ModuleNutritionalInjectionUnit> {
 
-    private static final ResourceLocation icon = MekanismUtils.getResource(ResourceType.GUI_HUD, "nutritional_injection_unit.png");
+    private static final Identifier icon = MekanismUtils.getResource(ResourceType.GUI_HUD, "nutritional_injection_unit.png");
 
     @Override
-    public void tickServer(IModule<ModuleNutritionalInjectionUnit> module, IModuleContainer moduleContainer, ItemStack stack, Player player) {
-        long usage = MekanismConfig.gear.mekaSuitEnergyUsageNutritionalInjection.get();
+    public void tickServer(IModule<ModuleNutritionalInjectionUnit> module, ItemAccess itemAccess, Player player, TransactionContext transaction) {
         if (MekanismUtils.isPlayingMode(player) && player.canEat(false)) {
             //Check if we can use a single iteration of it
-            IFluidHandlerItem handler = Capabilities.FLUID.getCapability(stack);
-            if (handler != null) {
-                int contained = StorageUtils.getContainedFluid(handler, MekanismFluids.NUTRITIONAL_PASTE.asStack(1)).getAmount();
-                int needed = Math.min(20 - player.getFoodData().getFoodLevel(), contained / MekanismConfig.general.nutritionalPasteMBPerFood.get());
-                int toFeed = Math.min(MathUtils.clampToInt(module.getContainerEnergy(stack) / usage), needed);
-                if (toFeed > 0) {
-                    module.useEnergy(player, stack, usage * toFeed);
-                    handler.drain(MekanismFluids.NUTRITIONAL_PASTE.asStack(toFeed * MekanismConfig.general.nutritionalPasteMBPerFood.get()), FluidAction.EXECUTE);
-                    player.getFoodData().eat(needed, MekanismConfig.general.nutritionalPasteSaturation.get());
+            ResourceHandler<FluidResource> fluidHandler = AutomatedResourceHandler.manual(Capabilities.FLUID.getCapability(itemAccess));
+            if (fluidHandler != null) {
+                FluidResource paste = MekanismFluids.NUTRITIONAL_PASTE.asResource();
+                int missingFood = FoodConstants.MAX_FOOD - player.getFoodData().getFoodLevel();
+                int pastePerFood = MekanismConfig.general.nutritionalPasteMBPerFood.get();
+                int energyUsage = MekanismConfig.gear.mekaSuitEnergyUsageNutritionalInjection.get();
+                int foodToFill;
+                try (Transaction simulation = Transaction.open(transaction)) {
+                    foodToFill = fluidHandler.extract(paste, missingFood * pastePerFood, simulation) / pastePerFood;
+                    //Limit how much food we can handle by the amount of energy stored
+                    foodToFill = module.getEnergyRateLimit(player, itemAccess, energyUsage, foodToFill, simulation);
+                    if (foodToFill == 0) {
+                        return;
+                    }
+                }
+                try (Transaction subTransaction = Transaction.open(transaction)) {
+                    int energyToUse = foodToFill * energyUsage;
+                    int pasteToUse = foodToFill * pastePerFood;
+                    //Note: This if statement should always be true given we already simulated that we could extract at least this much,
+                    // but we validate it just in case before actually committing any changes
+                    if (fluidHandler.extract(paste, pasteToUse, subTransaction) == pasteToUse && module.useAllEnergy(player, itemAccess, energyToUse, subTransaction)) {
+                        player.getFoodData().eat(foodToFill, MekanismConfig.general.nutritionalPasteSaturation.get());
+                        subTransaction.commit();
+                    }
                 }
             }
         }
     }
 
     @Override
-    public void addHUDElements(IModule<ModuleNutritionalInjectionUnit> module, IModuleContainer moduleContainer, ItemStack stack, Player player, Consumer<IHUDElement> hudElementAdder) {
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter> void addHUDElements(IModule<ModuleNutritionalInjectionUnit> module, IModuleContainer moduleContainer,
+          ITEM instance, Player player, Consumer<IHUDElement> hudElementAdder) {
         if (module.isEnabled()) {
-            IFluidHandlerItem handler = Capabilities.FLUID.getCapability(stack);
             double ratio = 0;
-            if (handler != null) {
-                int max = MekanismConfig.gear.mekaSuitNutritionalMaxStorage.getAsInt();
-                handler.drain(MekanismFluids.NUTRITIONAL_PASTE.asStack(max), FluidAction.SIMULATE);
-                FluidStack stored = StorageUtils.getContainedFluid(handler, MekanismFluids.NUTRITIONAL_PASTE.asStack(1));
-                ratio = StorageUtils.getRatio(stored.getAmount(), MekanismConfig.gear.mekaSuitNutritionalMaxStorage.get());
+            ResourceHandler<FluidResource> fluidHandler = Capabilities.FLUID.getCapability(ItemAccessUtils.sideEffectFreeAccess(instance));
+            if (fluidHandler != null) {
+                long max = MekanismConfig.gear.mekaSuitNutritionalMaxStorage.getAsLong();
+                long stored = 0;
+                for (int tank = 0, size = fluidHandler.size(); tank < size; tank++) {
+                    if (fluidHandler.getResource(tank).is(MekanismFluids.NUTRITIONAL_PASTE)) {
+                        long inTank = fluidHandler.getAmountAsLong(tank);
+                        if (stored >= max - inTank) {
+                            stored = max;
+                            break;
+                        }
+                        stored += inTank;
+                    }
+                }
+                ratio = MathUtils.divideToLevel(stored, max);
             }
             hudElementAdder.accept(IModuleHelper.INSTANCE.hudElementPercent(icon, ratio));
         }

@@ -1,19 +1,19 @@
 package mekanism.common.lib.distribution.handler;
 
-/**
- * Created by Thiakil on 30/04/2021.
- */
-public abstract class LongHandler {
+import mekanism.common.lib.transaction.SimpleLongJournal;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
 
-    private long accepted;
+public abstract class LongHandler extends SimpleLongJournal {
 
-    protected void accept(long amount) {
-        accepted += amount;
+    protected long accept(long amount, TransactionContext transaction) {
+        updateSnapshots(transaction);
+        value += amount;
+        return amount;
     }
 
     public long getAccepted() {
-        return accepted;
+        return value;
     }
 
-    public abstract long perform(long amountOffered, boolean isSimulate);
+    public abstract long perform(long amountOffered, TransactionContext transaction);
 }

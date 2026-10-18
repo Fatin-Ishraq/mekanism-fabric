@@ -1,13 +1,14 @@
 package mekanism.client.recipe_viewer.jei;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.serialization.Codec;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import mekanism.api.chemical.ChemicalStack;
+import mekanism.api.chemical.ChemicalStackTemplate;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.GuiElement;
 import mekanism.client.gui.element.bar.GuiBar.IBarInfoHandler;
@@ -37,19 +38,25 @@ import mezz.jei.api.neoforge.NeoForgeTypes;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.IRecipeManager;
 import mezz.jei.api.recipe.RecipeIngredientRole;
-import mezz.jei.api.recipe.RecipeType;
 import mezz.jei.api.recipe.category.IRecipeCategory;
+import mezz.jei.api.recipe.types.IRecipeType;
 import net.minecraft.SharedConstants;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.events.AbstractContainerEventHandler;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.context.ContextMap;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.display.SlotDisplayContext;
+import mekanism.neoshim.neoforge.fluids.FluidInstance;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
+import mekanism.neoshim.neoforge.fluids.FluidStackTemplate;
 import mekanism.neoshim.neoforge.fluids.FluidType;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix3x2fStack;
+import org.jspecify.annotations.Nullable;
 
 //TODO: Re-evaluate this extending AbstractContainerEventHandler
 public abstract class BaseRecipeCategory<RECIPE> extends AbstractContainerEventHandler implements IRecipeCategory<RECIPE>, IGuiWrapper {
@@ -57,7 +64,7 @@ public abstract class BaseRecipeCategory<RECIPE> extends AbstractContainerEventH
     protected static IDrawable createIcon(IGuiHelper helper, IRecipeViewerRecipeType<?> recipeType) {
         ItemStack stack = recipeType.iconStack();
         if (stack.isEmpty()) {
-            ResourceLocation icon = recipeType.icon();
+            Identifier icon = recipeType.icon();
             if (icon == null) {
                 throw new IllegalStateException("Expected recipe type to have either an icon stack or an icon location");
             }
@@ -69,7 +76,7 @@ public abstract class BaseRecipeCategory<RECIPE> extends AbstractContainerEventH
     private final List<GuiElement> guiElements = new ArrayList<>();
     private final Component component;
     private final IGuiHelper guiHelper;
-    private final RecipeType<RECIPE> recipeType;
+    private final IRecipeType<RECIPE> recipeType;
     private final IDrawable icon;
     private final int xOffset;
     private final int yOffset;
@@ -84,7 +91,7 @@ public abstract class BaseRecipeCategory<RECIPE> extends AbstractContainerEventH
         this(helper, MekanismJEI.recipeType(recipeType), recipeType.getTextComponent(), createIcon(helper, recipeType), recipeType.xOffset(), recipeType.yOffset(), recipeType.width(), recipeType.height());
     }
 
-    protected BaseRecipeCategory(IGuiHelper helper, RecipeType<RECIPE> recipeType, Component component, IDrawable icon, int xOffset, int yOffset, int width, int height) {
+    protected BaseRecipeCategory(IGuiHelper helper, IRecipeType<RECIPE> recipeType, Component component, IDrawable icon, int xOffset, int yOffset, int width, int height) {
         this.recipeType = recipeType;
         this.component = component;
         this.guiHelper = helper;
@@ -95,18 +102,21 @@ public abstract class BaseRecipeCategory<RECIPE> extends AbstractContainerEventH
         this.height = height;
     }
 
+    //TODO - 26.1 review that this is only used client side
+    protected static ContextMap getSlotDisplayContext() {
+        return SlotDisplayContext.fromLevel(Objects.requireNonNull(Minecraft.getInstance().level));
+    }
+
     protected <ELEMENT extends GuiElement> ELEMENT addElement(ELEMENT element) {
         guiElements.add(element);
         return element;
     }
 
-    @NotNull
     @Override
     public List<GuiElement> children() {
         return guiElements;
     }
 
-    @NotNull
     @Override
     public ScreenRectangle getRectangle() {
         return new ScreenRectangle(getGuiLeft(), getGuiTop(), getXSize(), getYSize());
@@ -121,10 +131,8 @@ public abstract class BaseRecipeCategory<RECIPE> extends AbstractContainerEventH
         }
     }
 
-    /**
-     * @apiNote x and y are based on the values set in the tile, as the GUI then shifts the slots by one to account for the border. This method is mostly meant as a
-     * helper to make keeping track of the positioning numbers easier.
-     */
+    /// @apiNote x and y are based on the values set in the tile, as the GUI then shifts the slots by one to account for the border. This method is mostly meant as a
+    /// helper to make keeping track of the positioning numbers easier.
     protected GuiSlot addSlot(SlotType type, int x, int y) {
         return addElement(new GuiSlot(type, this, x - 1, y - 1));
     }
@@ -168,7 +176,7 @@ public abstract class BaseRecipeCategory<RECIPE> extends AbstractContainerEventH
     }
 
     @Override
-    public RecipeType<RECIPE> getRecipeType() {
+    public IRecipeType<RECIPE> getRecipeType() {
         return recipeType;
     }
 
@@ -178,19 +186,19 @@ public abstract class BaseRecipeCategory<RECIPE> extends AbstractContainerEventH
     }
 
     @Override
-    public void draw(RECIPE recipe, IRecipeSlotsView recipeSlotsView, GuiGraphics guiGraphics, double mouseX, double mouseY) {
+    public void draw(RECIPE recipe, IRecipeSlotsView recipeSlotsView, GuiGraphicsExtractor guiGraphics, double mouseX, double mouseY) {
         //Translate back by our offset so that we are effectively rendering the foreground starting at 0, 0
         // This is needed to make sure that we render things like crystallizer text in the correct spot
         // If this ends up causing issues elsewhere we will need to look into it further
-        PoseStack pose = guiGraphics.pose();
-        pose.pushPose();
-        pose.translate(getGuiLeft(), getGuiTop(), 0);
+        Matrix3x2fStack matrix = guiGraphics.pose();
+        matrix.pushMatrix();
+        matrix.translate(getGuiLeft(), getGuiTop());
         renderElements(recipe, recipeSlotsView, guiGraphics, (int) mouseX, (int) mouseY);
-        pose.popPose();
+        matrix.popMatrix();
     }
 
-    protected void renderElements(RECIPE recipe, IRecipeSlotsView recipeSlotsView, GuiGraphics guiGraphics, int x, int y) {
-        PoseStack pose = guiGraphics.pose();
+    protected void renderElements(RECIPE recipe, IRecipeSlotsView recipeSlotsView, GuiGraphicsExtractor guiGraphics, int x, int y) {
+        Matrix3x2fStack matrix = guiGraphics.pose();
         for (GuiElement guiElement : guiElements) {
             guiElement.renderShifted(guiGraphics, x, y, 0);
         }
@@ -203,9 +211,9 @@ public abstract class BaseRecipeCategory<RECIPE> extends AbstractContainerEventH
         // When using 200 the crystallizer screen's ore type slot ends up rendering in front of JEI's item rendering, so for now we are just setting this to zero
         int zOffset = 0;//200;
         for (GuiElement element : guiElements) {
-            pose.pushPose();
-            element.onRenderForeground(guiGraphics, x, y, zOffset, zOffset);
-            pose.popPose();
+            matrix.pushMatrix();
+            element.onRenderForeground(guiGraphics, x, y);
+            matrix.popMatrix();
         }
     }
 
@@ -216,7 +224,7 @@ public abstract class BaseRecipeCategory<RECIPE> extends AbstractContainerEventH
 
     @Nullable
     @Override
-    public abstract ResourceLocation getRegistryName(RECIPE recipe);
+    public abstract Identifier getIdentifier(RECIPE recipe);
 
     @Override
     public abstract Codec<RECIPE> getCodec(ICodecHelper codecHelper, IRecipeManager recipeManager);
@@ -285,9 +293,21 @@ public abstract class BaseRecipeCategory<RECIPE> extends AbstractContainerEventH
         return initItem(builder, role, slot.getX(), slot.getY(), stacks);
     }
 
+    protected IRecipeSlotBuilder initItem(IRecipeLayoutBuilder builder, GuiSlot slot, List<ItemStackTemplate> stacks) {
+        return initItem(builder, slot.getX(), slot.getY(), stacks);
+    }
+
     protected IRecipeSlotBuilder initItem(IRecipeLayoutBuilder builder, RecipeIngredientRole role, int x, int y, List<ItemStack> stacks) {
         return builder.addSlot(role, x + 1, y + 1)
               .addItemStacks(stacks);
+    }
+
+    protected IRecipeSlotBuilder initItem(IRecipeLayoutBuilder builder, int x, int y, List<ItemStackTemplate> stacks) {
+        return initItem(builder, RecipeIngredientRole.OUTPUT, x, y, stacks.stream().map(ItemStackTemplate::create).toList());
+    }
+
+    protected IRecipeSlotBuilder initFluid(IRecipeLayoutBuilder builder, GuiGauge<?> gauge, List<FluidStackTemplate> stacks) {
+        return initFluid(builder, RecipeIngredientRole.OUTPUT, gauge, stacks.stream().map(FluidStackTemplate::create).toList());
     }
 
     protected IRecipeSlotBuilder initFluid(IRecipeLayoutBuilder builder, RecipeIngredientRole role, GuiGauge<?> gauge, List<FluidStack> stacks) {
@@ -295,16 +315,20 @@ public abstract class BaseRecipeCategory<RECIPE> extends AbstractContainerEventH
         int height = gauge.getHeight() - 2;
         //If we have no max (no fluids or just an empty fluid) we want to ensure the fluid renderer doesn't throw errors,
         // so we just return a capacity for the render of a bucket
-        int max = stacks.stream().mapToInt(FluidStack::getAmount).filter(stackSize -> stackSize > 0).max().orElse(FluidType.BUCKET_VOLUME);
+        int max = stacks.stream().mapToInt(FluidInstance::amount).filter(stackSize -> stackSize > 0).max().orElse(FluidType.BUCKET_VOLUME);
         return init(builder, NeoForgeTypes.FLUID_STACK, role, gauge, stacks)
               .setFluidRenderer(max, false, width, height);
+    }
+
+    protected IRecipeSlotBuilder initChemical(IRecipeLayoutBuilder builder, GuiElement element, List<ChemicalStackTemplate> stacks) {
+        return initChemical(builder, RecipeIngredientRole.OUTPUT, element, stacks.stream().map(ChemicalStackTemplate::create).toList());
     }
 
     protected IRecipeSlotBuilder initChemical(IRecipeLayoutBuilder builder, RecipeIngredientRole role, GuiElement element, List<ChemicalStack> stacks) {
         int width = element.getWidth() - 2;
         int height = element.getHeight() - 2;
         //If we have no max (no chemicals or just an empty chemical) we mirror how we handle fluids and just return a capacity for the render of a bucket
-        long max = stacks.stream().mapToLong(ChemicalStack::getAmount).filter(stackSize -> stackSize > 0).max().orElse(FluidType.BUCKET_VOLUME);
+        int max = stacks.stream().mapToInt(ChemicalStack::amount).filter(stackSize -> stackSize > 0).max().orElse(FluidType.BUCKET_VOLUME);
         return init(builder, MekanismJEI.TYPE_CHEMICAL, role, element, stacks)
               .setCustomRenderer(MekanismJEI.TYPE_CHEMICAL, new ChemicalStackRenderer(max, width, height));
     }

@@ -12,11 +12,13 @@ import mekanism.client.render.MekanismRenderer;
 import mekanism.common.lib.transmitter.TransmissionType;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
-public class GuiConfigTypeTab extends GuiInsetElement<Void> {
+public class GuiConfigTypeTab extends GuiInsetElement<@Nullable Void> {
 
     private final Map<TransmissionType, Tooltip> typeTooltips = new EnumMap<>(TransmissionType.class);
     private final TransmissionType transmission;
@@ -28,7 +30,7 @@ public class GuiConfigTypeTab extends GuiInsetElement<Void> {
         transmission = type;
     }
 
-    private static ResourceLocation getResource(TransmissionType t) {
+    private static Identifier getResource(TransmissionType t) {
         return MekanismUtils.getResource(ResourceType.GUI, t.getTransmission() + ".png");
     }
 
@@ -37,8 +39,8 @@ public class GuiConfigTypeTab extends GuiInsetElement<Void> {
     }
 
     @Override
-    protected void colorTab(GuiGraphics guiGraphics) {
-        MekanismRenderer.color(guiGraphics, switch (transmission) {
+    protected int getTabColor(GuiGraphicsExtractor guiGraphics) {
+        return MekanismRenderer.color(switch (transmission) {
             case ENERGY -> SpecialColors.TAB_ENERGY_CONFIG;
             case FLUID -> SpecialColors.TAB_FLUID_CONFIG;
             case CHEMICAL -> SpecialColors.TAB_CHEMICAL_CONFIG;
@@ -53,7 +55,7 @@ public class GuiConfigTypeTab extends GuiInsetElement<Void> {
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY, int button) {
+    public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
         config.setCurrentType(transmission);
         config.updateTabs();
     }

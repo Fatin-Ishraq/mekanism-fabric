@@ -11,18 +11,24 @@ import mekanism.common.tile.interfaces.IHasVisualization;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
 import mekanism.common.util.text.BooleanStateDisplay.OnOff;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import org.jspecify.annotations.Nullable;
 
 public class GuiVisualsTab extends GuiInsetElement<IHasVisualization> {
 
     private static final Component ON = MekanismLang.VISUALS.translate(OnOff.ON);
     private static final Component OFF = MekanismLang.VISUALS.translate(OnOff.OFF);
     private static final Component TOO_BIG = MekanismLang.VISUALS_TOO_BIG.translateColored(EnumColor.RED);
+    @Nullable
     private static final Tooltip VISUALS_ON = TooltipUtils.create(ON);
+    @Nullable
     private static final Tooltip VISUALS_OFF = TooltipUtils.create(OFF);
+    @Nullable
     private static final Tooltip VISUALS_ON_TOO_BIG = TooltipUtils.create(ON, TOO_BIG);
+    @Nullable
     private static final Tooltip VISUALS_OFF_TOO_BIG = TooltipUtils.create(OFF, TOO_BIG);
 
     public GuiVisualsTab(IGuiWrapper gui, IHasVisualization hasVisualization) {
@@ -39,12 +45,12 @@ public class GuiVisualsTab extends GuiInsetElement<IHasVisualization> {
     }
 
     @Override
-    protected void colorTab(GuiGraphics guiGraphics) {
-        MekanismRenderer.color(guiGraphics, SpecialColors.TAB_VISUALS);
+    protected int getTabColor(GuiGraphicsExtractor guiGraphics) {
+        return MekanismRenderer.color(SpecialColors.TAB_VISUALS);
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY, int button) {
+    public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
         dataSource.toggleClientRendering();
     }
 }

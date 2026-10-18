@@ -3,7 +3,7 @@ package mekanism.common.inventory.container.item;
 import java.util.Collections;
 import java.util.List;
 import mekanism.api.security.SecurityMode;
-import mekanism.common.attachments.FrequencyAware;
+import mekanism.common.component.FrequencyAware;
 import mekanism.common.inventory.container.sync.SyncableFrequency;
 import mekanism.common.inventory.container.sync.list.SyncableFrequencyList;
 import mekanism.common.lib.frequency.Frequency;
@@ -13,18 +13,19 @@ import mekanism.common.registries.MekanismDataComponents;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import org.jspecify.annotations.Nullable;
 
 public abstract class FrequencyItemContainer<FREQ extends Frequency> extends MekanismItemContainer {
 
     private List<FREQ> publicCache = Collections.emptyList();
     private List<FREQ> privateCache = Collections.emptyList();
     private List<FREQ> trustedCache = Collections.emptyList();
+    @Nullable
     private FREQ freq;
 
-    protected FrequencyItemContainer(ContainerTypeRegistryObject<?> type, int id, Inventory inv, InteractionHand hand, ItemStack stack) {
-        super(type, id, inv, hand, stack);
+    protected FrequencyItemContainer(ContainerTypeRegistryObject<?> type, int id, Inventory inv, InteractionHand hand, ItemAccess itemAccess) {
+        super(type, id, inv, hand, itemAccess);
     }
 
     public InteractionHand getHand() {
@@ -43,10 +44,10 @@ public abstract class FrequencyItemContainer<FREQ extends Frequency> extends Mek
         DataComponentType<FrequencyAware<FREQ>> frequencyComponent = MekanismDataComponents.getFrequencyComponent(getFrequencyType());
         if (frequencyComponent != null) {
             //Note: It should never be null, but we check just in case
-            FrequencyAware<FREQ> frequencyAware = stack.get(frequencyComponent);
+            FrequencyAware<FREQ> frequencyAware = itemAccess.getResource().get(frequencyComponent);
             if (frequencyAware != null) {
                 //Start it out at what the value on the stack is
-                return frequencyAware.getFrequency(stack, frequencyComponent);
+                return frequencyAware.frequency().orElse(null);
             }
         }
         return null;
@@ -64,7 +65,7 @@ public abstract class FrequencyItemContainer<FREQ extends Frequency> extends Mek
         return trustedCache;
     }
 
-    private void setFrequency(FREQ frequency) {
+    private void setFrequency(@Nullable FREQ frequency) {
         this.freq = frequency;
     }
 
@@ -82,9 +83,9 @@ public abstract class FrequencyItemContainer<FREQ extends Frequency> extends Mek
             //Server side sync handling
             //Note: It is important these are in the same order as the client side trackers
             track(SyncableFrequency.create(frequencyType, this::getFrequencyFromStack, this::setFrequency));
-            track(SyncableFrequencyList.create(frequencyType, () -> frequencyType.getManager(null, SecurityMode.PUBLIC).getFrequencies(), value -> publicCache = value));
-            track(SyncableFrequencyList.create(frequencyType, () -> frequencyType.getManager(getPlayerUUID(), SecurityMode.PRIVATE).getFrequencies(), value -> privateCache = value));
-            track(SyncableFrequencyList.create(frequencyType, () -> frequencyType.getManager(getPlayerUUID(), SecurityMode.TRUSTED).getFrequencies(), value -> trustedCache = value));
+            track(SyncableFrequencyList.create(frequencyType, () -> frequencyType.getLookup(null, SecurityMode.PUBLIC).getFrequencies(), value -> publicCache = value));
+            track(SyncableFrequencyList.create(frequencyType, () -> frequencyType.getLookup(getPlayerUUID(), SecurityMode.PRIVATE).getFrequencies(), value -> privateCache = value));
+            track(SyncableFrequencyList.create(frequencyType, () -> frequencyType.getLookup(getPlayerUUID(), SecurityMode.TRUSTED).getFrequencies(), value -> trustedCache = value));
         }
     }
 }

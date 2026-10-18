@@ -1,12 +1,11 @@
 package mekanism.common.recipe.upgrade;
 
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.common.registries.MekanismDataComponents;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.Nullable;
+import mekanism.common.util.ItemAccessUtils;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public class SortingRecipeData implements RecipeUpgradeData<SortingRecipeData> {
 
     static final SortingRecipeData SORTING = new SortingRecipeData();
@@ -21,8 +20,7 @@ public class SortingRecipeData implements RecipeUpgradeData<SortingRecipeData> {
     }
 
     @Override
-    public boolean applyToStack(HolderLookup.Provider provider, ItemStack stack) {
-        stack.set(MekanismDataComponents.SORTING, true);
-        return true;
+    public boolean applyToStack(ItemAccess itemAccess, TransactionContext transaction) {
+        return ItemAccessUtils.exchange(itemAccess, itemAccess.getResource().with(MekanismDataComponents.SORTING, true),  transaction);
     }
 }

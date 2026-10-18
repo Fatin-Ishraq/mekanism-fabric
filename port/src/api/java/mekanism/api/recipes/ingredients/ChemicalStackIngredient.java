@@ -5,99 +5,88 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.List;
 import java.util.Objects;
 import mekanism.api.SerializationConstants;
-import mekanism.api.SerializerHelper;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.chemical.Chemical;
 import mekanism.api.chemical.ChemicalStack;
 import mekanism.api.recipes.ingredients.chemical.ChemicalIngredient;
 import mekanism.api.recipes.ingredients.creator.IngredientCreatorAccess;
 import net.minecraft.core.Holder;
+import net.minecraft.core.TypedInstance;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.util.ExtraCodecs;
+import net.minecraft.util.context.ContextMap;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Base implementation for a ChemicalIngredient with an amount.
- *
- * <p>{@link ChemicalIngredient}, like its item counterpart, explicitly does not perform count checks,
- * so this class is used to (a) wrap a standard ChemicalIngredient with an amount and (b) provide a standard serialization format for mods to use.
- *
- * @see mekanism.neoshim.neoforge.common.crafting.SizedIngredient
- */
-@NothingNullByDefault
-public final class ChemicalStackIngredient implements InputIngredient<ChemicalStack> {
+/// Base implementation for a ChemicalIngredient with an amount.
+///
+/// [ChemicalIngredient], like its item counterpart, explicitly does not perform count checks, so this class is used to (a) wrap a standard ChemicalIngredient with an
+/// amount and (b) provide a standard serialization format for mods to use.
+///
+/// @see mekanism.neoshim.neoforge.common.crafting.SizedIngredient
+public final class ChemicalStackIngredient implements InputIngredient<Chemical, ChemicalStack> {
 
-    /**
-     * The "flat" codec for {@link ChemicalStackIngredient}.
-     *
-     * <p>The amount is serialized inline with the rest of the ingredient, for example:
-     *
-     * <pre>{@code
-     * {
-     *     "chemical": "mekanism:hydrogen",
-     *     "amount": 250
-     * }
-     * }</pre>
-     * <p>
-     * Compound chemical ingredients are always serialized using the map codec, i.e.
-     *
-     * <pre>{@code
-     * {
-     *     "type": "mekanism:compound",
-     *     "ingredients": [
-     *         { "chemical": "mekanism:hydrogen" },
-     *         { "chemical": "mekanism:oxygen" }
-     *     ],
-     *     "amount": 500
-     * }
-     * }</pre>
-     *
-     * @since 10.6.0
-     */
+    /// The "flat" codec for [ChemicalStackIngredient].
+    ///
+    /// The amount is serialized inline with the rest of the ingredient, for example:
+    /// ```json
+    /// {
+    ///     "chemical": "mekanism:hydrogen",
+    ///     "amount": 250
+    /// }
+    /// ```
+    ///
+    /// Compound chemical ingredients are always serialized using the map codec, i.e.
+    /// ```json
+    /// {
+    ///     "type": "mekanism:compound",
+    ///     "ingredients": [
+    ///         { "chemical": "mekanism:hydrogen" },
+    ///         { "chemical": "mekanism:oxygen" }
+    ///     ],
+    ///     "amount": 500
+    /// }
+    /// ```
+    ///
+    /// @since 10.6.0
     public static final Codec<ChemicalStackIngredient> CODEC = RecordCodecBuilder.create(instance -> instance.group(
           IngredientCreatorAccess.chemical().mapCodecNonEmpty().forGetter(ChemicalStackIngredient::ingredient),
-          SerializerHelper.POSITIVE_LONG_CODEC.fieldOf(SerializationConstants.AMOUNT).forGetter(ChemicalStackIngredient::amount)
+          ExtraCodecs.POSITIVE_INT.fieldOf(SerializationConstants.AMOUNT).forGetter(ChemicalStackIngredient::amount)
     ).apply(instance, ChemicalStackIngredient::new));
 
-    /**
-     * A stream codec for sending {@link ChemicalStackIngredient}s over the network.
-     *
-     * @since 10.6.0
-     */
+    /// A stream codec for sending [ChemicalStackIngredient]s over the network.
+    ///
+    /// @since 10.6.0
     public static final StreamCodec<RegistryFriendlyByteBuf, ChemicalStackIngredient> STREAM_CODEC = StreamCodec.composite(
           IngredientCreatorAccess.chemical().streamCodec(), ChemicalStackIngredient::ingredient,
-          ByteBufCodecs.VAR_LONG, ChemicalStackIngredient::amount,
+          ByteBufCodecs.VAR_INT, ChemicalStackIngredient::amount,
           ChemicalStackIngredient::new
     );
 
-    /**
-     * Creates a Chemical Stack Ingredient that matches a given ingredient and amount. Prefer calling via
-     * {@link mekanism.api.recipes.ingredients.creator.IngredientCreatorAccess#chemical()} and
-     * {@link mekanism.api.recipes.ingredients.creator.IChemicalStackIngredientCreator#from(ChemicalIngredient, long)}.
-     *
-     * @param ingredient Ingredient to match.
-     * @param amount     Amount to match.
-     *
-     * @throws NullPointerException     if the given instance is null.
-     * @throws IllegalArgumentException if the given instance is empty.
-     * @since 10.6.0
-     */
-    public static ChemicalStackIngredient of(ChemicalIngredient ingredient, long amount) {
+    /// Creates a Chemical Stack Ingredient that matches a given ingredient and amount. Prefer calling via
+    /// [mekanism.api.recipes.ingredients.creator.IngredientCreatorAccess#chemical()] and
+    /// [mekanism.api.recipes.ingredients.creator.IChemicalStackIngredientCreator#from(ChemicalIngredient, int)].
+    ///
+    /// @param ingredient Ingredient to match.
+    /// @param amount     Amount to match.
+    ///
+    /// @throws NullPointerException     if the given instance is null.
+    /// @throws IllegalArgumentException if the given instance is empty.
+    /// @since 10.6.0
+    public static ChemicalStackIngredient of(ChemicalIngredient ingredient, int amount) {
         Objects.requireNonNull(ingredient, "ChemicalStackIngredients cannot be created from a null ingredient.");
         if (ingredient.isEmpty()) {
             throw new IllegalArgumentException("ChemicalStackIngredients cannot be created using the empty ingredient.");
+        } else if (amount <= 0) {
+            throw new IllegalArgumentException("Size must be positive");
         }
         return new ChemicalStackIngredient(ingredient, amount);
     }
 
     private final ChemicalIngredient ingredient;
-    private final long amount;
+    private final int amount;
 
-    public ChemicalStackIngredient(ChemicalIngredient ingredient, long amount) {
-        if (amount <= 0) {
-            throw new IllegalArgumentException("Size must be positive");
-        }
+    private ChemicalStackIngredient(ChemicalIngredient ingredient, int amount) {
         this.ingredient = ingredient;
         this.amount = amount;
     }
@@ -107,40 +96,22 @@ public final class ChemicalStackIngredient implements InputIngredient<ChemicalSt
 
     @Override
     public boolean test(ChemicalStack stack) {
-        return testType(stack) && stack.getAmount() >= amount;
+        return testType(stack) && stack.amount() >= amount;
     }
 
     @Override
-    public boolean testType(ChemicalStack stack) {
+    public boolean testType(TypedInstance<Chemical> stack) {
         Objects.requireNonNull(stack);
-        return testType(stack.getChemicalHolder());
+        return testType(stack.typeHolder());
     }
 
-    /**
-     * Evaluates this predicate on the given argument, ignoring any size data.
-     *
-     * @param chemical Input argument.
-     *
-     * @return {@code true} if the input argument matches the predicate, otherwise {@code false}
-     *
-     * @deprecated Use {@link #testType(Holder)} instead
-     */
-    @SuppressWarnings("removal")
-    @Deprecated(forRemoval = true, since = "10.7.11")
-    public boolean testType(Chemical chemical) {
-        Objects.requireNonNull(chemical);
-        return ingredient.test(chemical);
-    }
-
-    /**
-     * Evaluates this predicate on the given argument, ignoring any size data.
-     *
-     * @param chemical Input argument.
-     *
-     * @return {@code true} if the input argument matches the predicate, otherwise {@code false}
-     *
-     * @since 10.7.11
-     */
+    /// Evaluates this predicate on the given argument, ignoring any size data.
+    ///
+    /// @param chemical Input argument.
+    ///
+    /// @return `true` if the input argument matches the predicate, otherwise `false`
+    ///
+    /// @since 10.7.11
     public boolean testType(Holder<Chemical> chemical) {
         Objects.requireNonNull(chemical);
         return ingredient.test(chemical);
@@ -152,7 +123,7 @@ public final class ChemicalStackIngredient implements InputIngredient<ChemicalSt
     }
 
     @Override
-    public long getNeededAmount(ChemicalStack stack) {
+    public int getNeededAmount(TypedInstance<Chemical> stack) {
         return testType(stack) ? amount : 0;
     }
 
@@ -167,7 +138,8 @@ public final class ChemicalStackIngredient implements InputIngredient<ChemicalSt
     }
 
     @Override
-    public List<ChemicalStack> getRepresentations() {
+    public List<ChemicalStack> getRepresentations(ContextMap context) {
+        //TODO - 26.1: Refactor this to be based off the display
         if (this.representations == null) {
             this.representations = ingredient.getChemicalHolders().stream()
                   .map(chemical -> new ChemicalStack(chemical, amount))
@@ -176,26 +148,22 @@ public final class ChemicalStackIngredient implements InputIngredient<ChemicalSt
         return representations;
     }
 
-    /**
-     * For use in recipe input caching. Gets the internal Chemical Ingredient.
-     *
-     * @since 10.6.0
-     */
+    /// For use in recipe input caching. Gets the internal Chemical Ingredient.
+    ///
+    /// @since 10.6.0
     public ChemicalIngredient ingredient() {
         return ingredient;
     }
 
-    /**
-     * For use in recipe input caching. Gets the internal amount this ingredient represents.
-     *
-     * @since 10.6.0
-     */
-    public long amount() {
+    /// For use in recipe input caching. Gets the internal amount this ingredient represents.
+    ///
+    /// @since 10.6.0
+    public int amount() {
         return amount;
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) {
             return true;
         } else if (o == null || getClass() != o.getClass()) {
@@ -207,7 +175,7 @@ public final class ChemicalStackIngredient implements InputIngredient<ChemicalSt
 
     @Override
     public int hashCode() {
-        return 31 * ingredient.hashCode() + Long.hashCode(amount);
+        return 31 * ingredient.hashCode() + amount;
     }
 
     @Override

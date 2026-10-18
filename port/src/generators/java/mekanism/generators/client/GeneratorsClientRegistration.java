@@ -1,11 +1,7 @@
 package mekanism.generators.client;
 
 import mekanism.api.gear.IModuleHelper;
-import mekanism.client.ClientRegistration;
 import mekanism.client.ClientRegistrationUtil;
-import mekanism.client.model.baked.ExtensionBakedModel.TransformedBakedModel;
-import mekanism.client.render.RenderPropertiesProvider.MekRenderProperties;
-import mekanism.client.render.lib.QuadTransformation;
 import mekanism.common.inventory.container.tile.MekanismTileContainer;
 import mekanism.generators.client.gui.GuiBioGenerator;
 import mekanism.generators.client.gui.GuiFissionReactor;
@@ -39,22 +35,18 @@ import mekanism.generators.common.registries.GeneratorsModules;
 import mekanism.generators.common.registries.GeneratorsTileEntityTypes;
 import mekanism.generators.common.tile.TileEntityAdvancedSolarGenerator;
 import mekanism.generators.common.tile.TileEntitySolarGenerator;
-import net.minecraft.client.renderer.ItemBlockRenderTypes;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.level.material.Fluid;
 import mekanism.neoshim.api.distmarker.Dist;
 import mekanism.neoshim.bus.api.SubscribeEvent;
 import mekanism.neoshim.fml.common.EventBusSubscriber;
 import mekanism.neoshim.fml.event.lifecycle.FMLClientSetupEvent;
 import mekanism.neoshim.neoforge.client.event.EntityRenderersEvent;
-import mekanism.neoshim.neoforge.client.event.RegisterClientReloadListenersEvent;
-import mekanism.neoshim.neoforge.client.event.RegisterColorHandlersEvent;
+import mekanism.neoshim.neoforge.client.event.RegisterFluidModelsEvent;
 import mekanism.neoshim.neoforge.client.event.RegisterMenuScreensEvent;
+import mekanism.neoshim.neoforge.client.event.RegisterSpecialModelRendererEvent;
 import mekanism.neoshim.neoforge.client.event.TextureAtlasStitchedEvent;
 import mekanism.neoshim.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 
@@ -66,16 +58,6 @@ public class GeneratorsClientRegistration {
 
     @SubscribeEvent
     public static void init(FMLClientSetupEvent event) {
-        event.enqueueWork(() -> {
-            //Set fluids to a translucent render layer
-            for (Holder<Fluid> fluid : GeneratorsFluids.FLUIDS.getFluidEntries()) {
-                ItemBlockRenderTypes.setRenderLayer(fluid.value(), RenderType.translucent());
-            }
-        });
-
-        // adv solar gen requires to be translated up 1 block, so handle the model separately
-        ClientRegistration.addCustomModel(GeneratorsBlocks.ADVANCED_SOLAR_GENERATOR, (orig, evt) -> new TransformedBakedModel<Void>(orig,
-              QuadTransformation.translate(0, 1, 0)));
         //TODO: Eventually make use of these custom model wrappers
         //ClientRegistration.addCustomModel(GeneratorsBlocks.FISSION_FUEL_ASSEMBLY, (orig, evt) -> new FuelAssemblyBakedModel(orig, 0.75));
         //ClientRegistration.addCustomModel(GeneratorsBlocks.CONTROL_ROD_ASSEMBLY, (orig, evt) -> new FuelAssemblyBakedModel(orig, 0.375));
@@ -105,11 +87,6 @@ public class GeneratorsClientRegistration {
         event.registerLayerDefinition(ModelTurbine.TURBINE_LAYER, ModelTurbine::createLayerDefinition);
     }
 
-    @SubscribeEvent
-    public static void registerClientReloadListeners(RegisterClientReloadListenersEvent event) {
-        event.registerReloadListener(RenderWindGeneratorItem.RENDERER);
-    }
-
     @SuppressWarnings("Convert2MethodRef")
     @SubscribeEvent
     public static void registerScreens(RegisterMenuScreensEvent event) {
@@ -133,8 +110,8 @@ public class GeneratorsClientRegistration {
     }
 
     @SubscribeEvent
-    public static void registerItemColorHandlers(RegisterColorHandlersEvent.Item event) {
-        ClientRegistrationUtil.registerBucketColorHandler(event, GeneratorsFluids.FLUIDS);
+    public static void fluidModels(RegisterFluidModelsEvent event) {
+        ClientRegistrationUtil.registerFluidModels(event, GeneratorsFluids.FLUIDS);
     }
 
     @SubscribeEvent
@@ -142,16 +119,17 @@ public class GeneratorsClientRegistration {
         if (!event.getAtlas().location().equals(TextureAtlas.LOCATION_BLOCKS)) {
             return;
         }
-        //Reset any cached models now that the atlases are built
-        RenderBioGenerator.resetCachedModels();
-        RenderFissionReactor.resetCachedModels();
         GeneratorsSpecialColors.GUI_OBJECTS.parse(MekanismGenerators.rl("textures/colormap/gui_objects.png"));
     }
 
     @SubscribeEvent
     public static void registerClientExtensions(RegisterClientExtensionsEvent event) {
-        event.registerItem(new MekRenderProperties(RenderWindGeneratorItem.RENDERER), GeneratorsBlocks.WIND_GENERATOR.getItemHolder());
         ClientRegistrationUtil.registerBlockExtensions(event, GeneratorsBlocks.BLOCKS);
         ClientRegistrationUtil.registerFluidExtensions(event, GeneratorsFluids.FLUIDS);
+    }
+
+    @SubscribeEvent
+    public static void specialItemRenderers(RegisterSpecialModelRendererEvent event) {
+        event.register(MekanismGenerators.rl("wind_generator_model"), RenderWindGeneratorItem.Unbaked.MAP_CODEC);
     }
 }

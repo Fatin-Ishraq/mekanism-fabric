@@ -1,6 +1,6 @@
 package mekanism.common.item.block.transmitter;
 
-import java.util.List;
+import java.util.function.Consumer;
 import mekanism.api.text.EnumColor;
 import mekanism.common.MekanismLang;
 import mekanism.common.block.attribute.Attribute;
@@ -15,29 +15,32 @@ import net.minecraft.world.TickRateManager;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.item.component.TooltipDisplay;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
 
 public class ItemBlockLogisticalTransporter extends ItemBlockTransporter<TileEntityLogisticalTransporter> {
 
+    private final TransporterTier tier;
+
     public ItemBlockLogisticalTransporter(BlockLargeTransmitter<TileEntityLogisticalTransporter> block, Item.Properties properties) {
+        tier = Attribute.getTierNN(block, TransporterTier.class);
         super(block, properties);
     }
 
-    @NotNull
     @Override
     public TransporterTier getTier() {
-        return Attribute.getTier(getBlock(), TransporterTier.class);
+        return tier;
     }
 
     @Override
-    protected void addStats(@NotNull ItemStack stack, @NotNull Item.TooltipContext context, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        super.addStats(stack, context, tooltip, flag);
-        TransporterTier tier = getTier();
+    protected void addStats(ItemStack stack, ItemAccess itemAccess, Item.TooltipContext context, TooltipDisplay tooltipDisplay,
+          Consumer<Component> tooltipAdder, TooltipFlag flag) {
+        super.addStats(stack, itemAccess, context, tooltipDisplay, tooltipAdder, flag);
         //Ensure no one somehow passes in invalid data
         float tickRate = Math.max(context.tickRate(), TickRateManager.MIN_TICKRATE);
         float speed = tier.getSpeed() / (5 * SharedConstants.TICKS_PER_SECOND / tickRate);
         float pull = tier.getPullAmount() * tickRate / MekanismUtils.TICKS_PER_HALF_SECOND;
-        tooltip.add(MekanismLang.SPEED.translateColored(EnumColor.INDIGO, EnumColor.GRAY, UnitDisplayUtils.roundDecimals(speed)));
-        tooltip.add(MekanismLang.PUMP_RATE.translateColored(EnumColor.INDIGO, EnumColor.GRAY, UnitDisplayUtils.roundDecimals(pull)));
+        tooltipAdder.accept(MekanismLang.SPEED.translateColored(EnumColor.INDIGO, EnumColor.GRAY, UnitDisplayUtils.roundDecimals(speed)));
+        tooltipAdder.accept(MekanismLang.PUMP_RATE.translateColored(EnumColor.INDIGO, EnumColor.GRAY, UnitDisplayUtils.roundDecimals(pull)));
     }
 }

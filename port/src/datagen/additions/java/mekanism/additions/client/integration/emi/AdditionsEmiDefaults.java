@@ -5,18 +5,16 @@ import java.util.concurrent.CompletableFuture;
 import mekanism.additions.common.MekanismAdditions;
 import mekanism.additions.common.registries.AdditionsBlocks;
 import mekanism.additions.common.registries.AdditionsItems;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.text.EnumColor;
 import mekanism.client.integration.emi.BaseEmiDefaults;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
-import mekanism.neoshim.neoforge.common.data.ExistingFileHelper;
+import net.minecraft.server.packs.resources.ResourceManager;
 
-@NothingNullByDefault
 public class AdditionsEmiDefaults extends BaseEmiDefaults {
 
-    public AdditionsEmiDefaults(PackOutput output, ExistingFileHelper existingFileHelper, CompletableFuture<HolderLookup.Provider> registries) {
-        super(output, existingFileHelper, registries, MekanismAdditions.MODID);
+    public AdditionsEmiDefaults(PackOutput output, ResourceManager serverResources, CompletableFuture<HolderLookup.Provider> registries) {
+        super(output, serverResources, registries, MekanismAdditions.MODID);
     }
 
     @Override

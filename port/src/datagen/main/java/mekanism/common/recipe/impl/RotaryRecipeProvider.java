@@ -10,15 +10,22 @@ import mekanism.common.registries.MekanismChemicals;
 import mekanism.common.registries.MekanismFluids;
 import mekanism.common.tags.MekanismTags;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
-import mekanism.neoshim.neoforge.fluids.FluidStack;
+import mekanism.neoshim.neoforge.fluids.FluidStackTemplate;
 
 class RotaryRecipeProvider implements ISubRecipeProvider {
+
+    private final HolderGetter<Fluid> fluids;
+
+    public RotaryRecipeProvider(HolderGetter<Fluid> fluids) {
+        this.fluids = fluids;
+    }
 
     @Override
     public void addRecipes(RecipeOutput consumer, HolderLookup.Provider registries) {
@@ -44,10 +51,10 @@ class RotaryRecipeProvider implements ISubRecipeProvider {
 
     private void addRotaryCondensentratorRecipe(RecipeOutput consumer, String basePath, DeferredChemical<Chemical> gas, Holder<Fluid> fluidOutput, TagKey<Fluid> fluidInput) {
         RotaryRecipeBuilder.rotary(
-              IngredientCreatorAccess.fluid().from(fluidInput, 1),
+              IngredientCreatorAccess.fluid().from(this.fluids, fluidInput, 1),
               IngredientCreatorAccess.chemicalStack().fromHolder(gas, 1),
-              gas.asStack(1),
-              new FluidStack(fluidOutput, 1)
-        ).build(consumer, Mekanism.rl(basePath + gas.getName()));
+              gas.asTemplate(1),
+              new FluidStackTemplate(fluidOutput, 1)
+        ).save(consumer, Mekanism.rl(basePath + gas.getName()));
     }
 }

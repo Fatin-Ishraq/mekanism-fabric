@@ -8,8 +8,6 @@ import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
 import mekanism.api.IIncrementalEnum;
-import mekanism.api.annotations.NothingNullByDefault;
-import mekanism.api.annotations.ParametersAreNotNullByDefault;
 import mekanism.api.gear.ICustomModule;
 import mekanism.api.gear.IModule;
 import mekanism.api.gear.IModuleContainer;
@@ -24,26 +22,28 @@ import mekanism.api.text.TextComponentUtil;
 import mekanism.common.Mekanism;
 import mekanism.common.MekanismLang;
 import mekanism.common.util.MekanismUtils;
-import net.minecraft.Util;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.ByIdMap;
 import net.minecraft.util.StringRepresentable;
+import net.minecraft.util.Util;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.common.TranslatableEnum;
 import mekanism.neoshim.neoforge.common.util.Lazy;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-@ParametersAreNotNullByDefault
 public record ModuleExcavationEscalationUnit(ExcavationMode excavationMode) implements ICustomModule<ModuleExcavationEscalationUnit> {
 
-    public static final ResourceLocation EXCAVATION_MODE = Mekanism.rl("efficiency");
+    public static final Identifier EXCAVATION_MODE = Mekanism.rl("efficiency");
 
-    private static final ResourceLocation RADIAL_ID = Mekanism.rl("excavation_mode");
+    private static final Identifier RADIAL_ID = Mekanism.rl("excavation_mode");
     private static final Int2ObjectMap<Lazy<NestedRadialMode>> RADIAL_DATAS = Util.make(() -> {
         int types = ExcavationMode.values().length - 2;
         Int2ObjectMap<Lazy<NestedRadialMode>> map = new Int2ObjectArrayMap<>(types);
@@ -68,13 +68,14 @@ public record ModuleExcavationEscalationUnit(ExcavationMode excavationMode) impl
     }
 
     @Override
-    public void addRadialModes(IModule<ModuleExcavationEscalationUnit> module, @NotNull ItemStack stack, Consumer<NestedRadialMode> adder) {
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter> void addRadialModes(IModule<ModuleExcavationEscalationUnit> module, ITEM instance, Consumer<NestedRadialMode> adder) {
         adder.accept(getNestedData(module));
     }
 
     @Nullable
     @Override
-    public <MODE extends IRadialMode> MODE getMode(IModule<ModuleExcavationEscalationUnit> module, ItemStack stack, RadialData<MODE> radialData) {
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter, MODE extends IRadialMode> MODE getMode(IModule<ModuleExcavationEscalationUnit> module, ITEM instance,
+          RadialData<MODE> radialData) {
         if (radialData == getRadialData(module)) {
             return (MODE) excavationMode;
         }
@@ -82,34 +83,37 @@ public record ModuleExcavationEscalationUnit(ExcavationMode excavationMode) impl
     }
 
     @Override
-    public <MODE extends IRadialMode> boolean setMode(IModule<ModuleExcavationEscalationUnit> module, Player player, IModuleContainer moduleContainer, ItemStack stack, RadialData<MODE> radialData, MODE mode) {
+    public <MODE extends IRadialMode> boolean setMode(IModule<ModuleExcavationEscalationUnit> module, Player player, ItemAccess itemAccess, RadialData<MODE> radialData,
+          MODE mode, @Nullable TransactionContext transaction) {
         if (radialData == getRadialData(module)) {
             ExcavationMode newMode = (ExcavationMode) mode;
             if (excavationMode != newMode) {
-                moduleContainer.replaceModuleConfig(player.registryAccess(), stack, module.getDataHolder(), module.<ExcavationMode>getConfigOrThrow(EXCAVATION_MODE).with(newMode));
+                module.replaceModuleConfig(player.registryAccess(), itemAccess, transaction, module.<ExcavationMode>getConfigOrThrow(EXCAVATION_MODE).with(newMode));
             }
         }
         return false;
     }
 
     @Override
-    public Component getModeScrollComponent(IModule<ModuleExcavationEscalationUnit> module, ItemStack stack) {
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter> Component getModeScrollComponent(IModule<ModuleExcavationEscalationUnit> module, ITEM instance) {
         return MekanismLang.GENERIC_WITH_PARENTHESIS.translateColored(EnumColor.INDIGO, excavationMode.sliceName(), EnumColor.AQUA, excavationMode.getEfficiency());
     }
 
     @Override
-    public void changeMode(IModule<ModuleExcavationEscalationUnit> module, Player player, IModuleContainer moduleContainer, ItemStack stack, int shift, boolean displayChangeMessage) {
+    public void changeMode(IModule<ModuleExcavationEscalationUnit> module, Player player, ItemAccess itemAccess, int shift,
+          boolean displayChangeMessage, @Nullable TransactionContext transaction) {
         ExcavationMode newMode = excavationMode.adjust(shift, v -> v.ordinal() < module.getInstalledCount() + 2);
         if (excavationMode != newMode) {
             if (displayChangeMessage) {
                 module.displayModeChange(player, MekanismLang.MODULE_EFFICIENCY.translate(), newMode);
             }
-            moduleContainer.replaceModuleConfig(player.registryAccess(), stack, module.getDataHolder(), module.<ExcavationMode>getConfigOrThrow(EXCAVATION_MODE).with(newMode));
+            module.replaceModuleConfig(player.registryAccess(), itemAccess, transaction, module.<ExcavationMode>getConfigOrThrow(EXCAVATION_MODE).with(newMode));
         }
     }
 
     @Override
-    public void addHUDStrings(IModule<ModuleExcavationEscalationUnit> module, IModuleContainer moduleContainer, ItemStack stack, Player player, Consumer<Component> hudStringAdder) {
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter> void addHUDStrings(IModule<ModuleExcavationEscalationUnit> module, IModuleContainer moduleContainer,
+          ITEM instance, Player player, Consumer<Component> hudStringAdder) {
         if (module.isEnabled()) {
             hudStringAdder.accept(MekanismLang.DISASSEMBLER_EFFICIENCY.translateColored(EnumColor.DARK_GRAY, EnumColor.INDIGO, getEfficiency()));
         }
@@ -119,7 +123,6 @@ public record ModuleExcavationEscalationUnit(ExcavationMode excavationMode) impl
         return excavationMode.getEfficiency();
     }
 
-    @NothingNullByDefault
     public enum ExcavationMode implements IIncrementalEnum<ExcavationMode>, IHasTextComponent, TranslatableEnum, IRadialMode, StringRepresentable {
         OFF(MekanismLang.RADIAL_EXCAVATION_SPEED_OFF, 0, EnumColor.WHITE, "speed_off"),
         SLOW(MekanismLang.RADIAL_EXCAVATION_SPEED_SLOW, 4, EnumColor.PINK, "speed_slow"),
@@ -133,7 +136,7 @@ public record ModuleExcavationEscalationUnit(ExcavationMode excavationMode) impl
         public static final StreamCodec<ByteBuf, ExcavationMode> STREAM_CODEC = ByteBufCodecs.idMapper(BY_ID, ExcavationMode::ordinal);
 
         private final String serializedName;
-        private final ResourceLocation icon;
+        private final Identifier icon;
         private final ILangEntry langEntry;
         private final Component label;
         private final EnumColor color;
@@ -167,15 +170,13 @@ public record ModuleExcavationEscalationUnit(ExcavationMode excavationMode) impl
             return efficiency;
         }
 
-        @NotNull
         @Override
         public Component sliceName() {
             return langEntry.translateColored(color);
         }
 
-        @NotNull
         @Override
-        public ResourceLocation icon() {
+        public Identifier icon() {
             return icon;
         }
 

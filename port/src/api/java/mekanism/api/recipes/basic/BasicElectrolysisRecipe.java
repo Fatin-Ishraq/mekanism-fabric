@@ -3,44 +3,35 @@ package mekanism.api.recipes.basic;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import mekanism.api.annotations.NothingNullByDefault;
-import mekanism.api.chemical.ChemicalStack;
+import mekanism.api.chemical.ChemicalStackTemplate;
 import mekanism.api.recipes.ElectrolysisRecipe;
 import mekanism.api.recipes.MekanismRecipeSerializers;
 import mekanism.api.recipes.ingredients.FluidStackIngredient;
+import net.minecraft.core.TypedInstance;
 import net.minecraft.world.item.crafting.RecipeSerializer;
-import mekanism.neoshim.neoforge.fluids.FluidStack;
+import net.minecraft.world.level.material.Fluid;
 import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public class BasicElectrolysisRecipe extends ElectrolysisRecipe {
 
     protected final FluidStackIngredient input;
-    protected final ChemicalStack leftChemicalOutput;
-    protected final ChemicalStack rightChemicalOutput;
-    protected final long energyMultiplier;//todo double?
+    protected final ChemicalStackTemplate leftChemicalOutput;
+    protected final ChemicalStackTemplate rightChemicalOutput;
+    protected final int energyMultiplier;//todo double?
 
-    /**
-     * @param input               Input.
-     * @param energyMultiplier    Multiplier to the energy cost in relation to the configured hydrogen separating energy cost. Must be at least one.
-     * @param leftChemicalOutput  Left output.
-     * @param rightChemicalOutput Right output.
-     */
-    public BasicElectrolysisRecipe(FluidStackIngredient input, long energyMultiplier, ChemicalStack leftChemicalOutput, ChemicalStack rightChemicalOutput) {
+    /// @param input               Input.
+    /// @param energyMultiplier    Multiplier to the energy cost in relation to the configured hydrogen separating energy cost. Must be at least one.
+    /// @param leftChemicalOutput  Left output.
+    /// @param rightChemicalOutput Right output.
+    public BasicElectrolysisRecipe(FluidStackIngredient input, int energyMultiplier, ChemicalStackTemplate leftChemicalOutput, ChemicalStackTemplate rightChemicalOutput) {
         this.input = Objects.requireNonNull(input, "Input cannot be null.");
         this.energyMultiplier = energyMultiplier;
         if (energyMultiplier < 1) {
             throw new IllegalArgumentException("Energy multiplier must be at least one.");
         }
-        Objects.requireNonNull(leftChemicalOutput, "Left output cannot be null");
-        Objects.requireNonNull(rightChemicalOutput, "Right output cannot be null");
-        if (leftChemicalOutput.isEmpty()) {
-            throw new IllegalArgumentException("Left output cannot be empty.");
-        } else if (rightChemicalOutput.isEmpty()) {
-            throw new IllegalArgumentException("Right output cannot be empty.");
-        }
-        this.leftChemicalOutput = leftChemicalOutput.copy();
-        this.rightChemicalOutput = rightChemicalOutput.copy();
+        this.leftChemicalOutput = Objects.requireNonNull(leftChemicalOutput, "Left output cannot be null");
+        this.rightChemicalOutput = Objects.requireNonNull(rightChemicalOutput, "Right output cannot be null");
     }
 
     @Override
@@ -54,31 +45,21 @@ public class BasicElectrolysisRecipe extends ElectrolysisRecipe {
     }
 
     @Override
-    public boolean test(FluidStack fluidStack) {
-        return this.input.test(fluidStack);
-    }
-
-    @Override
     @Contract(value = "_ -> new", pure = true)
-    public ElectrolysisRecipeOutput getOutput(FluidStack input) {
-        return new ElectrolysisRecipeOutput(leftChemicalOutput.copy(), rightChemicalOutput.copy());
+    public ElectrolysisRecipeOutput getOutput(TypedInstance<Fluid> input) {
+        return new ElectrolysisRecipeOutput(leftChemicalOutput, rightChemicalOutput);
     }
 
     @Override
-    public long getEnergyMultiplier() {
+    public int getEnergyMultiplier() {
         return energyMultiplier;
     }
 
-    @Override
-    public String getGroup() {
-        return "electrolytic_separator";
-    }
-
-    public ChemicalStack getLeftChemicalOutput() {
+    public ChemicalStackTemplate getLeftChemicalOutput() {
         return leftChemicalOutput;
     }
 
-    public ChemicalStack getRightChemicalOutput() {
+    public ChemicalStackTemplate getRightChemicalOutput() {
         return rightChemicalOutput;
     }
 
@@ -88,7 +69,7 @@ public class BasicElectrolysisRecipe extends ElectrolysisRecipe {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (o == this) {
             return true;
         } else if (o == null || getClass() != o.getClass()) {
@@ -104,7 +85,7 @@ public class BasicElectrolysisRecipe extends ElectrolysisRecipe {
         int result = input.hashCode();
         result = 31 * result + leftChemicalOutput.hashCode();
         result = 31 * result + rightChemicalOutput.hashCode();
-        result = 31 * result + Long.hashCode(energyMultiplier);
+        result = 31 * result + energyMultiplier;
         return result;
     }
 }

@@ -2,10 +2,10 @@ package mekanism.common.content.network.transmitter;
 
 import io.netty.buffer.ByteBuf;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.function.IntFunction;
 import mekanism.api.IIncrementalEnum;
 import mekanism.api.SerializationConstants;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.text.EnumColor;
 import mekanism.api.text.IHasTextComponent.IHasEnumNameTextComponent;
 import mekanism.api.text.ILangEntry;
@@ -16,17 +16,16 @@ import mekanism.common.tile.transmitter.TileEntityTransmitter;
 import mekanism.common.util.EnumUtils;
 import mekanism.common.util.WorldUtils;
 import net.minecraft.core.Direction;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.ByIdMap;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import org.jspecify.annotations.Nullable;
 
 public class DiversionTransporter extends LogisticalTransporterBase {
 
@@ -41,7 +40,7 @@ public class DiversionTransporter extends LogisticalTransporterBase {
     }
 
     @Override
-    public void onNeighborBlockChange(Direction side) {
+    public void onNeighborBlockChange(@Nullable Direction side) {
         //Override onNeighborBlockChange to recheck all connections as our connections
         // might have changed due to the redstone mode changing
         boolean receivingPower = isGettingPowered();
@@ -78,51 +77,54 @@ public class DiversionTransporter extends LogisticalTransporterBase {
             //If we can't handle redstone, just refresh the side the connection changed on so that if a transmitter is removed
             // or is set to none then we stop trying to be connected to it
             //TODO - 1.20.2: See if we can come up with a better way to handle this as there are definitely better ways
-            refreshConnections(side);
+            if (side == null) {//TODO - 26.1: Re-evaluate
+                refreshConnections();
+            } else {
+                refreshConnections(side);
+            }
         }
     }
 
-    private void readModes(@NotNull CompoundTag tag) {
-        if (tag.contains(SerializationConstants.MODE, Tag.TAG_INT_ARRAY)) {
-            int[] modeIndices = tag.getIntArray(SerializationConstants.MODE);
+    private void readModes(ValueInput input) {
+        Optional<int[]> optionalModes = input.getIntArray(SerializationConstants.MODE);
+        if (optionalModes.isPresent()) {
+            int[] modeIndices = optionalModes.get();
             for (int i = 0; i < modeIndices.length && i < modes.length; i++) {
                 modes[i] = DiversionControl.BY_ID.apply(modeIndices[i]);
             }
         }
     }
 
-    @NotNull
-    private CompoundTag writeModes(@NotNull CompoundTag nbtTags) {
+    private void writeModes(ValueOutput output) {
         int[] modeIndices = new int[modes.length];
         for (int i = 0; i < modes.length; i++) {
             modeIndices[i] = modes[i].ordinal();
         }
-        nbtTags.putIntArray(SerializationConstants.MODE, modeIndices);
-        return nbtTags;
+        output.putIntArray(SerializationConstants.MODE, modeIndices);
     }
 
     @Override
-    public void read(HolderLookup.Provider provider, @NotNull CompoundTag nbtTags) {
-        super.read(provider, nbtTags);
-        readModes(nbtTags);
-    }
-
-    @NotNull
-    @Override
-    public CompoundTag write(HolderLookup.Provider provider, @NotNull CompoundTag nbtTags) {
-        return writeModes(super.write(provider, nbtTags));
-    }
-
-    @NotNull
-    @Override
-    public CompoundTag getReducedUpdateTag(@NotNull HolderLookup.Provider provider, CompoundTag updateTag) {
-        return writeModes(super.getReducedUpdateTag(provider, updateTag));
+    public void read(ValueInput input) {
+        super.read(input);
+        readModes(input);
     }
 
     @Override
-    public boolean handleUpdateTag(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider provider) {
-        boolean refreshModelData = super.handleUpdateTag(tag, provider);
-        readModes(tag);
+    public void write(ValueOutput output) {
+        super.write(output);
+        writeModes(output);
+    }
+
+    @Override
+    public void writeReducedUpdatedTag(ValueOutput output) {
+        super.writeReducedUpdatedTag(output);
+        writeModes(output);
+    }
+
+    @Override
+    public boolean handleUpdateTag(ValueInput input) {
+        boolean refreshModelData = super.handleUpdateTag(input);
+        readModes(input);
         return refreshModelData;
     }
 
@@ -154,16 +156,16 @@ public class DiversionTransporter extends LogisticalTransporterBase {
     }
 
     @Override
-    public InteractionResult onRightClick(Player player, Direction side) {
+    public InteractionResult onRightClick(Level level, Player player, Direction side) {
         side = getTransmitterTile().getSideLookingAt(player, side);
         DiversionControl newMode = modes[side.ordinal()].getNext();
         updateMode(side, newMode);
-        player.displayClientMessage(MekanismLang.TOGGLE_DIVERTER.translateColored(EnumColor.GRAY, EnumColor.RED, newMode), true);
+        player.sendOverlayMessage(MekanismLang.TOGGLE_DIVERTER.translateColored(EnumColor.GRAY, EnumColor.RED, newMode));
         return InteractionResult.SUCCESS;
     }
 
     @Override
-    public boolean exposesInsertCap(@NotNull Direction side) {
+    public boolean exposesInsertCap(Direction side) {
         return super.exposesInsertCap(side) && modeReqsMet(side);
     }
 
@@ -190,7 +192,6 @@ public class DiversionTransporter extends LogisticalTransporterBase {
         return WorldUtils.isGettingPowered(getLevel(), getBlockPos());
     }
 
-    @NothingNullByDefault
     public enum DiversionControl implements IIncrementalEnum<DiversionControl>, IHasEnumNameTextComponent {
         DISABLED(MekanismLang.DIVERSION_CONTROL_DISABLED),
         HIGH(MekanismLang.DIVERSION_CONTROL_HIGH),

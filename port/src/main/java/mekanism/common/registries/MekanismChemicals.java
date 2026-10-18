@@ -3,6 +3,7 @@ package mekanism.common.registries;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import mekanism.api.MekanismAPI;
 import mekanism.api.chemical.Chemical;
 import mekanism.api.chemical.ChemicalBuilder;
 import mekanism.api.text.EnumColor;
@@ -13,6 +14,7 @@ import mekanism.common.registration.impl.DeferredChemical;
 import mekanism.common.registration.impl.SlurryRegistryObject;
 import mekanism.common.resource.PrimaryResource;
 import mekanism.common.util.EnumUtils;
+import net.minecraft.util.ARGB;
 
 public class MekanismChemicals {
 
@@ -21,19 +23,20 @@ public class MekanismChemicals {
 
     public static final ChemicalDeferredRegister CHEMICALS = new ChemicalDeferredRegister(Mekanism.MODID);
 
-    public static final DeferredChemical<Chemical> BIO = CHEMICALS.register("bio", Mekanism.rl("infuse_type/bio"), 0x5A4630);
-    public static final DeferredChemical<Chemical> FUNGI = CHEMICALS.register("fungi", Mekanism.rl("infuse_type/fungi"), 0x74656A);
-    public static final DeferredChemical<Chemical> TIN = CHEMICALS.registerInfuse("tin", 0xCCCCD9);
-    public static final DeferredChemical<Chemical> GOLD = CHEMICALS.registerInfuse("gold", 0xF2CD67);
-    public static final DeferredChemical<Chemical> REFINED_OBSIDIAN = CHEMICALS.registerInfuse("refined_obsidian", 0x7C00ED);
-    public static final DeferredChemical<Chemical> DIAMOND = CHEMICALS.registerInfuse("diamond", 0x6CEDD8);
-    public static final DeferredChemical<Chemical> REDSTONE = CHEMICALS.registerInfuse("redstone", 0xB30505);
-    public static final DeferredChemical<Chemical> CARBON = CHEMICALS.registerInfuse("carbon", 0x2C2C2C);
+    public static final DeferredChemical<Chemical> EMPTY = CHEMICALS.register(MekanismAPI.EMPTY_CHEMICAL_KEY.identifier().getPath(), () -> new Chemical(ChemicalBuilder.builder()));
+    public static final DeferredChemical<Chemical> BIO = CHEMICALS.register("bio", Mekanism.rl("mek_chemical/infuse_type/bio"), 0xFF5A4630);
+    public static final DeferredChemical<Chemical> FUNGI = CHEMICALS.register("fungi", Mekanism.rl("mek_chemical/infuse_type/fungi"), 0xFF74656A);
+    public static final DeferredChemical<Chemical> TIN = CHEMICALS.registerInfuse("tin", 0xFFCCCCD9);
+    public static final DeferredChemical<Chemical> GOLD = CHEMICALS.registerInfuse("gold", 0xFFF2CD67);
+    public static final DeferredChemical<Chemical> REFINED_OBSIDIAN = CHEMICALS.registerInfuse("refined_obsidian", 0xFF7C00ED);
+    public static final DeferredChemical<Chemical> DIAMOND = CHEMICALS.registerInfuse("diamond", 0xFF6CEDD8);
+    public static final DeferredChemical<Chemical> REDSTONE = CHEMICALS.registerInfuse("redstone", 0xFFB30505);
+    public static final DeferredChemical<Chemical> CARBON = CHEMICALS.registerInfuse("carbon", 0xFF2C2C2C);
 
     public static final DeferredChemical<Chemical> HYDROGEN = CHEMICALS.register(ChemicalConstants.HYDROGEN);
     public static final DeferredChemical<Chemical> OXYGEN = CHEMICALS.register(ChemicalConstants.OXYGEN);
-    public static final DeferredChemical<Chemical> STEAM = CHEMICALS.register("steam", () -> new Chemical(ChemicalBuilder.builder(Mekanism.rl("liquid/steam"))));
-    public static final DeferredChemical<Chemical> WATER_VAPOR = CHEMICALS.register("water_vapor", () -> new Chemical(ChemicalBuilder.builder(Mekanism.rl("liquid/steam"))));
+    public static final DeferredChemical<Chemical> STEAM = CHEMICALS.register("steam", () -> new Chemical(ChemicalBuilder.builder(Mekanism.rl("mek_liquid/steam"))));
+    public static final DeferredChemical<Chemical> WATER_VAPOR = CHEMICALS.register("water_vapor", () -> new Chemical(ChemicalBuilder.builder(Mekanism.rl("mek_liquid/steam"))));
     public static final DeferredChemical<Chemical> CHLORINE = CHEMICALS.register(ChemicalConstants.CHLORINE);
     public static final DeferredChemical<Chemical> SULFUR_DIOXIDE = CHEMICALS.register(ChemicalConstants.SULFUR_DIOXIDE);
     public static final DeferredChemical<Chemical> SULFUR_TRIOXIDE = CHEMICALS.register(ChemicalConstants.SULFUR_TRIOXIDE);
@@ -46,15 +49,15 @@ public class MekanismChemicals {
     public static final DeferredChemical<Chemical> ETHENE = CHEMICALS.register(ChemicalConstants.ETHENE);
     public static final DeferredChemical<Chemical> SODIUM = CHEMICALS.register(ChemicalConstants.SODIUM);
     public static final DeferredChemical<Chemical> SUPERHEATED_SODIUM = CHEMICALS.register(ChemicalConstants.SUPERHEATED_SODIUM);
-    public static final DeferredChemical<Chemical> BRINE = CHEMICALS.register("brine", 0xFEEF9C);
+    public static final DeferredChemical<Chemical> BRINE = CHEMICALS.register("brine", 0xFFFEEF9C);
     public static final DeferredChemical<Chemical> LITHIUM = CHEMICALS.register(ChemicalConstants.LITHIUM);
-    public static final DeferredChemical<Chemical> OSMIUM = CHEMICALS.register("osmium", 0x52BDCA);
-    public static final DeferredChemical<Chemical> FISSILE_FUEL = CHEMICALS.register("fissile_fuel", 0x2E332F);
-    public static final DeferredChemical<Chemical> NUCLEAR_WASTE = CHEMICALS.register("nuclear_waste", 0x4F412A);
-    public static final DeferredChemical<Chemical> SPENT_NUCLEAR_WASTE = CHEMICALS.register("spent_nuclear_waste", 0x262015);
-    public static final DeferredChemical<Chemical> PLUTONIUM = CHEMICALS.register("plutonium", 0x1F919C);
-    public static final DeferredChemical<Chemical> POLONIUM = CHEMICALS.register("polonium", 0x1B9E7B);
-    public static final DeferredChemical<Chemical> ANTIMATTER = CHEMICALS.register("antimatter", 0xA464B3);
+    public static final DeferredChemical<Chemical> OSMIUM = CHEMICALS.register("osmium", 0xFF52BDCA);
+    public static final DeferredChemical<Chemical> FISSILE_FUEL = CHEMICALS.register("fissile_fuel", 0xFF2E332F);
+    public static final DeferredChemical<Chemical> NUCLEAR_WASTE = CHEMICALS.register("nuclear_waste", 0xFF4F412A);
+    public static final DeferredChemical<Chemical> SPENT_NUCLEAR_WASTE = CHEMICALS.register("spent_nuclear_waste", 0xFF262015);
+    public static final DeferredChemical<Chemical> PLUTONIUM = CHEMICALS.register("plutonium", 0xFF1F919C);
+    public static final DeferredChemical<Chemical> POLONIUM = CHEMICALS.register("polonium", 0xFF1B9E7B);
+    public static final DeferredChemical<Chemical> ANTIMATTER = CHEMICALS.register("antimatter", 0xFFA464B3);
 
     public static Map<EnumColor, DeferredChemical<Chemical>> PIGMENT_COLOR_LOOKUP = new EnumMap<>(EnumColor.class);
     public static final Map<PrimaryResource, SlurryRegistryObject<Chemical, Chemical>> PROCESSED_RESOURCES = new LinkedHashMap<>();
@@ -70,9 +73,7 @@ public class MekanismChemicals {
 
     private static DeferredChemical<Chemical> registerPigment(EnumColor color) {
         int[] rgb = color.getRgbCode();
-        int tint = rgb[0] << 16;
-        tint |= rgb[1] << 8;
-        tint |= rgb[2];
+        int tint = ARGB.color(0xFF, rgb[0], rgb[1], rgb[2]);
         return CHEMICALS.registerPigment(color.getRegistryPrefix(), tint);
     }
 }

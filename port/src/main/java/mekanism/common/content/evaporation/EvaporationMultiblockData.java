@@ -4,11 +4,13 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BooleanSupplier;
 import mekanism.api.IEvaporationSolar;
 import mekanism.api.SerializationConstants;
 import mekanism.api.functions.ConstantPredicates;
 import mekanism.api.heat.HeatAPI;
+import mekanism.api.heat.IHeatCapacitor;
 import mekanism.api.recipes.FluidToFluidRecipe;
 import mekanism.api.recipes.cache.CachedRecipe;
 import mekanism.api.recipes.cache.CachedRecipe.OperationTracker.RecipeError;
@@ -24,8 +26,10 @@ import mekanism.common.capabilities.Capabilities;
 import mekanism.common.capabilities.fluid.BasicFluidTank;
 import mekanism.common.capabilities.fluid.VariableCapacityFluidTank;
 import mekanism.common.capabilities.heat.VariableHeatCapacitor;
+import mekanism.common.component.containers.type.ContainerType;
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.integration.computer.SpecialComputerMethodWrapper.ComputerFluidTankWrapper;
+import mekanism.common.integration.computer.SpecialComputerMethodWrapper.ComputerHeatCapacitorWrapper;
 import mekanism.common.integration.computer.SpecialComputerMethodWrapper.ComputerIInventorySlotWrapper;
 import mekanism.common.integration.computer.annotation.ComputerMethod;
 import mekanism.common.integration.computer.annotation.SyntheticComputerMethod;
@@ -43,20 +47,26 @@ import mekanism.common.recipe.lookup.ISingleRecipeLookupHandler.FluidRecipeLooku
 import mekanism.common.recipe.lookup.cache.InputRecipeCache.SingleFluid;
 import mekanism.common.recipe.lookup.monitor.RecipeCacheLookupMonitor;
 import mekanism.common.tile.multiblock.TileEntityThermalEvaporationBlock;
+import mekanism.common.tile.multiblock.TileEntityThermalEvaporationValve;
 import mekanism.common.tile.prefab.TileEntityRecipeMachine;
 import mekanism.common.tile.prefab.TileEntityStructuralMultiblock;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.NBTUtils;
+import mekanism.common.util.WorldUtils;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import mekanism.neoshim.neoforge.capabilities.BlockCapabilityCache;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.fluids.FluidStackTemplate;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
 public class EvaporationMultiblockData extends MultiblockData implements IValveHandler, FluidRecipeLookupHandler<FluidToFluidRecipe> {
 
@@ -77,12 +87,13 @@ public class EvaporationMultiblockData extends MultiblockData implements IValveH
                                                                                      "getOutputFilledPercentage"}, docPlaceholder = "output tank")
     public BasicFluidTank outputTank;
     @ContainerSync
-    public VariableHeatCapacitor heatCapacitor;
+    @WrappingComputerMethod(wrapper = ComputerHeatCapacitorWrapper.class, methodNames = "getTemperature", docPlaceholder = "thermal evaporation plant")
+    VariableHeatCapacitor heatCapacitor;
 
     private double biomeAmbientTemp;
     private double tempMultiplier;
 
-    private int inputTankCapacity;
+    private long inputTankCapacity;
     public float prevScale;
     @ContainerSync
     @SyntheticComputerMethod(getter = "getProductionAmount")
@@ -96,10 +107,10 @@ public class EvaporationMultiblockData extends MultiblockData implements IValveH
     @ContainerSync
     private final boolean[] trackedErrors = new boolean[TRACKED_ERROR_TYPES.size()];
 
-    private final Int2ObjectMap<BlockCapabilityCache<IEvaporationSolar, Void>> cachedSolar = new Int2ObjectArrayMap<>(4);
+    private final Int2ObjectMap<BlockCapabilityCache<IEvaporationSolar, @Nullable Void>> cachedSolar = new Int2ObjectArrayMap<>(4);
 
-    private final IOutputHandler<@NotNull FluidStack> outputHandler;
-    private final IInputHandler<@NotNull FluidStack> inputHandler;
+    private final IOutputHandler<FluidStackTemplate> outputHandler;
+    private final IInputHandler<Fluid, FluidStack> inputHandler;
 
     @WrappingComputerMethod(wrapper = ComputerIInventorySlotWrapper.class, methodNames = "getInputItemInput", docPlaceholder = "input side's input slot")
     final FluidInventorySlot inputInputSlot;
@@ -116,7 +127,7 @@ public class EvaporationMultiblockData extends MultiblockData implements IValveH
         recheckAllRecipeErrors = TileEntityRecipeMachine.shouldRecheckAllErrors(tile);
         //Default biome temp to the ambient temperature at the block we are at
         biomeAmbientTemp = HeatAPI.getAmbientTemp(tile.getLevel(), tile.getBlockPos());
-        fluidTanks.add(inputTank = VariableCapacityFluidTank.input(this, this::getMaxFluid, this::containsRecipe, createSaveAndComparator(recipeCacheLookupMonitor)));
+        fluidTanks.add(inputTank = VariableCapacityFluidTank.input(this, () -> inputTankCapacity, this::containsRecipe, createSaveAndComparator(recipeCacheLookupMonitor)));
         fluidTanks.add(outputTank = VariableCapacityFluidTank.output(this, MekanismConfig.general.evaporationOutputTankCapacity, ConstantPredicates.alwaysTrue(), this));
         inputHandler = InputHelper.getInputHandler(inputTank, RecipeError.NOT_ENOUGH_INPUT);
         outputHandler = OutputHelper.getOutputHandler(outputTank, RecipeError.NOT_ENOUGH_OUTPUT_SPACE);
@@ -126,15 +137,20 @@ public class EvaporationMultiblockData extends MultiblockData implements IValveH
         inventorySlots.add(outputOutputSlot = OutputInventorySlot.at(this, 152, 51));
         inputInputSlot.setSlotType(ContainerSlotType.INPUT);
         inputOutputSlot.setSlotType(ContainerSlotType.INPUT);
-        heatCapacitors.add(heatCapacitor = VariableHeatCapacitor.create(MekanismConfig.general.evaporationHeatCapacity.get() * 3, () -> biomeAmbientTemp, this));
+        heatCapacitor = VariableHeatCapacitor.create(MekanismConfig.general.evaporationHeatCapacity.get() * 3, () -> biomeAmbientTemp, this);
     }
 
     @Override
-    public void onCreated(Level world) {
-        super.onCreated(world);
+    protected IHeatCapacitor heatCapacitor() {
+        return heatCapacitor;
+    }
+
+    @Override
+    public void onCreated(Level world, TransactionContext transaction) {
+        super.onCreated(world, transaction);
         biomeAmbientTemp = calculateAverageAmbientTemperature(world);
         // update the heat capacity now that we've read
-        heatCapacitor.setHeatCapacity(MekanismConfig.general.evaporationHeatCapacity.get() * height(), true);
+        heatCapacitor.updateHeatAndCapacity(MekanismConfig.general.evaporationHeatCapacity.get() * height(), transaction);
         updateSolars(world);
     }
 
@@ -147,18 +163,19 @@ public class EvaporationMultiblockData extends MultiblockData implements IValveH
     }
 
     @Override
-    public boolean tick(Level world) {
+    public boolean tick(ServerLevel world) {
         boolean needsPacket = super.tick(world);
         // external heat dissipation
-        lastEnvironmentLoss = simulateEnvironment();
-        // update temperature
-        updateHeatCapacitors(null);
-        //After we update the heat capacitors, update our temperature multiplier
-        // Note: We use the ambient temperature without taking our biome into account as we want to have a consistent multiplier
-        tempMultiplier = (Math.min(MAX_MULTIPLIER_TEMP, getTemperature()) - HeatAPI.AMBIENT_TEMP) * MekanismConfig.general.evaporationTempMultiplier.get() *
-                         ((double) height() / MAX_HEIGHT);
-        inputOutputSlot.drainTank(outputOutputSlot);
-        inputInputSlot.fillTank(outputInputSlot);
+        try (Transaction transaction = Transaction.openRoot()) {
+            lastEnvironmentLoss = simulateEnvironment(transaction);
+            // update our temperature multiplier
+            // Note: We use the ambient temperature without taking our biome into account as we want to have a consistent multiplier
+            tempMultiplier = (Math.min(MAX_MULTIPLIER_TEMP, getTemperature()) - HeatAPI.AMBIENT_TEMP) * MekanismConfig.general.evaporationTempMultiplier.get() *
+                             ((double) height() / MAX_HEIGHT);
+            inputOutputSlot.drainTankIntoSlot(outputOutputSlot, transaction);
+            inputInputSlot.fillTankFromSlot(outputInputSlot, transaction);
+            transaction.commit();
+        }
         recipeCacheLookupMonitor.updateAndProcess();
         float scale = MekanismUtils.getScale(prevScale, inputTank);
         if (!Mth.equal(scale, prevScale)) {
@@ -169,39 +186,61 @@ public class EvaporationMultiblockData extends MultiblockData implements IValveH
     }
 
     @Override
+    protected void updateEjectors(Level world) {
+        if (!world.isClientSide()) {
+            //Note: We don't need to wrap valve tanks on the client side
+            for (Map.Entry<BlockPos, ValveData> entry : valves.entrySet()) {
+                TileEntityThermalEvaporationValve tile = WorldUtils.getTileEntity(TileEntityThermalEvaporationValve.class, world, entry.getKey());
+                if (tile != null) {
+                    ValveData valve = entry.getValue();
+                    valve.resetTanks();
+                    valve.addTank(inputTank, true);
+                    valve.addTank(outputTank, false);
+                }
+            }
+        }
+    }
+
+    @Override
+    protected boolean hasFluidValveHandling() {
+        return true;
+    }
+
+    @Override
     public boolean allowsStructuralGuiAccess(TileEntityStructuralMultiblock multiblock) {
         return false;
     }
 
     @Override
-    public void readUpdateTag(CompoundTag tag, HolderLookup.Provider provider) {
-        super.readUpdateTag(tag, provider);
-        NBTUtils.setFluidStackIfPresent(provider, tag, SerializationConstants.FLUID, fluid -> inputTank.setStack(fluid));
-        NBTUtils.setFloatIfPresent(tag, SerializationConstants.SCALE, scale -> prevScale = scale);
-        readValves(tag);
+    public void readUpdateTag(ValueInput input) {
+        super.readUpdateTag(input);
+        NBTUtils.readOrEmpty(input, SerializationConstants.FLUID, inputTank);
+        prevScale = input.getFloatOr(SerializationConstants.SCALE, prevScale);
+        readValves(input);
     }
 
     @Override
-    public void writeUpdateTag(CompoundTag tag, HolderLookup.Provider provider) {
-        super.writeUpdateTag(tag, provider);
-        tag.put(SerializationConstants.FLUID, inputTank.getFluid().saveOptional(provider));
-        tag.putFloat(SerializationConstants.SCALE, prevScale);
-        writeValves(tag);
+    public void writeUpdateTag(ValueOutput output) {
+        super.writeUpdateTag(output);
+        NBTUtils.storeNonEmpty(output, SerializationConstants.FLUID, inputTank);
+        output.putFloat(SerializationConstants.SCALE, prevScale);
+        writeValves(output);
     }
 
     @Override
-    public double simulateEnvironment() {
-        double currentTemperature = getTemperature();
+    public double simulateEnvironment(TransactionContext transaction) {
         double heatCapacity = heatCapacitor.getHeatCapacity();
-        heatCapacitor.handleHeat(getActiveSolars() * MekanismConfig.general.evaporationSolarMultiplier.get() * heatCapacity);
-        if (Math.abs(currentTemperature - biomeAmbientTemp) < 0.001) {
-            heatCapacitor.handleHeat(biomeAmbientTemp * heatCapacity - heatCapacitor.getHeat());
+        heatCapacitor.handleHeat(getActiveSolars() * MekanismConfig.general.evaporationSolarMultiplier.get() * heatCapacity, transaction);
+        double currentTemperature = getTemperature();
+        double temperatureDifference = Math.abs(currentTemperature - biomeAmbientTemp);
+        if (temperatureDifference < 0.001) {
+            heatCapacitor.handleHeat(biomeAmbientTemp * heatCapacity - heatCapacitor.getHeat(), transaction);
         } else {
-            double incr = MekanismConfig.general.evaporationHeatDissipation.get() * Math.sqrt(Math.abs(currentTemperature - biomeAmbientTemp));
+            double incr = MekanismConfig.general.evaporationHeatDissipation.get() * Math.sqrt(temperatureDifference);
             if (currentTemperature > biomeAmbientTemp) {
                 incr = -incr;
             }
-            heatCapacitor.handleHeat(heatCapacity * incr);
+            heatCapacitor.handleHeat(heatCapacity * incr, transaction);
             if (incr < 0) {
                 return -incr;
             }
@@ -209,7 +248,6 @@ public class EvaporationMultiblockData extends MultiblockData implements IValveH
         return 0;
     }
 
-    @ComputerMethod
     public double getTemperature() {
         return heatCapacitor.getTemperature();
     }
@@ -223,11 +261,6 @@ public class EvaporationMultiblockData extends MultiblockData implements IValveH
         }
     }
 
-    public int getMaxFluid() {
-        return inputTankCapacity;
-    }
-
-    @NotNull
     @Override
     public IMekanismRecipeTypeProvider<SingleFluidRecipeInput, FluidToFluidRecipe, SingleFluid<FluidToFluidRecipe>> getRecipeType() {
         return MekanismRecipeType.EVAPORATING;
@@ -249,10 +282,9 @@ public class EvaporationMultiblockData extends MultiblockData implements IValveH
         Arrays.fill(trackedErrors, false);
     }
 
-    @NotNull
     @Override
-    public CachedRecipe<FluidToFluidRecipe> createNewCachedRecipe(@NotNull FluidToFluidRecipe recipe, int cacheIndex) {
-        return OneInputCachedRecipe.fluidToFluid(recipe, recheckAllRecipeErrors, inputHandler, outputHandler)
+    public CachedRecipe<FluidToFluidRecipe> createNewCachedRecipe(FluidToFluidRecipe recipe, int cacheIndex) {
+        return new OneInputCachedRecipe<>(recipe, recheckAllRecipeErrors, inputHandler, outputHandler)
               .setErrorsChanged(errors -> {
                   for (int i = 0; i < trackedErrors.length; i++) {
                       trackedErrors[i] = errors.contains(TRACKED_ERROR_TYPES.get(i));
@@ -313,11 +345,11 @@ public class EvaporationMultiblockData extends MultiblockData implements IValveH
 
     @Override
     protected int getMultiblockRedstoneLevel() {
-        return MekanismUtils.redstoneLevelFromContents(inputTank.getFluidAmount(), inputTank.getCapacity());
+        return ContainerType.FLUID.getRedstoneSignalFromContainer(inputTank);
     }
 
     @Override
-    public void remove(Level world, Structure oldStructure) {
+    public void remove(LevelReader world, Structure oldStructure) {
         //Clear the cached solar panels so that we don't hold references to them and prevent them from being able to be garbage collected
         cachedSolar.clear();
         super.remove(world, oldStructure);

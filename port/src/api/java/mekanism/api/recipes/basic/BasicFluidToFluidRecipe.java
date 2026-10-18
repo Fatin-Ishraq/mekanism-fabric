@@ -3,36 +3,27 @@ package mekanism.api.recipes.basic;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.recipes.FluidToFluidRecipe;
 import mekanism.api.recipes.MekanismRecipeSerializers;
 import mekanism.api.recipes.ingredients.FluidStackIngredient;
+import net.minecraft.core.TypedInstance;
 import net.minecraft.world.item.crafting.RecipeSerializer;
-import mekanism.neoshim.neoforge.fluids.FluidStack;
+import net.minecraft.world.level.material.Fluid;
+import mekanism.neoshim.neoforge.fluids.FluidStackTemplate;
 import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public class BasicFluidToFluidRecipe extends FluidToFluidRecipe {
 
     protected final FluidStackIngredient input;
-    protected final FluidStack output;
+    protected final FluidStackTemplate output;
 
-    /**
-     * @param input  Input.
-     * @param output Output.
-     */
-    public BasicFluidToFluidRecipe(FluidStackIngredient input, FluidStack output) {
+    /// @param input  Input.
+    /// @param output Output.
+    public BasicFluidToFluidRecipe(FluidStackIngredient input, FluidStackTemplate output) {
         this.input = Objects.requireNonNull(input, "Input cannot be null.");
         Objects.requireNonNull(output, "Output cannot be null.");
-        if (output.isEmpty()) {
-            throw new IllegalArgumentException("Output cannot be empty.");
-        }
-        this.output = output.copy();
-    }
-
-    @Override
-    public boolean test(FluidStack fluidStack) {
-        return this.input.test(fluidStack);
+        this.output = output;
     }
 
     @Override
@@ -41,17 +32,17 @@ public class BasicFluidToFluidRecipe extends FluidToFluidRecipe {
     }
 
     @Override
-    public List<FluidStack> getOutputDefinition() {
+    public List<FluidStackTemplate> getOutputDefinition() {
         return Collections.singletonList(output);
     }
 
     @Override
-    @Contract(value = "_ ->new", pure = true)
-    public FluidStack getOutput(FluidStack input) {
-        return output.copy();
+    @Contract(pure = true)
+    public FluidStackTemplate getOutput(TypedInstance<Fluid> input) {
+        return output;
     }
 
-    public FluidStack getOutputRaw() {
+    public FluidStackTemplate getOutputRaw() {
         return output;
     }
 
@@ -61,21 +52,20 @@ public class BasicFluidToFluidRecipe extends FluidToFluidRecipe {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (o == this) {
             return true;
         } else if (o == null || getClass() != o.getClass()) {
             return false;
         }
         BasicFluidToFluidRecipe other = (BasicFluidToFluidRecipe) o;
-        return input.equals(other.input) && FluidStack.matches(output, other.output);
+        return input.equals(other.input) && output.equals(other.output);
     }
 
     @Override
     public int hashCode() {
         int hash = input.hashCode();
-        hash = 31 * hash + FluidStack.hashFluidAndComponents(output);
-        hash = 31 * hash + output.getAmount();
+        hash = 31 * hash + output.hashCode();
         return hash;
     }
 }

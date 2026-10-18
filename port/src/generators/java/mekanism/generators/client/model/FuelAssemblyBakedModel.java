@@ -1,5 +1,5 @@
 package mekanism.generators.client.model;
-
+/* TODO update this
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -9,22 +9,16 @@ import mekanism.client.render.MekanismRenderer;
 import mekanism.client.render.lib.Quad;
 import mekanism.common.lib.Color;
 import mekanism.generators.common.tile.fission.TileEntityFissionAssembly;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.resources.model.BakedModel;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
-import mekanism.neoshim.neoforge.client.ChunkRenderTypeSet;
-import mekanism.neoshim.neoforge.client.model.BakedModelWrapper;
-import mekanism.neoshim.neoforge.client.model.data.ModelData;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.model.data.ModelData;
+import org.jspecify.annotations.Nullable;
 import org.joml.Vector3f;
 
 //TODO: Eventually make use of this if we figure out a way to not have coolant rendering make this invisible
-@NothingNullByDefault
 public class FuelAssemblyBakedModel extends BakedModelWrapper<BakedModel> {
 
     private static final Color GLOW_ARGB = Color.rgbad(0.466, 0.882, 0.929, 0.6);
@@ -41,7 +35,6 @@ public class FuelAssemblyBakedModel extends BakedModelWrapper<BakedModel> {
         this.height = height;
     }
 
-    @NotNull
     @Override
     public List<BakedQuad> getQuads(@Nullable BlockState state, @Nullable Direction side, RandomSource rand, ModelData data, @Nullable RenderType renderType) {
         List<BakedQuad> quads = super.getQuads(state, side, rand, data, renderType);
@@ -89,4 +82,4 @@ public class FuelAssemblyBakedModel extends BakedModelWrapper<BakedModel> {
         }
         return super.getRenderTypes(state, rand, data);
     }
-}
+}*/

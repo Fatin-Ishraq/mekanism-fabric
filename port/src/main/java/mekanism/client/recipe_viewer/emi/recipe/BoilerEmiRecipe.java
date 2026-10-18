@@ -3,7 +3,7 @@ package mekanism.client.recipe_viewer.emi.recipe;
 import dev.emi.emi.api.widget.WidgetHolder;
 import java.util.Collections;
 import java.util.List;
-import mekanism.api.math.MathUtils;
+import mekanism.api.chemical.ChemicalStackTemplate;
 import mekanism.api.text.EnumColor;
 import mekanism.client.gui.element.GuiInnerScreen;
 import mekanism.client.gui.element.gauge.GaugeType;
@@ -15,20 +15,21 @@ import mekanism.common.MekanismLang;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.UnitDisplayUtils.TemperatureUnit;
 import mekanism.common.util.text.TextUtils;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public class BoilerEmiRecipe extends MekanismEmiRecipe<BoilerRecipeViewerRecipe> {
 
-    public BoilerEmiRecipe(MekanismEmiRecipeCategory category, ResourceLocation id, BoilerRecipeViewerRecipe recipe) {
+    public BoilerEmiRecipe(MekanismEmiRecipeCategory category, Identifier id, BoilerRecipeViewerRecipe recipe) {
         super(category, id, recipe);
         addInputDefinition(recipe.water());
         addChemicalOutputDefinition(List.of(recipe.steam()));
-        if (recipe.superHeatedCoolant() == null) {
+        ChemicalStackTemplate cooledCoolant = recipe.cooledCoolant();
+        if (recipe.superHeatedCoolant() == null || cooledCoolant == null) {
             addEmptyInput();
             addOutputDefinition(Collections.emptyList());
         } else {
             addInputDefinition(recipe.superHeatedCoolant());
-            addChemicalOutputDefinition(List.of(recipe.cooledCoolant()));
+            addChemicalOutputDefinition(List.of(cooledCoolant));
         }
     }
 
@@ -38,7 +39,7 @@ public class BoilerEmiRecipe extends MekanismEmiRecipe<BoilerRecipeViewerRecipe>
         // so that they fit properly in emi
         addElement(widgetHolder, new GuiInnerScreen(this, 48, 23, 96, 40, () -> List.of(
               MekanismLang.TEMPERATURE.translate(MekanismUtils.getTemperatureDisplay(recipe.temperature(), TemperatureUnit.KELVIN, true)),
-              MekanismLang.BOIL_RATE.translate(TextUtils.format(MathUtils.clampToInt(recipe.steam().getAmount())))
+              MekanismLang.BOIL_RATE.translate(TextUtils.format(recipe.steam().amount()))
         )));
         initTank(widgetHolder, GuiChemicalGauge.getDummy(GaugeType.STANDARD, this, 6, 13).setLabel(MekanismLang.BOILER_HEATED_COOLANT_TANK.translateColored(EnumColor.ORANGE)), input(1));
         initTank(widgetHolder, GuiFluidGauge.getDummy(GaugeType.STANDARD, this, 26, 13).setLabel(MekanismLang.BOILER_WATER_TANK.translateColored(EnumColor.INDIGO)), input(0));

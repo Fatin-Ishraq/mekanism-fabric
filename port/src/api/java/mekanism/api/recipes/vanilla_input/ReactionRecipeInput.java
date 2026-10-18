@@ -1,16 +1,13 @@
 package mekanism.api.recipes.vanilla_input;
 
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.chemical.ChemicalStack;
 import net.minecraft.world.item.ItemStack;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Simple implementation of a recipe input for {@link mekanism.api.recipes.PressurizedReactionRecipe}.
- *
- * @since 10.6.0
- */
-@NothingNullByDefault
+/// Simple implementation of a recipe input for [mekanism.api.recipes.PressurizedReactionRecipe].
+///
+/// @since 10.6.0
 public record ReactionRecipeInput(ItemStack item, FluidStack fluid, ChemicalStack chemical) implements FluidRecipeInput, ChemicalRecipeInput {
 
     @Override
@@ -48,7 +45,7 @@ public record ReactionRecipeInput(ItemStack item, FluidStack fluid, ChemicalStac
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (o == this) {
             return true;
         } else if (o == null || getClass() != o.getClass()) {
@@ -62,9 +59,9 @@ public record ReactionRecipeInput(ItemStack item, FluidStack fluid, ChemicalStac
     public int hashCode() {
         int hash = chemical.hashCode();
         hash = 31 * hash + ItemStack.hashItemAndComponents(item);
-        hash = 31 + hash + item.getCount();
+        hash = 31 + hash + item.count();
         hash = 31 * hash + FluidStack.hashFluidAndComponents(fluid);
-        hash = 31 + hash + fluid.getAmount();
+        hash = 31 + hash + fluid.amount();
         return hash;
     }
 }

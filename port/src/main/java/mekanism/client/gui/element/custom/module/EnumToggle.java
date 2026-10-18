@@ -10,14 +10,16 @@ import mekanism.client.render.IFancyFontRenderer.TextAlignment;
 import mekanism.common.MekanismLang;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 
 class EnumToggle<TYPE extends Enum<TYPE> & IHasTextComponent> extends MiniElement<TYPE> {
 
-    private static final ResourceLocation SLIDER = MekanismUtils.getResource(ResourceType.GUI, "slider.png");
+    private static final Identifier SLIDER = MekanismUtils.getResource(ResourceType.GUI, "slider.png");
     private static final float TEXT_SCALE = 0.7F;
     private static final int BAR_START = 10;
 
@@ -31,7 +33,7 @@ class EnumToggle<TYPE extends Enum<TYPE> & IHasTextComponent> extends MiniElemen
         super(parent, data, description, xPos, yPos);
         BAR_LENGTH = this.parent.getScreenWidth() - 24;
         enumConstants = data.getEnumConstants();
-        this.optionDistance = (BAR_LENGTH / (enumConstants.size() - 1));
+        this.optionDistance = BAR_LENGTH / (enumConstants.size() - 1);
         this.usesIcons = !enumConstants.isEmpty() && enumConstants.getFirst() instanceof IHasModeIcon;
     }
 
@@ -41,14 +43,14 @@ class EnumToggle<TYPE extends Enum<TYPE> & IHasTextComponent> extends MiniElemen
     }
 
     @Override
-    protected void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void renderBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         int center = optionDistance * data.get().ordinal();
-        guiGraphics.blit(SLIDER, getRelativeX() + BAR_START + center - 2, getRelativeY() + 11, 0, 0, 5, 6, 8, 8);
-        guiGraphics.blit(SLIDER, getRelativeX() + BAR_START, getRelativeY() + 17, 0, 6, BAR_LENGTH, 2, 8, 8);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, SLIDER, getRelativeX() + BAR_START + center - 2, getRelativeY() + 11, 0, 0, 5, 6, 8, 8);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, SLIDER, getRelativeX() + BAR_START, getRelativeY() + 17, 0, 6, BAR_LENGTH, 2, 8, 8);
     }
 
     @Override
-    protected void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         int textColor = parent.screenTextColor();
         Component description = this.description;
         if (usesIcons) {
@@ -61,12 +63,12 @@ class EnumToggle<TYPE extends Enum<TYPE> & IHasTextComponent> extends MiniElemen
             int optionCenter = BAR_START + optionDistance * option.ordinal();
             int color = textColor;
             if (text.getStyle().getColor() != null) {
-                color = 0xFF000000 | text.getStyle().getColor().getValue();
+                color = ARGB.opaque(text.getStyle().getColor().getValue());
             }
             GuiUtils.fill(guiGraphics, getRelativeX() + optionCenter, getRelativeY() + 17, 1, 3, color);
             if (usesIcons) {
                 IHasModeIcon hasModeIcon = (IHasModeIcon) option;
-                guiGraphics.blit(hasModeIcon.getModeIcon(), getRelativeX() + optionCenter - 8, getRelativeY() + 19, 0, 0, 16, 16, 16, 16);
+                guiGraphics.blit(RenderPipelines.GUI_TEXTURED, hasModeIcon.getModeIcon(), getRelativeX() + optionCenter - 8, getRelativeY() + 19, 0, 0, 16, 16, 16, 16);
             } else {
                 //Similar to logic for drawScaledCenteredText except shifts values slightly if they go past the max length
                 int textWidth = parent.font().width(text);
@@ -114,7 +116,7 @@ class EnumToggle<TYPE extends Enum<TYPE> & IHasTextComponent> extends MiniElemen
         List<TYPE> options = enumConstants;
         int size = options.size() - 1;
         int cur = (int) Math.round(((mouseX - getX() - BAR_START) / BAR_LENGTH) * size);
-        cur = Mth.clamp(cur, 0, size);
+        cur = Math.clamp(cur, 0, size);
         if (cur != data.get().ordinal()) {
             setData(options.get(cur));
         }

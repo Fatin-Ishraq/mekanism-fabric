@@ -14,30 +14,34 @@ import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import mekanism.client.lang.MekanismLangProvider;
-import mekanism.client.model.MekanismItemModelProvider;
+import mekanism.client.model.MekanismModelProvider;
 import mekanism.client.sound.MekanismSoundProvider;
-import mekanism.client.state.MekanismBlockStateProvider;
 import mekanism.client.texture.MekanismSpriteSourceProvider;
 import mekanism.client.texture.PrideRobitTextureProvider;
 import mekanism.common.advancements.MekanismAdvancementProvider;
 import mekanism.common.integration.computer.ComputerHelpProvider;
 import mekanism.common.lib.FieldReflectionHelper;
 import mekanism.common.loot.MekanismLootProvider;
+import mekanism.common.recipe.MekRecipeRunner;
 import mekanism.common.recipe.impl.MekanismRecipeProvider;
 import mekanism.common.registries.MekanismDatapackRegistryProvider;
 import mekanism.common.tag.MekanismTagProvider;
-import net.minecraft.Util;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.CachedOutput;
 import net.minecraft.data.DataGenerator;
 import net.minecraft.data.DataProvider;
 import net.minecraft.data.PackOutput;
+import net.minecraft.data.advancements.AdvancementProvider;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.util.Util;
 import mekanism.neoshim.bus.api.SubscribeEvent;
 import mekanism.neoshim.fml.DeferredWorkQueue;
 import mekanism.neoshim.fml.ModContainer;
@@ -49,7 +53,6 @@ import mekanism.neoshim.fml.event.config.ModConfigEvent;
 import mekanism.neoshim.fml.event.lifecycle.InterModEnqueueEvent;
 import mekanism.neoshim.fml.event.lifecycle.InterModProcessEvent;
 import mekanism.neoshim.fml.util.ObfuscationReflectionHelper;
-import mekanism.neoshim.neoforge.common.data.ExistingFileHelper;
 import mekanism.neoshim.neoforge.data.event.GatherDataEvent;
 
 @EventBusSubscriber(modid = Mekanism.MODID)
@@ -77,40 +80,37 @@ public class MekanismDataGenerator {
     }
 
     @SubscribeEvent
-    public static void gatherData(GatherDataEvent event) {
+    public static void gatherData(GatherDataEvent.Client event) {
         bootstrapConfigs(Mekanism.MODID);
         bootstrapIMC();
         DataGenerator gen = event.getGenerator();
         PackOutput output = gen.getPackOutput();
-        ExistingFileHelper existingFileHelper = event.getExistingFileHelper();
         MekanismDatapackRegistryProvider drProvider = new MekanismDatapackRegistryProvider(output, event.getLookupProvider());
         CompletableFuture<HolderLookup.Provider> lookupProvider = drProvider.getRegistryProvider();
-        gen.addProvider(true, new BasePackMetadataGenerator(output, MekanismLang.PACK_DESCRIPTION));
+        ResourceManager clientResources = event.getResourceManager(PackType.CLIENT_RESOURCES);
         //Client side data generators
-        gen.addProvider(event.includeClient(), new MekanismLangProvider(output));
-        gen.addProvider(event.includeClient(), new PrideRobitTextureProvider(output, existingFileHelper));
-        gen.addProvider(event.includeClient(), new MekanismSoundProvider(output, existingFileHelper));
-        gen.addProvider(event.includeClient(), new MekanismSpriteSourceProvider(output, existingFileHelper, lookupProvider));
-        gen.addProvider(event.includeClient(), new MekanismItemModelProvider(output, existingFileHelper));
-        gen.addProvider(event.includeClient(), new MekanismBlockStateProvider(output, existingFileHelper));
+        gen.addProvider(true, new MekanismLangProvider(output));
+        gen.addProvider(true, new PrideRobitTextureProvider(output, clientResources));
+        gen.addProvider(true, new MekanismSoundProvider(output));
+        gen.addProvider(true, new MekanismSpriteSourceProvider(output, lookupProvider));
+        gen.addProvider(true, new MekanismModelProvider(output, clientResources));
+        //todo - 26.1: gen.addProvider(true, new MekanismBlockStateProvider(output));
         //Server side data generators
-        gen.addProvider(event.includeServer(), new MekanismTagProvider(output, lookupProvider, existingFileHelper));
-        gen.addProvider(event.includeServer(), new MekanismLootProvider(output, lookupProvider));
-        gen.addProvider(event.includeServer(), drProvider);
-        gen.addProvider(event.includeServer(), new MekanismDataMapsProvider(output, lookupProvider));
-        MekanismRecipeProvider recipeProvider = new MekanismRecipeProvider(output, lookupProvider, existingFileHelper);
-        gen.addProvider(event.includeServer(), recipeProvider);
-        gen.addProvider(event.includeServer(), new MekanismAdvancementProvider(output, lookupProvider, existingFileHelper));
-        gen.addProvider(event.includeServer(), new ComputerHelpProvider(output, lookupProvider, Mekanism.MODID));
+        gen.addProvider(true, new MekanismTagProvider(output, lookupProvider));
+        gen.addProvider(true, new MekanismLootProvider(output, lookupProvider));
+        gen.addProvider(true, drProvider);
+        gen.addProvider(true, new MekanismDataMapsProvider(output, lookupProvider));
+        HashSet<String> disabledCompats = new HashSet<>();
+        gen.addProvider(true, new MekRecipeRunner(output, lookupProvider, (registries, recipeOutput) -> new MekanismRecipeProvider(registries, recipeOutput, disabledCompats), Mekanism.MODID));
+        gen.addProvider(true, new AdvancementProvider(output, lookupProvider, List.of(new MekanismAdvancementProvider())));
+        gen.addProvider(true, new ComputerHelpProvider(output, lookupProvider, Mekanism.MODID));
         //Data generator to help with persisting data when porting across MC versions when optional deps aren't updated yet
         // DO NOT ADD OTHERS AFTER THIS ONE
-        PersistingDisabledProvidersProvider.addDisableableProviders(event, lookupProvider, recipeProvider.getDisabledCompats());
+        PersistingDisabledProvidersProvider.addDisableableProviders(event, lookupProvider, disabledCompats);
     }
 
-    /**
-     * Used to bootstrap configs to their default values so that if we are querying if things exist we don't have issues with it happening to early or in cases we have
-     * fake tiles.
-     */
+    /// Used to bootstrap configs to their default values so that if we are querying if things exist we don't have issues with it happening to early or in cases we have
+    /// fake tiles.
     @SuppressWarnings("UnstableApiUsage")
     public static void bootstrapConfigs(String modid) {
         for (Set<ModConfig> configs : CONFIG_SETS.getValue(ConfigTracker.INSTANCE).values()) {
@@ -151,10 +151,8 @@ public class MekanismDataGenerator {
         processIMC.runTasks();
     }
 
-    /**
-     * Basically a copy of {@link DataProvider#saveStable(CachedOutput, JsonElement, Path)} but it takes a consumer of the output stream instead of serializes json using
-     * GSON. Use it to write arbitrary files.
-     */
+    /// Basically a copy of [DataProvider#saveStable(CachedOutput, JsonElement, Path)] but it takes a consumer of the output stream instead of serializes json using GSON.
+    /// Use it to write arbitrary files.
     @SuppressWarnings({"UnstableApiUsage", "deprecation"})
     public static CompletableFuture<?> save(CachedOutput cache, IOConsumer<OutputStream> osConsumer, Path path) {
         return CompletableFuture.runAsync(() -> {

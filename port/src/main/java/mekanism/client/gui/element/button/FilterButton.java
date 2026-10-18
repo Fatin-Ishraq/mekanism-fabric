@@ -8,6 +8,7 @@ import java.util.function.ObjIntConsumer;
 import java.util.function.Predicate;
 import mekanism.api.text.EnumColor;
 import mekanism.api.text.TextComponentUtil;
+import mekanism.client.MekanismClient;
 import mekanism.client.gui.GuiUtils;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.slot.GuiSequencedSlotDisplay;
@@ -26,27 +27,29 @@ import mekanism.common.content.transporter.SorterFilter;
 import mekanism.common.inventory.warning.WarningTracker.WarningType;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public class FilterButton extends MekanismButton {
 
-    private static final ResourceLocation TEXTURE = MekanismUtils.getResource(ResourceType.GUI_BUTTON, "filter_holder.png");
+    private static final Identifier TEXTURE = MekanismUtils.getResource(ResourceType.GUI_BUTTON, "filter_holder.png");
     protected static final int TEXTURE_WIDTH = 156;
     protected static final int TEXTURE_HEIGHT = 58;
 
     protected final FilterManager<?> filterManager;
     private final GuiSequencedSlotDisplay slotDisplay;
-    private final ObjIntConsumer<IFilter<?>> onPress;
+    private final ObjIntConsumer<@Nullable IFilter<?>> onPress;
     private final IntSupplier filterIndex;
     private final RadioButton toggleButton;
     private final GuiSlot slot;
     private final int index;
+    @Nullable
     private IFilter<?> prevFilter;
 
     @Nullable
@@ -58,8 +61,8 @@ public class FilterButton extends MekanismButton {
     }
 
     public FilterButton(IGuiWrapper gui, int x, int y, int width, int height, int index, IntSupplier filterIndex, FilterManager<?> filterManager,
-          ObjIntConsumer<IFilter<?>> onPress, IntConsumer toggleButtonPress, Function<IFilter<?>, List<ItemStack>> renderStackSupplier) {
-        super(gui, x, y, width, height, CommonComponents.EMPTY, (element, mouseX, mouseY) -> {
+          ObjIntConsumer<@Nullable IFilter<?>> onPress, IntConsumer toggleButtonPress, Function<@Nullable IFilter<?>, List<ItemStack>> renderStackSupplier) {
+        super(gui, x, y, width, height, CommonComponents.EMPTY, (element, _, _) -> {
             FilterButton button = (FilterButton) element;
             int actualIndex = button.filterIndex.getAsInt() + button.index;
             button.onPress.accept(getFilter(button.filterManager, actualIndex), actualIndex);
@@ -72,7 +75,7 @@ public class FilterButton extends MekanismButton {
         slot = addChild(new GuiSlot(SlotType.NORMAL, gui, relativeX + 2, relativeY + 2));
         slotDisplay = addChild(new GuiSequencedSlotDisplay(gui, relativeX + 3, relativeY + 3, () -> renderStackSupplier.apply(getFilter())));
         toggleButton = addChild(new RadioButton(gui, relativeX + this.width - RadioButton.RADIO_SIZE - getToggleXShift(), relativeY + (this.height / 2) - (RadioButton.RADIO_SIZE / 2),
-              this::isEnabled, (element, mouseX, mouseY) -> {
+              this::isEnabled, (_, _, _) -> {
             toggleButtonPress.accept(getActualIndex());
             return true;
         }, MekanismLang.FILTER_STATE.translate(EnumColor.BRIGHT_GREEN, MekanismLang.MODULE_ENABLED_LOWER), MekanismLang.FILTER_STATE.translate(EnumColor.RED, MekanismLang.MODULE_DISABLED_LOWER)));
@@ -97,7 +100,7 @@ public class FilterButton extends MekanismButton {
         return getFilter(filterManager, getActualIndex());
     }
 
-    public FilterButton warning(@NotNull WarningType type, @NotNull Predicate<IFilter<?>> hasWarning) {
+    public FilterButton warning(WarningType type, Predicate<@Nullable IFilter<?>> hasWarning) {
         //Proxy applying the warning to the slot
         slot.warning(type, () -> hasWarning.test(getFilter()));
         return this;
@@ -112,19 +115,18 @@ public class FilterButton extends MekanismButton {
     }
 
     @Override
-    public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void updateBeforeExtract() {
         setVisibility(getFilter() != null);
-        super.render(guiGraphics, mouseX, mouseY, partialTicks);
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
-        guiGraphics.blit(TEXTURE, getButtonX(), getButtonY(), getButtonWidth(), getButtonHeight(), 0, isMouseOverCheckWindows(mouseX, mouseY) ? 0 : 29, TEXTURE_WIDTH, 29, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, getButtonX(), getButtonY(), 0, isMouseOverCheckWindows(mouseX, mouseY) ? 0 : 29, getButtonWidth(), getButtonHeight(), TEXTURE_WIDTH, 29, TEXTURE_WIDTH, TEXTURE_HEIGHT);
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         IFilter<?> filter = getFilter();
         if (filter != prevFilter) {
@@ -132,7 +134,7 @@ public class FilterButton extends MekanismButton {
             prevFilter = filter;
         }
         Component filterDescriptor = switch (filter) {
-            case IItemStackFilter<?> item -> item.getItemStack().getHoverName();
+            case IItemStackFilter<?> item -> item.getItemType().getHoverName();
             case ITagFilter<?> tag -> TextComponentUtil.getString(tag.getTagName());
             case IModIDFilter<?> modId -> TextComponentUtil.getString(modId.getModID());
             case OredictionificatorFilter<?, ?, ?> oredictionificatorFilter -> TextComponentUtil.getString(oredictionificatorFilter.getFilterText());
@@ -154,8 +156,8 @@ public class FilterButton extends MekanismButton {
             Component color = sorterFilter.color == null ? MekanismLang.NO_COLOR.translate() : sorterFilter.color.getName();
             drawScaledScrollingString(guiGraphics, color, 27, 12, TextAlignment.LEFT, titleTextColor(), textWidth - 8, 3, false, 0.7F);
         } else if (filter instanceof OredictionificatorItemFilter oreDictFilter) {
-            ItemStack result = oreDictFilter.getResult();
-            Component text = TextComponentUtil.build(result, " (", MekanismUtils.getModId(result), ")");
+            ItemResource result = oreDictFilter.getResult();
+            Component text = TextComponentUtil.build(result, " (", MekanismClient.getModId(result.toStack()), ")");
             drawScaledScrollingString(guiGraphics, text, 19, 12, TextAlignment.LEFT, titleTextColor(), textWidth, 3, false, 0.7F);
         } else if (filter instanceof QIOItemStackFilter itemFilter) {
             if (itemFilter.fuzzyMode) {

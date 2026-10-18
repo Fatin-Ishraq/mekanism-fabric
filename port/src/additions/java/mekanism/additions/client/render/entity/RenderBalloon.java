@@ -1,71 +1,85 @@
 package mekanism.additions.client.render.entity;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import java.util.Collections;
 import java.util.List;
 import mekanism.additions.client.model.AdditionsModelCache;
-import mekanism.additions.common.MekanismAdditions;
+import mekanism.additions.client.render.entity.RenderBalloon.BalloonRenderState;
 import mekanism.additions.common.entity.EntityBalloon;
-import mekanism.api.text.EnumColor;
-import mekanism.client.model.BaseModelCache.JSONModelData;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.block.model.BakedQuad;
+import mekanism.client.model.BaseModelCache;
+import net.minecraft.client.renderer.Sheets;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.util.LightCoordsUtil;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
+import org.jspecify.annotations.Nullable;
 
-public class RenderBalloon extends EntityRenderer<EntityBalloon> {
+public class RenderBalloon extends EntityRenderer<EntityBalloon, BalloonRenderState> {
 
-    public static final ResourceLocation BALLOON_TEXTURE = MekanismAdditions.rl("textures/item/balloon.png");
+    private static final RenderType RENDER_TYPE = Sheets.translucentBlockSheet();
 
     public RenderBalloon(EntityRendererProvider.Context context) {
         super(context);
     }
 
-    @NotNull
     @Override
-    public ResourceLocation getTextureLocation(@NotNull EntityBalloon entity) {
-        return BALLOON_TEXTURE;
+    public BalloonRenderState createRenderState() {
+        return new BalloonRenderState();
     }
 
     @Override
-    public void render(@NotNull EntityBalloon balloon, float entityYaw, float partialTick, @NotNull PoseStack matrix, @NotNull MultiBufferSource renderer, int light) {
-        matrix.pushPose();
-        matrix.translate(-0.5, -1, -0.5);
-
-        if (balloon.isLatchedToEntity()) {
+    public void extractRenderState(EntityBalloon balloon, BalloonRenderState state, float partialTick) {
+        super.extractRenderState(balloon, state, partialTick);
+        state.tint[0] = balloon.getColor().getPackedColor();
+        BaseModelCache.BlockStateModelPartHelper model;
+        LivingEntity latchedEntity = balloon.latchedEntity();
+        if (latchedEntity != null) {
             //Shift the rendering of the balloon to be over the entity
-            double x = balloon.latchedEntity.xOld + (balloon.latchedEntity.getX() - balloon.latchedEntity.xOld) * partialTick
-                       - (balloon.xOld + (balloon.getX() - balloon.xOld) * partialTick);
-            double y = balloon.latchedEntity.yOld + (balloon.latchedEntity.getY() - balloon.latchedEntity.yOld) * partialTick
-                       - (balloon.yOld + (balloon.getY() - balloon.yOld) * partialTick)
-                       + balloon.getAddedHeight();
-            double z = balloon.latchedEntity.zOld + (balloon.latchedEntity.getZ() - balloon.latchedEntity.zOld) * partialTick
-                       - (balloon.zOld + (balloon.getZ() - balloon.zOld) * partialTick);
-            matrix.translate(x, y, z);
+            Vec3 latchedLerp = Mth.lerp(partialTick, latchedEntity.oldPosition(), latchedEntity.position());
+            Vec3 balloonLerp = Mth.lerp(partialTick, balloon.oldPosition(), balloon.position());
+            state.latchedAdjustment = latchedLerp.subtract(balloonLerp)
+                  .add(0, balloon.getAddedHeight(latchedEntity), 0);
+            model = AdditionsModelCache.INSTANCE.BALLOON;
+        } else if (balloon.isLatchedToPos()) {
+            model = AdditionsModelCache.INSTANCE.BALLOON;
+        } else {
+            model = AdditionsModelCache.INSTANCE.BALLOON_FREE;
+        }
+        state.model = model.getBakedModel();
+    }
+
+    @Override
+    public void submit(BalloonRenderState state, PoseStack poseStack, SubmitNodeCollector nodeCollector, CameraRenderState camera) {
+        poseStack.pushPose();
+        poseStack.translate(-0.5, -1, -0.5);
+
+        if (state.latchedAdjustment != null) {
+            poseStack.translate(state.latchedAdjustment);
         }
 
-        JSONModelData model = balloon.isLatched() ? AdditionsModelCache.INSTANCE.BALLOON : AdditionsModelCache.INSTANCE.BALLOON_FREE;
+        nodeCollector.submitBlockModel(poseStack, RENDER_TYPE, state.model, state.tint, LightCoordsUtil.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, 0);
+        poseStack.popPose();
+        super.submit(state, poseStack, nodeCollector, camera);
+    }
 
-        List<BakedQuad> quads = model.getQuads(balloon.level().random);
-        RenderType renderType = RenderType.entityTranslucent(TextureAtlas.LOCATION_BLOCKS);
-        VertexConsumer builder = renderer.getBuffer(renderType);
-        PoseStack.Pose last = matrix.last();
-        for (BakedQuad quad : quads) {
-            float[] color = {1, 1, 1, 1};
-            if (quad.getTintIndex() == 0) {
-                EnumColor balloonColor = balloon.getColor();
-                color[0] = balloonColor.getColor(0);
-                color[1] = balloonColor.getColor(1);
-                color[2] = balloonColor.getColor(2);
-            }
-            builder.putBulkData(last, quad, color[0], color[1], color[2], color[3], light, OverlayTexture.NO_OVERLAY, false);
-        }
-        matrix.popPose();
-        super.render(balloon, entityYaw, partialTick, matrix, renderer, light);
+    @Override
+    protected boolean affectedByCulling(EntityBalloon balloon) {
+        return false;
+    }
+
+    public static class BalloonRenderState extends EntityRenderState {
+
+        @Nullable
+        public Vec3 latchedAdjustment;
+        public List<BlockStateModelPart> model = Collections.emptyList();
+        public final int[] tint = new int[1];
     }
 }

@@ -1,6 +1,5 @@
 package mekanism.common.registration.impl;
 
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.text.IHasTextComponent;
 import mekanism.api.text.IHasTranslationKey;
 import mekanism.common.registration.MekanismDeferredHolder;
@@ -10,10 +9,11 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.material.Fluid;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
+import mekanism.neoshim.neoforge.fluids.FluidStackTemplate;
 import mekanism.neoshim.neoforge.fluids.FluidType;
 import mekanism.neoshim.neoforge.registries.DeferredHolder;
+import mekanism.neoshim.neoforge.transfer.fluid.FluidResource;
 
-@NothingNullByDefault
 public class FluidRegistryObject<TYPE extends FluidType, STILL extends Fluid, FLOWING extends Fluid, BLOCK extends LiquidBlock, BUCKET extends BucketItem>
     extends MekanismDeferredHolder<Fluid, STILL> implements IHasTextComponent, IHasTranslationKey {
 
@@ -48,8 +48,17 @@ public class FluidRegistryObject<TYPE extends FluidType, STILL extends Fluid, FL
         return bucket;
     }
 
+    public FluidResource asResource() {
+        return FluidResource.of(this);
+    }
+
     public FluidStack asStack(int amount) {
         return new FluidStack(get(), amount);
+    }
+
+    public FluidStackTemplate asTemplate(int amount) {
+        //TODO - 26.1: Should we pass get() or this to the template constructor?
+        return new FluidStackTemplate(get(), amount);
     }
 
     @Override

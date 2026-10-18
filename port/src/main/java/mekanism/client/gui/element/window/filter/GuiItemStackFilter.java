@@ -11,8 +11,8 @@ import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.tile.interfaces.ITileFilterHolder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public abstract class GuiItemStackFilter<FILTER extends IItemStackFilter<FILTER>, TILE extends TileEntityMekanism & ITileFilterHolder<? super FILTER>>
       extends GuiFilter<FILTER, TILE> {
@@ -25,7 +25,7 @@ public abstract class GuiItemStackFilter<FILTER extends IItemStackFilter<FILTER>
     protected List<Component> getScreenText() {
         List<Component> list = super.getScreenText();
         if (filter.hasFilter()) {
-            list.add(filter.getItemStack().getHoverName());
+            list.add(filter.getItemType().getHoverName());
         }
         return list;
     }
@@ -35,17 +35,16 @@ public abstract class GuiItemStackFilter<FILTER extends IItemStackFilter<FILTER>
         return MekanismLang.ITEM_FILTER_NO_ITEM;
     }
 
-    @NotNull
     @Override
     protected List<ItemStack> getRenderStacks() {
-        ItemStack stack = filter.getItemStack();
-        return stack.isEmpty() ? Collections.emptyList() : Collections.singletonList(stack);
+        ItemResource itemType = filter.getItemType();
+        return itemType.isEmpty() ? Collections.emptyList() : Collections.singletonList(itemType.toStack());
     }
 
     @Nullable
     @Override
     protected IGhostItemConsumer getGhostHandler() {
-        return ingredient -> setFilterStackWithSound(((ItemStack) ingredient).copyWithCount(1));
+        return ingredient -> setFilterStackWithSound(ItemResource.of((ItemStack) ingredient));
     }
 
     @Nullable
@@ -54,13 +53,13 @@ public abstract class GuiItemStackFilter<FILTER extends IItemStackFilter<FILTER>
         return getHandleClickSlot(NOT_EMPTY, this::setFilterStack);
     }
 
-    private void setFilterStack(@NotNull ItemStack stack) {
-        filter.setItemStack(stack);
+    private void setFilterStack(ItemResource itemType) {
+        filter.setItemType(itemType);
         slotDisplay.updateStackList();
     }
 
-    protected void setFilterStackWithSound(@NotNull ItemStack stack) {
-        setFilterStack(stack);
+    protected void setFilterStackWithSound(ItemResource itemType) {
+        setFilterStack(itemType);
         playClickSound(BUTTON_CLICK_SOUND);
     }
 }

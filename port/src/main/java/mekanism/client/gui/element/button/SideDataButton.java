@@ -17,23 +17,20 @@ import mekanism.common.network.PacketUtils;
 import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.tile.component.config.DataType;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class SideDataButton extends BasicColorButton {
 
     private final SideDataPacketCreator packetCreator;
-    private final Supplier<DataType> dataTypeSupplier;
+    private final Supplier<@Nullable DataType> dataTypeSupplier;
     private final TileEntityMekanism tile;
     private final RelativeSide slotPos;
     private final ItemStack otherBlockItem;
@@ -43,15 +40,15 @@ public class SideDataButton extends BasicColorButton {
     @Nullable
     private Tooltip lastTooltip;
 
-    public SideDataButton(IGuiWrapper gui, int x, int y, RelativeSide slotPos, Supplier<DataType> dataTypeSupplier, Supplier<EnumColor> colorSupplier,
+    public SideDataButton(IGuiWrapper gui, int x, int y, RelativeSide slotPos, Supplier<@Nullable DataType> dataTypeSupplier, Supplier<@Nullable EnumColor> colorSupplier,
           TileEntityMekanism tile, SideDataPacketCreator packetCreator, boolean displayDataType) {
         super(gui, x, y, 22, () -> {
             DataType dataType = dataTypeSupplier.get();
             return dataType == null ? null : colorSupplier.get();
-        }, (element, mouseX, mouseY) -> {
+        }, (element, event, _) -> {
             SideDataButton button = (SideDataButton) element;
-            return PacketUtils.sendToServer(button.packetCreator.create(button.tile.getBlockPos(), MekClickType.left(Screen.hasShiftDown()), button.slotPos));
-        }, (element, mouseX, mouseY) -> {
+            return PacketUtils.sendToServer(button.packetCreator.create(button.tile.getBlockPos(), MekClickType.left(event.hasShiftDown()), button.slotPos));
+        }, (element, _, _) -> {
             SideDataButton button = (SideDataButton) element;
             return PacketUtils.sendToServer(button.packetCreator.create(button.tile.getBlockPos(), MekClickType.RIGHT, button.slotPos));
         });
@@ -66,7 +63,8 @@ public class SideDataButton extends BasicColorButton {
             BlockPos otherBlockPos = tile.getBlockPos().relative(globalSide);
             BlockState blockOnSide = tileWorld.getBlockState(otherBlockPos);
             if (!blockOnSide.isAir()) {
-                otherBlockItem = blockOnSide.getCloneItemStack(new BlockHitResult(otherBlockPos.getCenter().relative(globalSide.getOpposite(), 0.5), globalSide.getOpposite(), otherBlockPos, false), tileWorld, otherBlockPos, Minecraft.getInstance().player);
+                //TODO - 26.1 check that previous false was the same param, and if there's supposed to be a HitResult version???
+                otherBlockItem = blockOnSide.getCloneItemStack(otherBlockPos, tileWorld, false, Minecraft.getInstance().player);
             } else {
                 otherBlockItem = ItemStack.EMPTY;
             }
@@ -75,12 +73,13 @@ public class SideDataButton extends BasicColorButton {
         }
     }
 
+    @Nullable
     public DataType getDataType() {
         return this.dataTypeSupplier.get();
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
 
         if (!otherBlockItem.isEmpty()) {

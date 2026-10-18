@@ -7,19 +7,20 @@ import mekanism.common.particle.LaserParticleData;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.ParticleProvider;
-import net.minecraft.client.particle.ParticleRenderType;
+import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.particle.SpriteSet;
-import net.minecraft.client.particle.TextureSheetParticle;
-import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.state.level.QuadParticleRenderState;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.Direction;
+import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.NotNull;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
-public class LaserParticle extends TextureSheetParticle {
+public class LaserParticle extends SingleQuadParticle {
 
     private static final float RADIAN_45 = 45 * Mth.DEG_TO_RAD;
     private static final float RADIAN_90 = 90 * Mth.DEG_TO_RAD;
@@ -27,8 +28,8 @@ public class LaserParticle extends TextureSheetParticle {
     private final Direction direction;
     private final float halfLength;
 
-    private LaserParticle(ClientLevel world, Vec3 start, Vec3 end, Direction dir, float energyScale) {
-        super(world, (start.x + end.x) / 2D, (start.y + end.y) / 2D, (start.z + end.z) / 2D);
+    private LaserParticle(ClientLevel world, Vec3 start, Vec3 end, Direction dir, float energyScale, TextureAtlasSprite sprite) {
+        super(world, (start.x + end.x) / 2D, (start.y + end.y) / 2D, (start.z + end.z) / 2D, sprite);
         lifetime = 5;
         rCol = 1;
         gCol = 0;
@@ -43,28 +44,32 @@ public class LaserParticle extends TextureSheetParticle {
     }
 
     @Override
-    protected int getLightColor(float partialTick) {
-        return LightTexture.FULL_BRIGHT;
+    protected int getLightCoords(float partialTick) {
+        return LightCoordsUtil.FULL_BRIGHT;
     }
 
     @Override
-    public void render(@NotNull VertexConsumer vertexBuilder, Camera renderInfo, float partialTicks) {
-        Vec3 view = renderInfo.getPosition();
+    public void extract(QuadParticleRenderState particleTypeRenderState, Camera renderInfo, float partialTicks) {
+        //extractRotatedQuad(QuadParticleRenderState particleTypeRenderState, Camera camera, Quaternionf rotation, float partialTickTime)
+        Vec3 view = renderInfo.position();
         float newX = (float) (Mth.lerp(partialTicks, xo, x) - view.x());
         float newY = (float) (Mth.lerp(partialTicks, yo, y) - view.y());
         float newZ = (float) (Mth.lerp(partialTicks, zo, z) - view.z());
+        //
+
         float uMin = getU0();
         float uMax = getU1();
         float vMin = getV0();
         float vMax = getV1();
-        int light = getLightColor(partialTicks);
+        int light = getLightCoords(partialTicks);
         float quadSize = getQuadSize(partialTicks);
         Quaternionf quaternion = direction.getRotation();
         quaternion.mul(Axis.YP.rotation(RADIAN_45));
-        drawComponent(vertexBuilder, getResultVector(quaternion, newX, newY, newZ, quadSize), uMin, uMax, vMin, vMax, light);
-        Quaternionf quaternion2 = new Quaternionf(quaternion);
-        quaternion2.mul(Axis.YP.rotation(RADIAN_90));
-        drawComponent(vertexBuilder, getResultVector(quaternion2, newX, newY, newZ, quadSize), uMin, uMax, vMin, vMax, light);
+        //TODO - 26.1 make this not a SingleQuadParticle - SQP render the quad with all 4 vertices the same position, this does not
+        //drawComponent(vertexBuilder, getResultVector(quaternion, newX, newY, newZ, quadSize), uMin, uMax, vMin, vMax, light);
+        //Quaternionf quaternion2 = new Quaternionf(quaternion);
+        //quaternion2.mul(Axis.YP.rotation(RADIAN_90));
+        //drawComponent(vertexBuilder, getResultVector(quaternion2, newX, newY, newZ, quadSize), uMin, uMax, vMin, vMax, light);
     }
 
     private Vector3f[] getResultVector(Quaternionf quaternion, float newX, float newY, float newZ, float quadSize) {
@@ -94,16 +99,16 @@ public class LaserParticle extends TextureSheetParticle {
     }
 
     private void addVertex(VertexConsumer vertexBuilder, Vector3f pos, float u, float v, int light) {
-        vertexBuilder.addVertex(pos.x(), pos.y(), pos.z())
+        vertexBuilder.addVertex(pos)
               .setUv(u, v)
               .setColor(rCol, gCol, bCol, alpha)
               .setLight(light);
     }
 
-    @NotNull
     @Override
-    public ParticleRenderType getRenderType() {
-        return ParticleRenderType.PARTICLE_SHEET_TRANSLUCENT;
+    protected SingleQuadParticle.Layer getLayer() {
+        //TODO - 26.1: Validate this
+        return SingleQuadParticle.Layer.TRANSLUCENT;
     }
 
     @Override
@@ -136,8 +141,8 @@ public class LaserParticle extends TextureSheetParticle {
         });
     }
 
-    @NotNull
-    @Override
+    //TODO - 26.1 this
+    //@Override
     public AABB getRenderBoundingBox(float partialTicks) {
         return getBoundingBox();
     }
@@ -151,12 +156,10 @@ public class LaserParticle extends TextureSheetParticle {
         }
 
         @Override
-        public LaserParticle createParticle(LaserParticleData data, @NotNull ClientLevel world, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed) {
+        public LaserParticle createParticle(LaserParticleData data, ClientLevel world, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed, RandomSource random) {
             Pos3D start = new Pos3D(x, y, z);
             Pos3D end = start.translate(data.direction(), data.distance());
-            LaserParticle particleLaser = new LaserParticle(world, start, end, data.direction(), data.energyScale());
-            particleLaser.pickSprite(this.spriteSet);
-            return particleLaser;
+            return new LaserParticle(world, start, end, data.direction(), data.energyScale(), spriteSet.get(random));
         }
     }
 }

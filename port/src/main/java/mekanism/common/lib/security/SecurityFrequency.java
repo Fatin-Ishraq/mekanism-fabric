@@ -11,13 +11,13 @@ import mekanism.api.SerializationConstants;
 import mekanism.api.security.SecurityMode;
 import mekanism.common.lib.collection.HashList;
 import mekanism.common.lib.frequency.Frequency;
-import mekanism.common.lib.frequency.FrequencyType;
+import mekanism.common.lib.frequency.FrequencyTypes;
 import mekanism.common.network.PacketUtils;
 import mekanism.common.util.MekanismUtils;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class SecurityFrequency extends Frequency {
 
@@ -56,15 +56,13 @@ public class SecurityFrequency extends Frequency {
     private HashList<String> trustedCache = new HashList<>();
     private int trustedCacheHash;
 
-    /**
-     * @param uuid Should only be null if we have incomplete data that we are loading
-     */
+    /// @param uuid Should only be null if we have incomplete data that we are loading
     public SecurityFrequency(@Nullable UUID uuid, SecurityMode securityMode) {
-        super(FrequencyType.SECURITY, SECURITY, uuid, securityMode);
+        super(FrequencyTypes.SECURITY, SECURITY, uuid, securityMode);
     }
 
     private SecurityFrequency(@Nullable UUID owner, String ownerName, SecurityMode securityMode) {
-        super(FrequencyType.SECURITY, SECURITY, owner, ownerName, securityMode);
+        super(FrequencyTypes.SECURITY, SECURITY, owner, ownerName, securityMode);
     }
 
     @Override

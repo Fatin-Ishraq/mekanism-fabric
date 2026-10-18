@@ -8,12 +8,11 @@ import mekanism.common.registries.MekanismAttachmentTypes;
 import mekanism.common.util.MekanismUtils;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.LayeredDraw;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.entity.player.Player;
-import org.jetbrains.annotations.NotNull;
+import mekanism.neoshim.neoforge.client.gui.GuiLayer;
 
-public class RadiationOverlay implements LayeredDraw.Layer {
+public class RadiationOverlay implements GuiLayer {
 
     public static final RadiationOverlay INSTANCE = new RadiationOverlay();
 
@@ -28,7 +27,7 @@ public class RadiationOverlay implements LayeredDraw.Layer {
     }
 
     @Override
-    public void render(@NotNull GuiGraphics graphics, @NotNull DeltaTracker delta) {
+    public void render(GuiGraphicsExtractor graphics, DeltaTracker delta) {
         Minecraft minecraft = Minecraft.getInstance();
         Player player = minecraft.player;
         if (player != null && RadiationManager.isGlobalRadiationEnabled() && MekanismUtils.isPlayingMode(player)) {

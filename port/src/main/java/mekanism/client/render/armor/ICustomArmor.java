@@ -1,14 +1,16 @@
 package mekanism.client.render.armor;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.model.BabyModelTransform;
 import net.minecraft.client.model.HumanoidModel;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
 
+@FunctionalInterface
 public interface ICustomArmor {
 
-    void render(HumanoidModel<? extends LivingEntity> baseModel, @NotNull PoseStack matrix, @NotNull MultiBufferSource renderer, int light, int overlayLight,
-          float partialTicks, boolean hasEffect, LivingEntity entity, ItemStack stack);
+    BabyModelTransform BABY_MODEL_TRANSFORM = (BabyModelTransform) HumanoidModel.BABY_TRANSFORMER;
+
+    <STATE extends HumanoidRenderState> void render(HumanoidModel<STATE> baseModel, PoseStack poseStack, SubmitNodeCollector nodeCollector, int lightCoords, STATE state, ItemStack stack);
 }

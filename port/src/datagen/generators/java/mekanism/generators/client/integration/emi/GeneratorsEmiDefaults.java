@@ -1,22 +1,20 @@
 package mekanism.generators.client.integration.emi;
 
 import java.util.concurrent.CompletableFuture;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.client.integration.emi.BaseEmiDefaults;
-import mekanism.client.recipe_viewer.RecipeViewerUtils;
+import mekanism.common.util.RegistryUtils;
 import mekanism.generators.common.MekanismGenerators;
 import mekanism.generators.common.registries.GeneratorsBlocks;
 import mekanism.generators.common.registries.GeneratorsChemicals;
 import mekanism.generators.common.registries.GeneratorsItems;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
-import mekanism.neoshim.neoforge.common.data.ExistingFileHelper;
+import net.minecraft.server.packs.resources.ResourceManager;
 
-@NothingNullByDefault
 public class GeneratorsEmiDefaults extends BaseEmiDefaults {
 
-    public GeneratorsEmiDefaults(PackOutput output, ExistingFileHelper existingFileHelper, CompletableFuture<HolderLookup.Provider> registries) {
-        super(output, existingFileHelper, registries, MekanismGenerators.MODID);
+    public GeneratorsEmiDefaults(PackOutput output, ResourceManager serverResources, CompletableFuture<HolderLookup.Provider> registries) {
+        super(output, serverResources, registries, MekanismGenerators.MODID);
     }
 
     @Override
@@ -30,7 +28,7 @@ public class GeneratorsEmiDefaults extends BaseEmiDefaults {
         addSolarNeutronActivatorRecipes();
         addGearModuleRecipes();
         addRotaryRecipes();
-        addUncheckedRecipe(RecipeViewerUtils.synthetic(MekanismGenerators.rl("water"), "fission"));
+        addUncheckedRecipe(RegistryUtils.synthetic(MekanismGenerators.rl("water"), "fission"));
     }
 
     private void addRotaryRecipes() {

@@ -2,26 +2,25 @@ package mekanism.tools.common.recipe;
 
 import mekanism.tools.common.item.ItemMekanismShield;
 import mekanism.tools.common.registries.ToolsRecipeSerializers;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.BannerItem;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.CraftingBookCategory;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CustomRecipe;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BannerPatternLayers;
-import org.jetbrains.annotations.NotNull;
 
 public class MekBannerShieldRecipe extends CustomRecipe {
 
-    public MekBannerShieldRecipe(CraftingBookCategory category) {
-        super(category);
+    public static final MekBannerShieldRecipe INSTANCE = new MekBannerShieldRecipe();
+
+    private MekBannerShieldRecipe() {
+
     }
 
     @Override
-    public boolean matches(CraftingInput inv, @NotNull Level world) {
+    public boolean matches(CraftingInput inv, Level world) {
         ItemStack shieldStack = ItemStack.EMPTY;
         ItemStack bannerStack = ItemStack.EMPTY;
         for (int i = 0; i < inv.size(); ++i) {
@@ -47,9 +46,8 @@ public class MekBannerShieldRecipe extends CustomRecipe {
         return !shieldStack.isEmpty() && !bannerStack.isEmpty();
     }
 
-    @NotNull
     @Override
-    public ItemStack assemble(CraftingInput inv, @NotNull HolderLookup.Provider provider) {
+    public ItemStack assemble(CraftingInput inv) {
         ItemStack bannerStack = ItemStack.EMPTY;
         ItemStack shieldStack = ItemStack.EMPTY;
         for (int i = 0; i < inv.size(); ++i) {
@@ -71,18 +69,7 @@ public class MekBannerShieldRecipe extends CustomRecipe {
     }
 
     @Override
-    public boolean canCraftInDimensions(int width, int height) {
-        return width * height >= 2;
-    }
-
-    @Override
-    public boolean isIncomplete() {
-        return false;
-    }
-
-    @NotNull
-    @Override
-    public RecipeSerializer<?> getSerializer() {
+    public RecipeSerializer<MekBannerShieldRecipe> getSerializer() {
         return ToolsRecipeSerializers.BANNER_SHIELD.get();
     }
 }

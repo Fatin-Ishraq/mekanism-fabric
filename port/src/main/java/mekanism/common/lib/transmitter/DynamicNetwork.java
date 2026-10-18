@@ -19,8 +19,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import mekanism.neoshim.fml.util.thread.EffectiveSide;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import org.jspecify.annotations.Nullable;
 
 public abstract class DynamicNetwork<ACCEPTOR, NETWORK extends DynamicNetwork<ACCEPTOR, NETWORK, TRANSMITTER>,
       TRANSMITTER extends Transmitter<ACCEPTOR, NETWORK, TRANSMITTER>> implements INetworkDataHandler, IHasTextComponent {
@@ -110,7 +110,7 @@ public abstract class DynamicNetwork<ACCEPTOR, NETWORK extends DynamicNetwork<AC
     }
 
     public boolean isRemote() {
-        return world == null ? EffectiveSide.get().isClient() : world.isClientSide;
+        return world == null ? EffectiveSide.get().isClient() : world.isClientSide();
     }
 
     public void invalidate(@Nullable TRANSMITTER triggerTransmitter) {
@@ -122,18 +122,21 @@ public abstract class DynamicNetwork<ACCEPTOR, NETWORK extends DynamicNetwork<AC
         removeInvalid(triggerTransmitter);
         //Now invalidate the transmitters
         if (!isRemote()) {
-            for (TRANSMITTER transmitter : getTransmitters()) {
-                if (transmitter.isValid()) {
-                    transmitter.takeShare();
-                    transmitter.setTransmitterNetwork(null);
-                    TransmitterNetworkRegistry.registerOrphanTransmitter(transmitter);
+            try (Transaction transaction = Transaction.openRoot()) {
+                for (TRANSMITTER transmitter : getTransmitters()) {
+                    if (transmitter.isValid()) {
+                        transmitter.takeShare(transaction);
+                        transmitter.setTransmitterNetwork(null);
+                        TransmitterNetworkRegistry.registerOrphanTransmitter(transmitter);
+                    }
                 }
+                transaction.commit();
             }
         }
         deregister();
     }
 
-    protected void onLastTransmitterRemoved(@NotNull TRANSMITTER triggerTransmitter) {
+    protected void onLastTransmitterRemoved(TRANSMITTER triggerTransmitter) {
     }
 
     protected void removeInvalid(@Nullable TRANSMITTER triggerTransmitter) {
@@ -206,9 +209,7 @@ public abstract class DynamicNetwork<ACCEPTOR, NETWORK extends DynamicNetwork<AC
         return world;
     }
 
-    /**
-     * @apiNote Only called on the server
-     */
+    /// @apiNote Only called on the server
     public void onUpdate() {
     }
 
@@ -245,7 +246,7 @@ public abstract class DynamicNetwork<ACCEPTOR, NETWORK extends DynamicNetwork<AC
                     // - The old one unloads which causes this removedPositionedTransmitter call to take place
                     return;
                 }
-                Mekanism.logger.warn("Removed transmitter at position: {} in {} was different than expected.", pos, world == null ? null : world.dimension().location());
+                Mekanism.logger.warn("Removed transmitter at position: {} in {} was different than expected.", pos, world == null ? null : world.dimension().identifier());
             }
             positionedTransmitters.remove(pos.asLong());
         }
@@ -259,6 +260,7 @@ public abstract class DynamicNetwork<ACCEPTOR, NETWORK extends DynamicNetwork<AC
         return acceptorCache.hasAcceptor(acceptorPos);
     }
 
+    @Nullable
     public ACCEPTOR getCachedAcceptor(long acceptorPos, Direction side) {
         return acceptorCache.getCachedAcceptor(acceptorPos, side);
     }
@@ -268,7 +270,7 @@ public abstract class DynamicNetwork<ACCEPTOR, NETWORK extends DynamicNetwork<AC
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (o == this) {
             return true;
         } else if (o instanceof DynamicNetwork<?, ?, ?> other) {

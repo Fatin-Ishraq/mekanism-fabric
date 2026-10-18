@@ -1,32 +1,23 @@
 package mekanism.client.gui.element.progress;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.BufferUploader;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat.Mode;
 import java.util.function.BooleanSupplier;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.GuiTexturedElement;
 import mekanism.client.gui.element.progress.IProgressInfoHandler.IBooleanProgressInfoHandler;
-import mekanism.client.recipe_viewer.type.IRecipeViewerRecipeType;
 import mekanism.client.recipe_viewer.interfaces.IRecipeViewerRecipeArea;
-import mekanism.client.render.MekanismRenderer;
+import mekanism.client.recipe_viewer.type.IRecipeViewerRecipeType;
 import mekanism.common.inventory.warning.ISupportsWarning;
 import mekanism.common.inventory.warning.WarningTracker.WarningType;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.joml.Matrix4f;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
 public class GuiProgress extends GuiTexturedElement implements IRecipeViewerRecipeArea<GuiProgress>, ISupportsWarning<GuiProgress> {
 
     protected final IProgressInfoHandler handler;
     protected final ProgressType type;
-    private IRecipeViewerRecipeType<?>[] recipeCategories;
+    private IRecipeViewerRecipeType<?> @Nullable [] recipeCategories;
     @Nullable
     private ColorDetails colorDetails;
     @Nullable
@@ -48,17 +39,17 @@ public class GuiProgress extends GuiTexturedElement implements IRecipeViewerReci
     }
 
     @Override
-    public GuiProgress warning(@NotNull WarningType type, @NotNull BooleanSupplier warningSupplier) {
+    public GuiProgress warning(WarningType type, BooleanSupplier warningSupplier) {
         this.warningSupplier = ISupportsWarning.compound(this.warningSupplier, gui().trackWarning(type, warningSupplier));
         return this;
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
         if (handler.isActive()) {
-            ResourceLocation resource = getResource();
-            guiGraphics.blit(resource, relativeX, relativeY, 0, 0, width, height, type.getTextureWidth(), type.getTextureHeight());
+            Identifier resource = getResource();
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, resource, relativeX, relativeY, 0, 0, width, height, type.getTextureWidth(), type.getTextureHeight());
             boolean warning = warningSupplier != null && warningSupplier.getAsBoolean();
             double progress = warning ? 1 : getProgress();
             if (type.isVertical()) {
@@ -99,31 +90,30 @@ public class GuiProgress extends GuiTexturedElement implements IRecipeViewerReci
         return handler.isActive();
     }
 
-    @NotNull
     @Override
-    public GuiProgress recipeViewerCategories(@NotNull IRecipeViewerRecipeType<?>... recipeCategories) {
+    public GuiProgress recipeViewerCategories(IRecipeViewerRecipeType<?>... recipeCategories) {
         this.recipeCategories = recipeCategories;
         return this;
     }
 
-    @Nullable
     @Override
-    public IRecipeViewerRecipeType<?>[] getRecipeCategories() {
+    public IRecipeViewerRecipeType<?> @Nullable [] getRecipeCategories() {
         return recipeCategories;
     }
 
-    private void blit(GuiGraphics guiGraphics, ResourceLocation resource, int x, int y, float uOffset, float vOffset, int width, int height, int textureWidth, int textureHeight, double progress,
+    private void blit(GuiGraphicsExtractor guiGraphics, Identifier resource, int x, int y, float uOffset, float vOffset, int width, int height, int textureWidth, int textureHeight, double progress,
           boolean warning) {
         if (warning || colorDetails == null) {
             //If we are drawing a warning or don't have any color details just draw it normally
-            guiGraphics.blit(resource, x, y, uOffset, vOffset, width, height, textureWidth, textureHeight);
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, resource, x, y, uOffset, vOffset, width, height, textureWidth, textureHeight);
             return;
         }
-        int colorFrom = colorDetails.getColorFrom();
+        //TODO - 26.1: rendering, possible PIP
+        /*int colorFrom = colorDetails.getColorFrom();
         int colorTo = colorDetails.getColorTo();
-        if (colorFrom == 0xFFFFFFFF && colorTo == 0xFFFFFFFF) {
+        if (colorFrom == CommonColors.WHITE && colorTo == CommonColors.WHITE) {
             //No coloring needed, just use the normal blit method
-            guiGraphics.blit(resource, x, y, uOffset, vOffset, width, height, textureWidth, textureHeight);
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, resource, x, y, uOffset, vOffset, width, height, textureWidth, textureHeight);
             return;
         }
         //Merge of blit and fillGradient
@@ -135,14 +125,14 @@ public class GuiProgress extends GuiTexturedElement implements IRecipeViewerReci
         float minV = vOffset / textureHeight;
         float maxV = (vOffset + height) / textureHeight;
 
-        float alphaFrom = MekanismRenderer.getAlpha(colorFrom);
-        float redFrom = MekanismRenderer.getRed(colorFrom);
-        float greenFrom = MekanismRenderer.getGreen(colorFrom);
-        float blueFrom = MekanismRenderer.getBlue(colorFrom);
-        float alphaTo = MekanismRenderer.getAlpha(colorTo);
-        float redTo = MekanismRenderer.getRed(colorTo);
-        float greenTo = MekanismRenderer.getGreen(colorTo);
-        float blueTo = MekanismRenderer.getBlue(colorTo);
+        float alphaFrom = ARGB.alphaFloat(colorFrom);
+        float redFrom = ARGB.redFloat(colorFrom);
+        float greenFrom = ARGB.greenFloat(colorFrom);
+        float blueFrom = ARGB.blueFloat(colorFrom);
+        float alphaTo = ARGB.alphaFloat(colorTo);
+        float redTo = ARGB.redFloat(colorTo);
+        float greenTo = ARGB.greenFloat(colorTo);
+        float blueTo = ARGB.blueFloat(colorTo);
         //Adjust coloring to be based on how much of the progress bar is actually filled
         // so that it properly has the correct colors for the start and the end
         float percent = (float) progress;
@@ -205,7 +195,7 @@ public class GuiProgress extends GuiTexturedElement implements IRecipeViewerReci
 
         BufferUploader.drawWithShader(builder.buildOrThrow());
         //Reset blit and fill gradient states
-        RenderSystem.disableBlend();
+        RenderSystem.disableBlend();*/
     }
 
     public interface ColorDetails {

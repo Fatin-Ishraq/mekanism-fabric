@@ -1,7 +1,6 @@
 package mekanism.client.model;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import java.util.List;
 import mekanism.client.render.MekanismRenderType;
 import mekanism.common.Mekanism;
@@ -14,16 +13,16 @@ import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.CubeDeformation;
 import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.LightCoordsUtil;
 
-public class ModelAtomicDisassembler extends MekanismJavaModel {
+public class ModelAtomicDisassembler extends MekanismJavaModel.NoState {
 
     public static final ModelLayerLocation DISASSEMBLER_LAYER = new ModelLayerLocation(Mekanism.rl("atomic_disassembler"), "main");
-    private static final ResourceLocation DISASSEMBLER_TEXTURE = MekanismUtils.getResource(ResourceType.RENDER, "atomic_disassembler.png");
+    private static final Identifier DISASSEMBLER_TEXTURE = MekanismUtils.getResource(ResourceType.RENDER, "atomic_disassembler.png");
 
     private static final ModelPartData HANDLE = new ModelPartData("handle", CubeListBuilder.create()
           .texOffs(0, 10)
@@ -84,25 +83,27 @@ public class ModelAtomicDisassembler extends MekanismJavaModel {
     }
 
     private final RenderType BLADE_RENDER_TYPE = MekanismRenderType.BLADE.apply(DISASSEMBLER_TEXTURE);
-    private final RenderType RENDER_TYPE = renderType(DISASSEMBLER_TEXTURE);
+    private final RenderType RENDER_TYPE = RenderTypes.entitySolid(DISASSEMBLER_TEXTURE);
     private final List<ModelPart> parts;
     private final List<ModelPart> bladeParts;
 
     public ModelAtomicDisassembler(EntityModelSet entityModelSet) {
-        super(RenderType::entitySolid);
-        ModelPart root = entityModelSet.bakeLayer(DISASSEMBLER_LAYER);
+        super(entityModelSet.bakeLayer(DISASSEMBLER_LAYER));
         parts = getRenderableParts(root, HANDLE, HANDLE_TOP, HEAD, NECK, REAR_BAR, NECK_ANGLED, BLADE_HOLDER_BACK, BLADE_HOLDER_MAIN,
               BLADE_HOLDER_FRONT, HANDLE_BASE, HANDLE_TOP_BACK);
         bladeParts = getRenderableParts(root, BLADE_FRONT_CONNECTOR, BLADE_BACK, BLADE_FRONT_UPPER, BLADE_FRONT_LOWER, BLADE_BACK_SMALL);
     }
 
-    public void render(@NotNull PoseStack matrix, @NotNull MultiBufferSource renderer, int light, int overlayLight, boolean hasEffect) {
-        renderToBuffer(matrix, getVertexConsumer(renderer, RENDER_TYPE, hasEffect), light, overlayLight, 0xFFFFFFFF);
-        renderPartsToBuffer(bladeParts, matrix, getVertexConsumer(renderer, BLADE_RENDER_TYPE, hasEffect), LightTexture.FULL_BRIGHT, overlayLight, 0xBFFFFFFF);
+    //TODO should this give render type with or without texture?
+    @Override
+    public void collect(PoseStack poseStack, SubmitNodeCollector collector, int light, int overlayLight, boolean hasFoil) {
+        setupAnim();
+        collectParts(parts, poseStack, RENDER_TYPE, collector, light, overlayLight, -1, null, hasFoil);//TODO - 26.1 What color? vanilla seems to pass -1 when not specified
+        collectParts(bladeParts, poseStack, BLADE_RENDER_TYPE, collector, LightCoordsUtil.FULL_BRIGHT, overlayLight, 0xBFFFFFFF, null, hasFoil);
     }
 
-    @Override
-    public void renderToBuffer(@NotNull PoseStack poseStack, @NotNull VertexConsumer vertexConsumer, int light, int overlayLight, int color) {
+    /*@Override
+    public void renderToBuffer(PoseStack poseStack, VertexConsumer vertexConsumer, int light, int overlayLight, int color) {
         renderPartsToBuffer(parts, poseStack, vertexConsumer, light, overlayLight, color);
-    }
+    }*/
 }

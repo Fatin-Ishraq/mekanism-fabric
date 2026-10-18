@@ -1,15 +1,14 @@
 package mekanism.common.content.gear.mekasuit;
 
-import mekanism.api.annotations.ParametersAreNotNullByDefault;
 import mekanism.api.gear.ICustomModule;
 import mekanism.api.gear.IModule;
-import mekanism.api.gear.IModuleContainer;
 import mekanism.api.text.TextComponentUtil;
 import mekanism.common.registries.MekanismModules;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-@ParametersAreNotNullByDefault
 public class ModuleElytraUnit implements ICustomModule<ModuleElytraUnit> {
 
     @Override
@@ -18,7 +17,8 @@ public class ModuleElytraUnit implements ICustomModule<ModuleElytraUnit> {
     }
 
     @Override
-    public void changeMode(IModule<ModuleElytraUnit> module, Player player, IModuleContainer moduleContainer, ItemStack stack, int shift, boolean displayChangeMessage) {
-        module.toggleEnabled(moduleContainer, stack, player, TextComponentUtil.build(MekanismModules.ELYTRA_UNIT));
+    public void changeMode(IModule<ModuleElytraUnit> module, Player player, ItemAccess itemAccess, int shift, boolean displayChangeMessage,
+          @Nullable TransactionContext transaction) {
+        module.toggleEnabled(itemAccess, player, TextComponentUtil.build(MekanismModules.ELYTRA_UNIT), transaction);
     }
 }

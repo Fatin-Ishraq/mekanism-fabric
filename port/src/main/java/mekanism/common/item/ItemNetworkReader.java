@@ -2,24 +2,22 @@ package mekanism.common.item;
 
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.Set;
-import mekanism.api.Action;
-import mekanism.api.AutomationType;
 import mekanism.api.MekanismAPI;
-import mekanism.api.energy.IEnergyContainer;
 import mekanism.api.heat.IHeatHandler;
 import mekanism.api.text.EnumColor;
 import mekanism.api.text.ILangEntry;
 import mekanism.api.text.TextComponentUtil;
 import mekanism.common.MekanismLang;
 import mekanism.common.capabilities.Capabilities;
+import mekanism.common.capabilities.proxy.AutomatedEnergyHandler;
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.content.network.transmitter.Transmitter;
+import mekanism.common.lib.transaction.TransactionHelper;
 import mekanism.common.lib.transmitter.DynamicNetwork;
 import mekanism.common.lib.transmitter.TransmitterNetworkRegistry;
 import mekanism.common.tile.transmitter.TileEntityTransmitter;
 import mekanism.common.util.EnumUtils;
 import mekanism.common.util.MekanismUtils;
-import mekanism.common.util.StorageUtils;
 import mekanism.common.util.UnitDisplayUtils.TemperatureUnit;
 import mekanism.common.util.WorldUtils;
 import net.minecraft.core.BlockPos;
@@ -31,7 +29,10 @@ import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import org.jetbrains.annotations.NotNull;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.energy.EnergyHandler;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import org.jspecify.annotations.Nullable;
 
 public class ItemNetworkReader extends ItemEnergized {
 
@@ -48,22 +49,29 @@ public class ItemNetworkReader extends ItemEnergized {
         displayBorder(player, "[=======]", false);
     }
 
-    @NotNull
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Player player = context.getPlayer();
         Level world = context.getLevel();
-        if (!world.isClientSide && player != null) {
+        if (!world.isClientSide() && player != null) {
             BlockPos pos = context.getClickedPos();
             BlockEntity tile = WorldUtils.getTileEntity(world, pos);
             if (tile != null) {
                 if (!player.isCreative()) {
-                    long energyPerUse = MekanismConfig.gear.networkReaderEnergyUsage.get();
-                    IEnergyContainer energyContainer = StorageUtils.getEnergyContainer(context.getItemInHand(), 0);
-                    if (energyContainer == null || energyContainer.extract(energyPerUse, Action.SIMULATE, AutomationType.MANUAL) < energyPerUse) {
-                        return InteractionResult.FAIL;
+                    int energyPerUse = MekanismConfig.gear.networkReaderEnergyUsage.get();
+                    if (energyPerUse > 0) {
+                        EnergyHandler energyHandler = AutomatedEnergyHandler.manual(Capabilities.ENERGY.getCapability(ItemAccess.forStack(context.getItemInHand())));
+                        if (energyHandler == null) {
+                            return InteractionResult.FAIL;
+                        }
+                        //Protect against any mods that might be doing transactional logic, such as if an auto clicker validates it has enough energy before calling this method
+                        try (Transaction transaction = TransactionHelper.openTransactionSafe()) {
+                            if (energyHandler.extract(energyPerUse, transaction) < energyPerUse) {
+                                return InteractionResult.FAIL;
+                            }
+                            transaction.commit();
+                        }
                     }
-                    energyContainer.extract(energyPerUse, Action.EXECUTE, AutomationType.MANUAL);
                 }
                 Direction opposite = context.getClickedFace().getOpposite();
                 if (tile instanceof TileEntityTransmitter transmitterTile) {
@@ -94,7 +102,7 @@ public class ItemNetworkReader extends ItemEnergized {
         displayBorder(player, MekanismLang.MEKANISM, true);
         Transmitter<?, ?, ?> transmitter = tile.getTransmitter();
         if (transmitter.hasTransmitterNetwork()) {
-            DynamicNetwork<?, ?, ?> transmitterNetwork = transmitter.getTransmitterNetwork();
+            DynamicNetwork<?, ?, ?> transmitterNetwork = transmitter.getTransmitterNetworkNN();
             player.sendSystemMessage(MekanismLang.NETWORK_READER_TRANSMITTERS.translateColored(EnumColor.GRAY, EnumColor.DARK_GRAY, transmitterNetwork.transmittersSize()));
             player.sendSystemMessage(MekanismLang.NETWORK_READER_ACCEPTORS.translateColored(EnumColor.GRAY, EnumColor.DARK_GRAY, transmitterNetwork.getAcceptorCount()));
             sendMessageIfNonNull(player, MekanismLang.NETWORK_READER_NEEDED, transmitterNetwork.getNeededInfo());
@@ -121,7 +129,7 @@ public class ItemNetworkReader extends ItemEnergized {
             if (tile instanceof TileEntityTransmitter transmitterTile) {
                 Transmitter<?, ?, ?> transmitter = transmitterTile.getTransmitter();
                 DynamicNetwork<?, ?, ?> transmitterNetwork = transmitter.getTransmitterNetwork();
-                if (transmitterNetwork.hasAcceptor(pos) && !iteratedNetworks.contains(transmitterNetwork)) {
+                if (transmitterNetwork != null && transmitterNetwork.hasAcceptor(pos) && !iteratedNetworks.contains(transmitterNetwork)) {
                     displayBorder(player, compileList(transmitter.getSupportedTransmissionTypes()), false);
                     player.sendSystemMessage(MekanismLang.NETWORK_READER_CONNECTED_SIDES.translateColored(EnumColor.GRAY, EnumColor.DARK_GRAY,
                           compileList(transmitterNetwork.getAcceptorDirections(posAsLong))));
@@ -133,11 +141,11 @@ public class ItemNetworkReader extends ItemEnergized {
     }
 
     private void sendTemperature(Player player, IHeatHandler handler) {
-        Component temp = MekanismUtils.getTemperatureDisplay(handler.getTotalTemperature(), TemperatureUnit.KELVIN, true);
+        Component temp = MekanismUtils.getTemperatureDisplay(handler.getTemperature(), TemperatureUnit.KELVIN, true);
         player.sendSystemMessage(MekanismLang.NETWORK_READER_TEMPERATURE.translateColored(EnumColor.GRAY, EnumColor.DARK_GRAY, temp));
     }
 
-    private void sendMessageIfNonNull(Player player, ILangEntry langEntry, Object toSend) {
+    private void sendMessageIfNonNull(Player player, ILangEntry langEntry, @Nullable Object toSend) {
         if (toSend != null) {
             player.sendSystemMessage(langEntry.translateColored(EnumColor.GRAY, EnumColor.DARK_GRAY, toSend));
         }

@@ -7,39 +7,41 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.LongSupplier;
-import mekanism.api.Action;
-import mekanism.api.AutomationType;
 import mekanism.api.MekanismAPI;
 import mekanism.api.SerializationConstants;
-import mekanism.api.annotations.ParametersAreNotNullByDefault;
-import mekanism.api.energy.IEnergyContainer;
 import mekanism.api.gear.ICustomModule;
 import mekanism.api.gear.IHUDElement;
 import mekanism.api.gear.IModule;
 import mekanism.api.gear.IModuleContainer;
 import mekanism.api.gear.ModuleData;
 import mekanism.api.gear.config.ModuleConfig;
+import mekanism.api.math.MathUtils;
 import mekanism.api.text.EnumColor;
 import mekanism.api.text.IHasTextComponent;
+import mekanism.common.Mekanism;
 import mekanism.common.MekanismLang;
+import mekanism.common.capabilities.Capabilities;
+import mekanism.common.capabilities.proxy.AutomatedEnergyHandler;
 import mekanism.common.util.MekanismUtils;
-import mekanism.common.util.StorageUtils;
-import net.minecraft.MethodsReturnNonnullByDefault;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.ExtraCodecs;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.item.Item;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.energy.EnergyHandler;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-@ParametersAreNotNullByDefault
-@MethodsReturnNonnullByDefault
 public final class Module<MODULE extends ICustomModule<MODULE>> implements IModule<MODULE> {
 
     private record InstalledData(Holder<ModuleData<?>> holder, int installed) {
@@ -79,7 +81,7 @@ public final class Module<MODULE extends ICustomModule<MODULE>> implements IModu
           installedData -> installedData.configStreamCodecs().map(installedData::create, Module::getConfigs)
     );
 
-    private final Map<ResourceLocation, ModuleConfig<?>> configItemsByName = new HashMap<>();
+    private final Map<Identifier, ModuleConfig<?>> configItemsByName = new HashMap<>();
     private final List<ModuleConfig<?>> configItems;
 
     private final Holder<ModuleData<?>> holder;
@@ -111,79 +113,79 @@ public final class Module<MODULE extends ICustomModule<MODULE>> implements IModu
         return customModule;
     }
 
-    public void tick(IModuleContainer moduleContainer, ItemStack stack, Player player) {
+    public void tick(ItemAccess itemAccess, Player player, TransactionContext transaction) {
         if (isEnabled()) {
             if (player.level().isClientSide()) {
-                customModule.tickClient(this, moduleContainer, stack, player);
+                customModule.tickClient(this, itemAccess, player, transaction);
             } else {
-                customModule.tickServer(this, moduleContainer, stack, player);
+                customModule.tickServer(this, itemAccess, player, transaction);
             }
         }
     }
 
     @Nullable
     @Override
-    public IEnergyContainer getEnergyContainer(ItemStack stack) {
-        return StorageUtils.getEnergyContainer(stack, 0);
-    }
-
-    @Override
-    public long getContainerEnergy(ItemStack stack) {
-        IEnergyContainer energyContainer = getEnergyContainer(stack);
-        return energyContainer == null ? 0L : energyContainer.getEnergy();
-    }
-
-    @Override
-    public boolean hasEnoughEnergy(ItemStack stack, LongSupplier energySupplier) {
-        return hasEnoughEnergy(stack, energySupplier.getAsLong());
-    }
-
-    @Override
-    public boolean hasEnoughEnergy(ItemStack stack, long cost) {
-        return cost == 0L || getContainerEnergy(stack) >= cost;
-    }
-
-    @Override
-    public boolean canUseEnergy(LivingEntity wearer, ItemStack stack, long energy) {
-        //Note: This is subtly different than how useEnergy does it so that we can get to useEnergy when in creative
-        return canUseEnergy(wearer, stack, energy, false);
-    }
-
-    @Override
-    public boolean canUseEnergy(LivingEntity wearer, ItemStack stack, long energy, boolean ignoreCreative) {
-        return canUseEnergy(wearer, getEnergyContainer(stack), energy, ignoreCreative);
-    }
-
-    @Override
-    public boolean canUseEnergy(LivingEntity wearer, @Nullable IEnergyContainer energyContainer, long energy, boolean ignoreCreative) {
-        if (energyContainer != null && !wearer.isSpectator()) {
-            //Don't check spectators in general
-            if (!ignoreCreative || !(wearer instanceof Player player) || !player.isCreative()) {
-                return energyContainer.extract(energy, Action.SIMULATE, AutomationType.MANUAL) == energy;
-            }
+    public EnergyHandler getEnergyHandler(ItemAccess itemAccess, boolean bypassExtractionLimits) {
+        EnergyHandler energyHandler = Capabilities.ENERGY.getCapability(itemAccess);
+        if (bypassExtractionLimits) {
+            return AutomatedEnergyHandler.manual(energyHandler);
         }
-        return false;
+        return energyHandler;
     }
 
     @Override
-    public long useEnergy(LivingEntity wearer, ItemStack stack, long energy) {
-        return useEnergy(wearer, stack, energy, true);
-    }
-
-    @Override
-    public long useEnergy(LivingEntity wearer, ItemStack stack, long energy, boolean freeCreative) {
-        return useEnergy(wearer, getEnergyContainer(stack), energy, freeCreative);
-    }
-
-    @Override
-    public long useEnergy(LivingEntity wearer, @Nullable IEnergyContainer energyContainer, long energy, boolean freeCreative) {
-        if (energyContainer != null) {
-            //Use from spectators if this is called due to the various edge cases that exist for when things are calculated manually
-            if (!freeCreative || !(wearer instanceof Player player) || MekanismUtils.isPlayingMode(player)) {
-                return energyContainer.extract(energy, Action.EXECUTE, AutomationType.MANUAL);
-            }
+    public boolean hasEnoughEnergy(ItemAccess itemAccess, int energy) {
+        if (energy == 0) {
+            return true;
         }
-        return 0L;
+        EnergyHandler energyHandler = getEnergyHandler(itemAccess, true);
+        return energyHandler != null && energyHandler.getAmountAsInt() >= energy;
+    }
+
+    @Override
+    public boolean hasEnoughEnergy(@Nullable LivingEntity wearer, ItemAccess itemAccess, int energy, @Nullable TransactionContext transaction, boolean freeCreative) {
+        try (Transaction simulation = Transaction.open(transaction)) {
+            return useAllEnergy(wearer, itemAccess, energy, simulation, freeCreative);
+        }
+    }
+
+    @Override
+    public int getEnergyRateLimit(@Nullable LivingEntity wearer, ItemAccess itemAccess, int energyUsage, int rate, @Nullable TransactionContext transaction, boolean freeCreative) {
+        if (rate == 0) {
+            return 0;
+        } else if (freeCreative && wearer instanceof Player player && !MekanismUtils.isPlayingMode(player)) {
+            //Energy usage doesn't lower the usage rate
+            return rate;
+        }
+        EnergyHandler energyHandler = getEnergyHandler(itemAccess, true);
+        if (energyHandler == null) {
+            return 0;
+        }
+        try (Transaction simulation = Transaction.open(transaction)) {
+            //Calculate the max rate based on how much energy is available and can be extracted
+            return energyHandler.extract(MathUtils.multiplyClamped(rate, energyUsage), simulation) / energyUsage;
+        }
+    }
+
+    @Override
+    public boolean useAllEnergy(@Nullable LivingEntity wearer, ItemAccess itemAccess, int energy, @Nullable TransactionContext transaction, boolean freeCreative) {
+        if (energy == 0) {
+            //If there is no energy requirement skip looking up the energy handler
+            return true;
+        } else if (freeCreative && wearer instanceof Player player && !MekanismUtils.isPlayingMode(player)) {
+            return true;
+        }
+        EnergyHandler energyHandler = getEnergyHandler(itemAccess, true);
+        if (energyHandler == null) {
+            return false;
+        }
+        try (Transaction subTransaction = Transaction.open(transaction)) {
+            if (energyHandler.extract(energy, subTransaction) == energy) {
+                subTransaction.commit();
+                return true;
+            }
+            return false;
+        }
     }
 
     @Override
@@ -198,7 +200,7 @@ public final class Module<MODULE extends ICustomModule<MODULE>> implements IModu
 
     @Nullable
     @Override
-    public <TYPE> ModuleConfig<TYPE> getConfig(ResourceLocation name) {
+    public <TYPE> ModuleConfig<TYPE> getConfig(Identifier name) {
         //TODO - 1.20.5: Do we want to allow passing in the type to validate that the type is correct?
         return (ModuleConfig<TYPE>) configItemsByName.get(name);
     }
@@ -221,7 +223,7 @@ public final class Module<MODULE extends ICustomModule<MODULE>> implements IModu
         List<ModuleConfig<?>> moduleConfigs = getUntypedData().defaultConfigs(installed);
         List<ModuleConfig<?>> copiedConfigs = new ArrayList<>(moduleConfigs.size());
         for (ModuleConfig<?> moduleConfig : moduleConfigs) {
-            ResourceLocation name = moduleConfig.name();
+            Identifier name = moduleConfig.name();
             ModuleConfig<?> existingConfig = configItemsByName.get(name);
             if (existingConfig == null) {
                 copiedConfigs.add(moduleConfig);
@@ -276,15 +278,15 @@ public final class Module<MODULE extends ICustomModule<MODULE>> implements IModu
         throw new IllegalStateException("Could not find an existing config with name: " + config.name());
     }
 
-    public void addHUDStrings(Player player, IModuleContainer moduleContainer, ItemStack stack, List<Component> list) {
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter> void addHUDStrings(Player player, IModuleContainer moduleContainer, ITEM instance, List<Component> list) {
         if (renderHUD) {
-            customModule.addHUDStrings(this, moduleContainer, stack, player, list::add);
+            customModule.addHUDStrings(this, moduleContainer, instance, player, list::add);
         }
     }
 
-    public void addHUDElements(Player player, IModuleContainer moduleContainer, ItemStack stack, List<IHUDElement> list) {
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter> void addHUDElements(Player player, IModuleContainer moduleContainer, ITEM instance, List<IHUDElement> list) {
         if (renderHUD) {
-            customModule.addHUDElements(this, moduleContainer, stack, player, list::add);
+            customModule.addHUDElements(this, moduleContainer, instance, player, list::add);
         }
     }
 
@@ -317,26 +319,41 @@ public final class Module<MODULE extends ICustomModule<MODULE>> implements IModu
     public void displayModeChange(Player player, Component modeName, IHasTextComponent mode) {
         Component modeComponent = mode.getTextComponent();
         if (modeComponent.getStyle().getColor() != null) {
-            player.displayClientMessage(MekanismLang.MODULE_MODE_CHANGE.translate(modeName, modeComponent), true);
+            player.sendOverlayMessage(MekanismLang.MODULE_MODE_CHANGE.translate(modeName, modeComponent));
         } else {
-            player.displayClientMessage(MekanismLang.MODULE_MODE_CHANGE.translate(modeName, EnumColor.INDIGO, modeComponent), true);
+            player.sendOverlayMessage(MekanismLang.MODULE_MODE_CHANGE.translate(modeName, EnumColor.INDIGO, modeComponent));
         }
     }
 
     @Override
-    public void toggleEnabled(IModuleContainer moduleContainer, ItemStack stack, Player player, Component modeName) {
+    public void replaceModuleConfig(HolderLookup.Provider provider, ItemAccess itemAccess, @Nullable TransactionContext transaction, ModuleConfig<?> config) {
+        ModuleContainer moduleContainer = ModuleHelper.get().getModuleContainer(itemAccess.getResource());
+        if (moduleContainer != null) {
+            moduleContainer.replaceModuleConfig(provider, itemAccess, transaction, holder, config, false);
+        } else {
+            Mekanism.logger.warn("Tried to change mode for module: {}, but {} was not a module container.", holder.getRegisteredName(), itemAccess.getResource());
+        }
+    }
+
+    @Override
+    public void toggleEnabled(ItemAccess itemAccess, Player player, Component modeName, @Nullable TransactionContext transaction) {
         Component message;
         if (enabled) {//Going from enabled to disabled
             message = MekanismLang.GENERIC_STORED.translate(modeName, EnumColor.DARK_RED, MekanismLang.MODULE_DISABLED_LOWER);
         } else {//Going from disabled to enabled
             message = MekanismLang.GENERIC_STORED.translate(modeName, EnumColor.BRIGHT_GREEN, MekanismLang.MODULE_ENABLED_LOWER);
         }
-        player.displayClientMessage(message, true);
-        ((ModuleContainer) moduleContainer).toggleEnabled(player.registryAccess(), stack, holder);
+        player.sendOverlayMessage(message);
+        ModuleContainer moduleContainer = ModuleHelper.get().getModuleContainer(itemAccess.getResource());
+        if (moduleContainer != null) {
+            moduleContainer.toggleEnabled(player.registryAccess(), itemAccess, holder, transaction);
+        } else {
+            Mekanism.logger.warn("Tried to toggle module: {}, but {} was not a module container.", holder.getRegisteredName(), itemAccess.getResource());
+        }
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) {
             return true;
         } else if (o == null || getClass() != o.getClass()) {

@@ -4,8 +4,9 @@ import mekanism.api.SerializationConstants;
 import mekanism.common.lib.multiblock.MultiblockCache;
 import mekanism.common.tile.interfaces.IFluidContainerManager.ContainerEditMode;
 import mekanism.common.util.NBTUtils;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
 
 public class TankCache extends MultiblockCache<TankMultiblockData> {
 
@@ -18,26 +19,26 @@ public class TankCache extends MultiblockCache<TankMultiblockData> {
     }
 
     @Override
-    public void apply(HolderLookup.Provider provider, TankMultiblockData data) {
-        super.apply(provider, data);
+    public void apply(TankMultiblockData data, TransactionContext transaction) {
+        super.apply(data, transaction);
         data.editMode = editMode;
     }
 
     @Override
-    public void sync(TankMultiblockData data) {
-        super.sync(data);
+    public void sync(TankMultiblockData data, TransactionContext transaction) {
+        super.sync(data, transaction);
         editMode = data.editMode;
     }
 
     @Override
-    public void load(HolderLookup.Provider provider, CompoundTag nbtTags) {
-        super.load(provider, nbtTags);
-        NBTUtils.setEnumIfPresent(nbtTags, SerializationConstants.EDIT_MODE, ContainerEditMode.BY_ID, mode -> editMode = mode);
+    public void load(ValueInput input) {
+        super.load(input);
+        NBTUtils.setEnumIfPresent(input, SerializationConstants.EDIT_MODE, ContainerEditMode.BY_ID, mode -> editMode = mode);
     }
 
     @Override
-    public void save(HolderLookup.Provider provider, CompoundTag nbtTags) {
-        super.save(provider, nbtTags);
-        NBTUtils.writeEnum(nbtTags, SerializationConstants.EDIT_MODE, editMode);
+    public void save(ValueOutput output) {
+        super.save(output);
+        NBTUtils.writeEnum(output, SerializationConstants.EDIT_MODE, editMode);
     }
 }

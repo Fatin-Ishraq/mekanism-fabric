@@ -15,6 +15,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.ContainerEventHandler;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.renderer.Rect2i;
+import org.jspecify.annotations.Nullable;
 
 public class GuiElementHandler {
 
@@ -48,10 +49,10 @@ public class GuiElementHandler {
     }
 
     public static List<Rect2i> getGuiExtraAreas(GuiMekanism<?> gui) {
-        int parentX = gui.getGuiLeft();
-        int parentY = gui.getGuiTop();
-        int parentWidth = gui.getXSize();
-        int parentHeight = gui.getYSize();
+        int parentX = gui.getLeftPos();
+        int parentY = gui.getTopPos();
+        int parentWidth = gui.getImageWidth();
+        int parentHeight = gui.getImageHeight();
         //Add any children the gui has and any windows the gui has including all grandchildren that poke out of the main gui
         List<Rect2i> extraAreas = getAreasFor(parentX, parentY, parentWidth, parentHeight, gui.children());
         extraAreas.addAll(getAreasFor(parentX, parentY, parentWidth, parentHeight, gui.getWindows()));
@@ -59,7 +60,7 @@ public class GuiElementHandler {
     }
 
     public static <INGREDIENT> Optional<INGREDIENT> getClickableIngredientUnderMouse(GuiMekanism<?> gui, double mouseX, double mouseY,
-          BiFunction<IRecipeViewerIngredientHelper, Object, INGREDIENT> ingredientWrapper) {
+          BiFunction<IRecipeViewerIngredientHelper, Object, @Nullable INGREDIENT> ingredientWrapper) {
         GuiEventListener focused = gui.getFocused();
         if (focused instanceof GuiTextField || focused instanceof EditBox) {
             //Don't mark ingredients as clickable if a text box is focused
@@ -74,7 +75,7 @@ public class GuiElementHandler {
     }
 
     private static <INGREDIENT> Optional<INGREDIENT> getIngredientUnderMouse(List<? extends GuiEventListener> children, double mouseX, double mouseY,
-          BiFunction<IRecipeViewerIngredientHelper, Object, INGREDIENT> ingredientWrapper) {
+          BiFunction<IRecipeViewerIngredientHelper, Object, @Nullable INGREDIENT> ingredientWrapper) {
         for (GuiEventListener child : children) {
             if (child instanceof AbstractWidget widget) {
                 if (!widget.visible) {

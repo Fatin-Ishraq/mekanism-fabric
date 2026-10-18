@@ -4,12 +4,13 @@ import mekanism.api.text.EnumColor;
 import mekanism.api.text.IHasTextComponent;
 import mekanism.api.text.ILangEntry;
 import mekanism.common.MekanismLang;
-import mekanism.common.attachments.containers.ContainerType;
-import net.minecraft.MethodsReturnNonnullByDefault;
+import mekanism.common.component.containers.type.ContainerType;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.ItemStack;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.ResourceHandlerUtil;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
 
-@MethodsReturnNonnullByDefault
 public abstract class BooleanStateDisplay implements IHasTextComponent {
 
     protected final boolean value;
@@ -45,8 +46,9 @@ public abstract class BooleanStateDisplay implements IHasTextComponent {
             return value ? YES : NO;
         }
 
-        public static YesNo hasInventory(ItemStack stack) {
-            return of(ContainerType.ITEM.getAttachmentContainersIfPresent(stack).stream().anyMatch(slot -> !slot.isEmpty()), true);
+        public static YesNo hasInventory(ItemAccess itemAccess) {
+            ResourceHandler<ItemResource> handler = ContainerType.ITEM.getCapOrUnexposed(itemAccess);
+            return of(handler != null && !ResourceHandlerUtil.isEmpty(handler), true);
         }
 
         public static YesNo of(boolean value, boolean colored) {

@@ -1,32 +1,21 @@
 package mekanism.common.util;
 
 import io.netty.buffer.ByteBuf;
-import java.util.function.BooleanSupplier;
 import java.util.function.IntFunction;
-import java.util.function.Supplier;
-import mekanism.api.IDisableableEnum;
 import mekanism.api.IIncrementalEnum;
-import mekanism.api.annotations.NothingNullByDefault;
-import mekanism.api.energy.IEnergyConversion;
-import mekanism.api.functions.ConstantPredicates;
 import mekanism.api.text.IHasTranslationKey;
 import mekanism.api.text.ILangEntry;
 import mekanism.api.text.TextComponentUtil;
 import mekanism.common.MekanismLang;
-import mekanism.common.config.MekanismConfig;
-import mekanism.common.config.value.CachedDoubleValue;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.ByIdMap;
 import net.minecraft.util.Mth;
 import net.neoforged.neoforge.common.TranslatableEnum;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Code taken from UE and modified to fit Mekanism.
- */
+/// Code taken from UE and modified to fit Mekanism.
 public class UnitDisplayUtils {
     //TODO: Maybe at some point improve on the ITextComponents the two getDisplay methods build, and have them have better translation keys with formats
     // That would improve how well this handles en_ud as currently the order of the number and the unit is not reversed and the unit is not upside down
@@ -38,19 +27,34 @@ public class UnitDisplayUtils {
             return TextComponentUtil.build(existing);
         }
 
+        @Nullable
         @Override
         public Object getSymbol(boolean singular) {
             return null;
         }
 
+        @Nullable
         @Override
         public ILangEntry getLabel(boolean singular) {
             return null;
         }
     };
+    private static final Unit FORGE_ENERGY = new Unit() {
 
-    public static Component getDisplayShort(double value, EnergyUnit unit) {
-        return getDisplayBase(value, unit, 2, true, true);
+        @Override
+        public Object getSymbol(boolean singular) {
+            return MekanismLang.ENERGY_FORGE_SHORT;
+        }
+
+        @Override
+        public ILangEntry getLabel(boolean singular) {
+            return MekanismLang.ENERGY_FORGE;
+        }
+    };
+
+    public static Component getEnergyDisplayShort(long value) {
+        //TODO - 26.1: Re-evaluate this, getDisplayBase takes a double, can we make it more accurate for higher values by creating a variant for longs?
+        return getDisplayBase(value, FORGE_ENERGY, 2, true, true);
     }
 
     public static Component getDisplay(double temp, TemperatureUnit unit, int decimalPlaces, boolean shift, boolean isShort, boolean spaceBetweenSymbol) {
@@ -63,7 +67,7 @@ public class UnitDisplayUtils {
 
     private static Component getDisplayBase(double value, Unit unit, int decimalPlaces, boolean isShort, boolean spaceBetweenSymbol) {
         if (value == 0) {
-            return unit.appendTo(value, isShort, spaceBetweenSymbol, false);
+            return unit.appendTo("0", isShort, spaceBetweenSymbol, false);
         }
         boolean singular = Mth.equal(value, 1);
         boolean negative = value < 0;
@@ -127,111 +131,13 @@ public class UnitDisplayUtils {
             return TextComponentUtil.build(existing, getLabel(singular));
         }
 
+        @Nullable
         Object getSymbol(boolean singular);
 
+        @Nullable
         ILangEntry getLabel(boolean singular);
     }
 
-    @NothingNullByDefault
-    public enum EnergyUnit implements IDisableableEnum<EnergyUnit>, IEnergyConversion, Unit, IHasTranslationKey, TranslatableEnum {
-        JOULES(MekanismLang.ENERGY_JOULES, MekanismLang.ENERGY_JOULES_PLURAL, MekanismLang.ENERGY_JOULES_SHORT, "j", null, ConstantPredicates.ALWAYS_TRUE) {
-            @Override
-            public double getConversion() {
-                //Unused but override it anyway
-                return 1D;
-            }
-
-            @Override
-            public boolean isOneToOne() {
-                return true;
-            }
-
-            @Override
-            public long convertFrom(long joules) {
-                return joules;
-            }
-
-            @Override
-            public long convertTo(long joules) {
-                return joules;
-            }
-        },
-        FORGE_ENERGY(MekanismLang.ENERGY_FORGE, MekanismLang.ENERGY_FORGE, MekanismLang.ENERGY_FORGE_SHORT, "fe", () -> MekanismConfig.general.forgeConversionRate,
-              //Note: Use default value if called before configs are loaded. In general this should never happen, but third party mods may just call it regardless
-              () -> !MekanismConfig.general.blacklistForge.getOrDefault());
-
-        public static final IntFunction<EnergyUnit> BY_ID = ByIdMap.continuous(EnergyUnit::ordinal, values(), ByIdMap.OutOfBoundsStrategy.WRAP);
-        public static final StreamCodec<ByteBuf, EnergyUnit> STREAM_CODEC = ByteBufCodecs.idMapper(BY_ID, EnergyUnit::ordinal);
-
-        private final Supplier<CachedDoubleValue> conversion;
-        private final BooleanSupplier checkEnabled;
-        private final ILangEntry singularLangEntry;
-        private final ILangEntry pluralLangEntry;
-        private final ILangEntry shortLangEntry;
-        private final String tabName;
-
-        //Note: We ignore improper nulls as they only are null for joules which overrides the various use places
-        @SuppressWarnings("ConstantConditions")
-        EnergyUnit(ILangEntry singularLangEntry, ILangEntry pluralLangEntry, ILangEntry shortLangEntry, String tabName,
-              @Nullable Supplier<CachedDoubleValue> conversionRate, BooleanSupplier checkEnabled) {
-            this.singularLangEntry = singularLangEntry;
-            this.pluralLangEntry = pluralLangEntry;
-            this.shortLangEntry = shortLangEntry;
-            this.checkEnabled = checkEnabled;
-            this.tabName = tabName;
-            this.conversion = conversionRate;
-        }
-
-        @Override
-        public ILangEntry getSymbol(boolean singular) {
-            return shortLangEntry;
-        }
-
-        @Override
-        public ILangEntry getLabel(boolean singular) {
-            return singular ? singularLangEntry : pluralLangEntry;
-        }
-
-        @Override
-        public double getConversion() {
-            //Note: Use default value if called before configs are loaded. In general this should never happen,
-            // but third party mods may just call it regardless
-            return conversion.get().getOrDefault();
-        }
-
-        @Override
-        public String getTranslationKey() {
-            return shortLangEntry.getTranslationKey();
-        }
-
-        @NotNull
-        @Override
-        public Component getTranslatedName() {
-            return getLabel(false).translate();
-        }
-
-        @NotNull
-        @Override
-        public EnergyUnit byIndex(int index) {
-            return BY_ID.apply(index);
-        }
-
-        public String getTabName() {
-            return tabName;
-        }
-
-        @Override
-        public boolean isEnabled() {
-            return checkEnabled.getAsBoolean();
-        }
-
-        public static EnergyUnit getConfigured() {
-            EnergyUnit type = MekanismConfig.common.energyUnit.get();
-            return type.isEnabled() ? type : JOULES;
-        }
-    }
-
-    @NothingNullByDefault
     public enum TemperatureUnit implements IIncrementalEnum<TemperatureUnit>, IHasTranslationKey, Unit, TranslatableEnum {
         KELVIN(MekanismLang.TEMPERATURE_KELVIN, MekanismLang.TEMPERATURE_KELVIN_SHORT, "K", "k", 0, 1),
         CELSIUS(MekanismLang.TEMPERATURE_CELSIUS, MekanismLang.TEMPERATURE_CELSIUS_SHORT, "°C", "c", 273.15, 1),
@@ -276,7 +182,6 @@ public class UnitDisplayUtils {
             return langEntry;
         }
 
-        @NotNull
         @Override
         public Component getTranslatedName() {
             return getLabel(false).translate();
@@ -318,9 +223,7 @@ public class UnitDisplayUtils {
         }
     }
 
-    /**
-     * Metric system of measurement.
-     */
+    /// Metric system of measurement.
     public enum MeasurementUnit {
         FEMTO("Femto", "f", 0.000_000_000_000_001D),
         PICO("Pico", "p", 0.000_000_000_001D),
@@ -337,19 +240,13 @@ public class UnitDisplayUtils {
         ZETTA("Zetta", "Z", 1_000_000_000_000_000_000_000D),
         YOTTA("Yotta", "Y", 1_000_000_000_000_000_000_000_000D);
 
-        /**
-         * long name for the unit
-         */
+        /// long name for the unit
         private final String name;
 
-        /**
-         * short unit version of the unit
-         */
+        /// short unit version of the unit
         private final String symbol;
 
-        /**
-         * Point by which a number is considered to be of this unit
-         */
+        /// Point by which a number is considered to be of this unit
         private final double value;
 
         MeasurementUnit(String name, String symbol, double value) {
@@ -383,8 +280,12 @@ public class UnitDisplayUtils {
             if (spaceBetweenSymbol || !isShort) {
                 name = " " + name;
             }
+            String roundedStr = Double.toString(rounded);
+            if (roundedStr.endsWith(".0")) {
+                roundedStr = roundedStr.substring(0, roundedStr.length() - 2);
+            }
             //Note: We handle the space between symbols above
-            return unit.appendTo(rounded + name, isShort, false, singular);
+            return unit.appendTo(roundedStr + name, isShort, false, singular);
         }
     }
 }

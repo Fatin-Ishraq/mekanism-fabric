@@ -4,27 +4,25 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import mekanism.api.IDisableableEnum;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.math.MathUtils;
 import mekanism.api.radial.ClassBasedRadialData;
 import mekanism.api.radial.mode.IRadialMode;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public class DisableableEnumRadialData<MODE extends Enum<MODE> & IDisableableEnum<MODE> & IRadialMode> extends ClassBasedRadialData<MODE> {
 
     private final MODE[] modes;
     @Nullable
     private final MODE defaultMode;
 
-    DisableableEnumRadialData(ResourceLocation identifier, MODE defaultMode) {
+    DisableableEnumRadialData(Identifier identifier, MODE defaultMode) {
         super(identifier, Objects.requireNonNull(defaultMode, "Default mode cannot be null.").getDeclaringClass());
         this.modes = this.clazz.getEnumConstants();
         this.defaultMode = defaultMode;
     }
 
-    DisableableEnumRadialData(ResourceLocation identifier, Class<MODE> enumClass) {
+    DisableableEnumRadialData(Identifier identifier, Class<MODE> enumClass) {
         super(identifier, enumClass);
         this.modes = this.clazz.getEnumConstants();
         this.defaultMode = this.modes.length == 0 ? null : this.modes[0];

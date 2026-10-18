@@ -1,7 +1,7 @@
 package mekanism.common.lib.multiblock;
 
 import java.util.UUID;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public interface IMultiblock<T extends MultiblockData> extends IMultiblockBase {
 
@@ -19,7 +19,11 @@ public interface IMultiblock<T extends MultiblockData> extends IMultiblockBase {
     @Override
     T getDefaultData();
 
-    MultiblockManager<T> getManager();
+    MultiblockType<T> getMultiblockType();
+
+    default MultiblockManager<T> getManager() {
+        return MultiblockManager.get(getLevel(), getMultiblockType());
+    }
 
     @Nullable
     UUID getCacheID();
@@ -35,15 +39,16 @@ public interface IMultiblock<T extends MultiblockData> extends IMultiblockBase {
     void setStructure(Structure structure);
 
     @Override
-    default void setStructure(MultiblockManager<?> manager, Structure structure) {
-        if (manager == getManager()) {
+    default void setStructure(@Nullable MultiblockManager<?> manager, Structure structure) {
+        if ((manager == null || manager.getMultiblockType() == getMultiblockType()) && manager == getManager()) {
             setStructure(structure);
         }
     }
 
+    @Nullable
     @Override
     default Structure getStructure(MultiblockManager<?> manager) {
-        if (manager == getManager()) {
+        if (manager.getMultiblockType() == getMultiblockType() && manager == getManager()) {
             return getStructure();
         }
         return null;

@@ -3,27 +3,29 @@ package mekanism.common.lib.radial;
 import mekanism.api.radial.RadialData;
 import mekanism.api.radial.mode.IRadialMode;
 import mekanism.common.item.interfaces.IModeItem.IAttachmentBasedModeItem;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.item.Item;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
 public interface IRadialModeItem<MODE extends IRadialMode> extends IGenericRadialModeItem, IAttachmentBasedModeItem<MODE> {
 
-    @NotNull
     @Override
-    RadialData<MODE> getRadialData(ItemStack stack);
+    <ITEM extends TypedInstance<Item> & DataComponentGetter> RadialData<MODE> getRadialData(ITEM instance);
 
     @Nullable
     @Override
-    default <M extends IRadialMode> M getMode(ItemStack stack, RadialData<M> radialData) {
-        return radialData == getRadialData(stack) ? (M) getMode(stack) : null;
+    default <ITEM extends TypedInstance<Item> & DataComponentGetter, M extends IRadialMode> M getMode(ITEM instance, RadialData<M> radialData) {
+        return radialData == getRadialData(instance) ? (M) getMode(instance) : null;
     }
 
     @Override
-    default <M extends IRadialMode> void setMode(ItemStack stack, Player player, RadialData<M> radialData, M mode) {
-        if (radialData == getRadialData(stack)) {
-            setMode(stack, player, (MODE) mode);
+    default <M extends IRadialMode> void setMode(ItemAccess itemAccess, Player player, RadialData<M> radialData, M mode, @Nullable TransactionContext transaction) {
+        if (radialData == getRadialData(itemAccess.getResource())) {
+            setMode(itemAccess, player, (MODE) mode, transaction);
         }
     }
 }

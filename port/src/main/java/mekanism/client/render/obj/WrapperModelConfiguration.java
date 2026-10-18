@@ -1,13 +1,11 @@
 package mekanism.client.render.obj;
-
+/*
 import com.mojang.math.Transformation;
 import net.minecraft.client.renderer.block.model.ItemTransforms;
 import net.minecraft.client.resources.model.Material;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import mekanism.neoshim.neoforge.client.RenderTypeGroup;
-import mekanism.neoshim.neoforge.client.model.geometry.IGeometryBakingContext;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class WrapperModelConfiguration implements IGeometryBakingContext {
 
@@ -17,20 +15,18 @@ public class WrapperModelConfiguration implements IGeometryBakingContext {
         this.internal = internal;
     }
 
-    @NotNull
     @Override
     public String getModelName() {
         return internal.getModelName();
     }
 
     @Override
-    public boolean hasMaterial(@NotNull String name) {
+    public boolean hasMaterial(String name) {
         return internal.hasMaterial(name);
     }
 
-    @NotNull
     @Override
-    public Material getMaterial(@NotNull String name) {
+    public Material getMaterial(String name) {
         return internal.getMaterial(name);
     }
 
@@ -49,7 +45,6 @@ public class WrapperModelConfiguration implements IGeometryBakingContext {
         return internal.useAmbientOcclusion();
     }
 
-    @NotNull
     @Override
     public ItemTransforms getTransforms() {
         return internal.getTransforms();
@@ -67,12 +62,12 @@ public class WrapperModelConfiguration implements IGeometryBakingContext {
 
     @Nullable
     @Override
-    public ResourceLocation getRenderTypeHint() {
+    public Identifier getRenderTypeHint() {
         return internal.getRenderTypeHint();
     }
 
     @Override
-    public RenderTypeGroup getRenderType(ResourceLocation name) {
+    public RenderTypeGroup getRenderType(Identifier name) {
         return internal.getRenderType(name);
     }
-}
+}*/

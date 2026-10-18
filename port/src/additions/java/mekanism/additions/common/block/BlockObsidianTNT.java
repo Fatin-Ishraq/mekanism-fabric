@@ -6,15 +6,18 @@ import mekanism.common.block.states.IStateFluidLoggable;
 import mekanism.common.util.VoxelShapeUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.PrimedTnt;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.TntBlock;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -26,8 +29,7 @@ import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.pathfinder.PathComputationType;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class BlockObsidianTNT extends TntBlock implements IStateFluidLoggable {
 
@@ -54,78 +56,74 @@ public class BlockObsidianTNT extends TntBlock implements IStateFluidLoggable {
           box(1, -1, 1, 5, 12, 5)//Rod9
     );
 
-    public BlockObsidianTNT() {
-        super(BlockStateHelper.applyLightLevelAdjustments(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).ignitedByLava()));
+    public BlockObsidianTNT(BlockBehaviour.Properties properties) {
+        super(BlockStateHelper.applyLightLevelAdjustments(properties.mapColor(MapColor.COLOR_BLACK).ignitedByLava()));
         //Uses getDefaultState as starting state to take into account the stuff from super
         registerDefaultState(BlockStateHelper.getDefaultState(defaultBlockState()));
     }
 
     @Override
-    protected void createBlockStateDefinition(@NotNull StateDefinition.Builder<Block, BlockState> builder) {
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         super.createBlockStateDefinition(builder);
         BlockStateHelper.fillBlockStateContainer(this, builder);
     }
 
     @Nullable
     @Override
-    public BlockState getStateForPlacement(@NotNull BlockPlaceContext context) {
+    public BlockState getStateForPlacement(BlockPlaceContext context) {
         return BlockStateHelper.getStateForPlacement(super.getStateForPlacement(context), context);
     }
 
     @Override
-    public int getFlammability(@NotNull BlockState state, @NotNull BlockGetter world, @NotNull BlockPos pos, @NotNull Direction face) {
+    public int getFlammability(BlockState state, BlockGetter world, BlockPos pos, Direction face) {
         //300 is 100% chance fire will spread to this block, 100 is default for TNT
         // Given we are "obsidian" make ours slightly more stable against fire being spread than vanilla TNT
         return 75;
     }
 
     @Override
-    public void onCaughtFire(@NotNull BlockState state, Level world, @NotNull BlockPos pos, @Nullable Direction side, @Nullable LivingEntity igniter) {
-        if (!world.isClientSide && createAndAddEntity(world, pos, igniter)) {
+    public boolean onCaughtFire(BlockState state, Level world, BlockPos pos, @Nullable Direction side, @Nullable LivingEntity igniter) {
+        if (!world.isClientSide() && createAndAddEntity(world, pos, igniter)) {
             world.gameEvent(igniter, GameEvent.PRIME_FUSE, pos);
+            return true;
         }
-    }
-
-    @Override
-    public void wasExploded(Level world, @NotNull BlockPos pos, @NotNull Explosion explosion) {
-        if (!world.isClientSide) {
-            PrimedTnt tnt = EntityObsidianTNT.create(world, pos.getX() + 0.5F, pos.getY(), pos.getZ() + 0.5F, explosion.getIndirectSourceEntity());
-            if (tnt != null) {
-                tnt.setFuse((short) (world.random.nextInt(tnt.getFuse() / 4) + tnt.getFuse() / 8));
-                world.addFreshEntity(tnt);
-            }
-        }
-    }
-
-    @Override
-    protected boolean isPathfindable(@NotNull BlockState state, @NotNull PathComputationType type) {
         return false;
     }
 
-    @NotNull
     @Override
-    protected VoxelShape getShape(@NotNull BlockState state, @NotNull BlockGetter world, @NotNull BlockPos pos, @NotNull CollisionContext context) {
+    public void wasExploded(ServerLevel world, BlockPos pos, Explosion explosion) {
+        if (!world.isClientSide()) {
+            PrimedTnt tnt = new EntityObsidianTNT(world, pos.getX() + 0.5F, pos.getY(), pos.getZ() + 0.5F, explosion.getIndirectSourceEntity());
+            tnt.setFuse((short) (world.getRandom().nextInt(tnt.getFuse() / 4) + tnt.getFuse() / 8));
+            world.addFreshEntity(tnt);
+        }
+    }
+
+    @Override
+    protected boolean isPathfindable(BlockState state, PathComputationType type) {
+        return false;
+    }
+
+    @Override
+    protected VoxelShape getShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext context) {
         return bounds;
     }
 
-    @NotNull
     @Override
-    protected FluidState getFluidState(@NotNull BlockState state) {
+    protected FluidState getFluidState(BlockState state) {
         return getFluid(state);
     }
 
-    @NotNull
     @Override
-    protected BlockState updateShape(@NotNull BlockState state, @NotNull Direction facing, @NotNull BlockState facingState, @NotNull LevelAccessor world,
-          @NotNull BlockPos currentPos, @NotNull BlockPos facingPos) {
-        updateFluids(state, world, currentPos);
-        return super.updateShape(state, facing, facingState, world, currentPos, facingPos);
+    protected BlockState updateShape(BlockState state, LevelReader level, ScheduledTickAccess scheduledTickAccess, BlockPos currentPos,
+          Direction facing, BlockPos facingPos, BlockState facingState, RandomSource random) {
+        updateFluids(level, currentPos, state, scheduledTickAccess);
+        return super.updateShape(state, level, scheduledTickAccess, currentPos, facing, facingPos, facingState, random);
     }
 
-    public static boolean createAndAddEntity(@NotNull Level world, @NotNull BlockPos pos, @Nullable LivingEntity igniter) {
-        PrimedTnt tnt = EntityObsidianTNT.create(world, pos.getX() + 0.5F, pos.getY(), pos.getZ() + 0.5F, igniter);
-        if (tnt != null) {
-            world.addFreshEntity(tnt);
+    public static boolean createAndAddEntity(Level world, BlockPos pos, @Nullable LivingEntity igniter) {
+        PrimedTnt tnt = new EntityObsidianTNT(world, pos.getX() + 0.5F, pos.getY(), pos.getZ() + 0.5F, igniter);
+        if (world.addFreshEntity(tnt)) {
             world.playSound(null, tnt.getX(), tnt.getY(), tnt.getZ(), SoundEvents.TNT_PRIMED, SoundSource.BLOCKS);
             return true;
         }

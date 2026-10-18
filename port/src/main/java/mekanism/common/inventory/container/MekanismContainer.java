@@ -1,5 +1,6 @@
 package mekanism.common.inventory.container;
 
+import com.google.common.collect.Iterables;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.shorts.ShortUnaryOperator;
 import java.util.ArrayList;
@@ -9,16 +10,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import mekanism.api.Action;
-import mekanism.api.chemical.ChemicalStack;
+import mekanism.api.AutomationType;
+import mekanism.api.resource.LargeResourceStack;
 import mekanism.common.Mekanism;
 import mekanism.common.inventory.container.slot.ArmorSlot;
 import mekanism.common.inventory.container.slot.HotBarSlot;
 import mekanism.common.inventory.container.slot.IHasExtraData;
-import mekanism.common.inventory.container.slot.IInsertableSlot;
+import mekanism.common.inventory.container.slot.ITransactionalSlot;
 import mekanism.common.inventory.container.slot.InventoryContainerSlot;
 import mekanism.common.inventory.container.slot.MainInventorySlot;
 import mekanism.common.inventory.container.slot.OffhandSlot;
+import mekanism.common.inventory.container.slot.TransactionalSlot;
 import mekanism.common.inventory.container.sync.ISyncableData;
 import mekanism.common.inventory.container.sync.ISyncableData.DirtyType;
 import mekanism.common.inventory.container.sync.SyncableBlockPos;
@@ -28,27 +30,26 @@ import mekanism.common.inventory.container.sync.SyncableByteArray;
 import mekanism.common.inventory.container.sync.SyncableDouble;
 import mekanism.common.inventory.container.sync.SyncableEnum;
 import mekanism.common.inventory.container.sync.SyncableFloat;
-import mekanism.common.inventory.container.sync.SyncableFluidStack;
 import mekanism.common.inventory.container.sync.SyncableFrequency;
 import mekanism.common.inventory.container.sync.SyncableInt;
 import mekanism.common.inventory.container.sync.SyncableItemStack;
+import mekanism.common.inventory.container.sync.SyncableLargeResourceStack;
 import mekanism.common.inventory.container.sync.SyncableLong;
 import mekanism.common.inventory.container.sync.SyncableRegistryEntry;
+import mekanism.common.inventory.container.sync.SyncableResource;
 import mekanism.common.inventory.container.sync.SyncableShort;
-import mekanism.common.inventory.container.sync.chemical.SyncableChemicalStack;
 import mekanism.common.inventory.container.sync.list.SyncableCollection;
-import mekanism.common.inventory.container.sync.list.SyncableList;
 import mekanism.common.network.PacketUtils;
 import mekanism.common.network.to_client.container.PacketUpdateContainer;
 import mekanism.common.network.to_client.container.property.PropertyData;
 import mekanism.common.network.to_server.PacketWindowSelect;
 import mekanism.common.registration.impl.ContainerTypeRegistryObject;
 import mekanism.common.util.EnumUtils;
-import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Util;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -57,10 +58,12 @@ import net.minecraft.world.inventory.DataSlot;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import mekanism.neoshim.neoforge.fluids.FluidStack;
 import mekanism.neoshim.neoforge.network.PacketDistributor;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.resource.Resource;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
 public abstract class MekanismContainer extends AbstractContainerMenu implements ISecurityContainer {
 
@@ -76,20 +79,17 @@ public abstract class MekanismContainer extends AbstractContainerMenu implements
     protected final List<MainInventorySlot> mainInventorySlots = new ArrayList<>();
     protected final List<HotBarSlot> hotBarSlots = new ArrayList<>();
     protected final List<OffhandSlot> offhandSlots = new ArrayList<>();
+    private final Iterable<TransactionalSlot> playerSlots = Iterables.concat(hotBarSlots, mainInventorySlots);
     private final List<ISyncableData> trackedData = new ArrayList<>();
     private final Map<Object, List<ISyncableData>> specificTrackedData = new Object2ObjectOpenHashMap<>();
-    /**
-     * Keeps track of which window the player has open. Only used on the client, so doesn't need to keep track of other players.
-     *
-     * @apiNote Don't set this directly use the {@link #setSelectedWindow(SelectedWindowData)} instead, this is just protected so that the QIO item viewer container can
-     * copy it directly to the new container.
-     */
+    /// Keeps track of which window the player has open. Only used on the client, so doesn't need to keep track of other players.
+    ///
+    /// @apiNote Don't set this directly use the [#setSelectedWindow(SelectedWindowData)] instead, this is just protected so that the QIO item viewer container can copy
+    /// it directly to the new container.
     @Nullable
     protected SelectedWindowData selectedWindow;
-    /**
-     * Only used on the server
-     */
-    private Map<UUID, SelectedWindowData> selectedWindows;
+    /// Only used on the server
+    private final Map<UUID, SelectedWindowData> selectedWindows;
 
     protected MekanismContainer(ContainerTypeRegistryObject<?> type, int id, Inventory inv) {
         super(type.get(), id);
@@ -97,6 +97,8 @@ public abstract class MekanismContainer extends AbstractContainerMenu implements
         if (!getLevel().isClientSide()) {
             //Only keep track of uuid based selected grids on the server (we use a size of one as for the most part containers are actually 1:1)
             selectedWindows = new HashMap<>(1);
+        } else {
+            selectedWindows = Collections.emptyMap();
         }
     }
 
@@ -108,9 +110,8 @@ public abstract class MekanismContainer extends AbstractContainerMenu implements
         return inv.player.level();
     }
 
-    @NotNull
     @Override
-    protected Slot addSlot(@NotNull Slot slot) {
+    protected Slot addSlot(Slot slot) {
         super.addSlot(slot);
         if (slot instanceof IHasExtraData hasExtraData) {
             //If the slot has any extra data, allow it to add any trackers it may have
@@ -130,9 +131,7 @@ public abstract class MekanismContainer extends AbstractContainerMenu implements
         return slot;
     }
 
-    /**
-     * Adds slots and opens, must be called at end of extending classes constructors
-     */
+    /// Adds slots and opens, must be called at end of extending classes constructors
     protected void addSlotsAndOpen() {
         addSlots();
         addInventorySlots(inv);
@@ -163,30 +162,30 @@ public abstract class MekanismContainer extends AbstractContainerMenu implements
     }
 
     @Override
-    public boolean canTakeItemForPickAll(@NotNull ItemStack stack, @NotNull Slot slot) {
-        if (slot instanceof IInsertableSlot insertableSlot) {
-            if (!insertableSlot.canMergeWith(stack)) {
+    public boolean canTakeItemForPickAll(ItemStack stack, Slot slot) {
+        if (slot instanceof ITransactionalSlot transactionalSlot) {
+            if (!transactionalSlot.canMergeWith(stack)) {
                 return false;
             }
             SelectedWindowData selectedWindow = getLevel().isClientSide() ? getSelectedWindow() : getSelectedWindow(getPlayerUUID());
-            return insertableSlot.exists(selectedWindow) && super.canTakeItemForPickAll(stack, slot);
+            return transactionalSlot.exists(selectedWindow) && super.canTakeItemForPickAll(stack, slot);
         }
         return super.canTakeItemForPickAll(stack, slot);
     }
 
     @Override
-    public void removed(@NotNull Player player) {
+    public void removed(Player player) {
         super.removed(player);
         closeInventory(player);
     }
 
-    protected void closeInventory(@NotNull Player player) {
+    protected void closeInventory(Player player) {
         if (!player.level().isClientSide()) {
             clearSelectedWindow(player.getUUID());
         }
     }
 
-    protected void openInventory(@NotNull Inventory inv) {
+    protected void openInventory(Inventory inv) {
     }
 
     protected int getInventoryYOffset() {
@@ -197,7 +196,7 @@ public abstract class MekanismContainer extends AbstractContainerMenu implements
         return 8;
     }
 
-    protected void addInventorySlots(@NotNull Inventory inv) {
+    protected void addInventorySlots(Inventory inv) {
         if (this instanceof IEmptyContainer) {
             //Don't include the player's inventory slots
             return;
@@ -215,18 +214,19 @@ public abstract class MekanismContainer extends AbstractContainerMenu implements
         }
     }
 
-    protected void addArmorSlots(@NotNull Inventory inv, int x, int y, int offhandOffset) {
-        for (int index = 0; index < inv.armor.size(); index++) {
-            final EquipmentSlot slotType = EnumUtils.EQUIPMENT_SLOT_TYPES[2 + inv.armor.size() - index - 1];
-            addSlot(new ArmorSlot(inv, 36 + inv.armor.size() - index - 1, x, y, slotType));
+    protected void addArmorSlots(Inventory inv, int x, int y, int offhandOffset) {
+        int armorSlots = 4;
+        for (int index = 0; index < armorSlots; index++) {
+            final EquipmentSlot slotType = EnumUtils.EQUIPMENT_SLOT_TYPES[2 + armorSlots - index - 1];
+            addSlot(new ArmorSlot(inv, 36 + armorSlots - index - 1, x, y, slotType));
             y += 18;
         }
         if (offhandOffset != -1) {
-            addSlot(new OffhandSlot(inv, 40, x, y + offhandOffset, inv.player));
+            addSlot(new OffhandSlot(inv, Inventory.SLOT_OFFHAND, x, y + offhandOffset, inv.player));
         }
     }
 
-    protected HotBarSlot createHotBarSlot(@NotNull Inventory inv, int index, int x, int y) {
+    protected HotBarSlot createHotBarSlot(Inventory inv, int index, int x, int y) {
         return new HotBarSlot(inv, index, x, y);
     }
 
@@ -237,202 +237,150 @@ public abstract class MekanismContainer extends AbstractContainerMenu implements
         return Collections.unmodifiableList(inventoryContainerSlots);
     }
 
-    public List<MainInventorySlot> getMainInventorySlots() {
-        return Collections.unmodifiableList(mainInventorySlots);
+    public TransactionalSlot getPlayerSlot(int slot) {
+        if (slot < Inventory.getSelectionSize()) {//Hotbar
+            return hotBarSlots.get(slot);
+        }//Main inventory
+        return mainInventorySlots.get(slot - Inventory.getSelectionSize());
     }
 
-    public List<HotBarSlot> getHotBarSlots() {
-        return Collections.unmodifiableList(hotBarSlots);
+    public int getNumPlayerSlots() {
+        return hotBarSlots.size() + mainInventorySlots.size();
     }
 
-    /**
-     * @return The contents in this slot AFTER transferring items away.
-     */
-    @NotNull
+    public Iterable<TransactionalSlot> getPlayerSlots() {
+        return Iterables.unmodifiableIterable(playerSlots);
+    }
+
+    /// @return The contents in this slot AFTER transferring items away.
     @Override
-    public ItemStack quickMoveStack(@NotNull Player player, int slotID) {
-        Slot currentSlot = slots.get(slotID);
+    public ItemStack quickMoveStack(Player player, int slotID) {
+        Slot currentSlot = getSlot(slotID);
         if (currentSlot == null || !currentSlot.hasItem()) {
             return ItemStack.EMPTY;
         }
-        SelectedWindowData selectedWindow = player.level().isClientSide ? getSelectedWindow() : getSelectedWindow(player.getUUID());
-        if (currentSlot instanceof IInsertableSlot insertableSlot && !insertableSlot.exists(selectedWindow)) {
+        SelectedWindowData selectedWindow = player.level().isClientSide() ? getSelectedWindow() : getSelectedWindow(player.getUUID());
+        if (currentSlot instanceof ITransactionalSlot insertableSlot && !insertableSlot.exists(selectedWindow)) {
             return ItemStack.EMPTY;
         }
-        ItemStack slotStack = currentSlot.getItem();
-        ItemStack stackToInsert = slotStack;
-        if (currentSlot instanceof InventoryContainerSlot) {
-            //Note: Because our InventoryContainerSlots only allow extracting items at their max stack size we need to sanitize the stack
-            // if it is larger than its max stack size so that we don't cause any dupe bugs
-            if (slotStack.getCount() > slotStack.getMaxStackSize()) {
-                //We do this by pretending we only have a single stack of it stored so that when we transfer it at the end
-                // and remove from the slot (which due to impl details is limited to max stack size)
-                stackToInsert = slotStack = slotStack.copyWithCount(slotStack.getMaxStackSize());
-            }
-            //Insert into stacks that already contain an item in the order armor, hot bar -> main inventory
-            stackToInsert = insertItem(armorSlots, stackToInsert, true, selectedWindow);
-            stackToInsert = insertItem(hotBarSlots, stackToInsert, true, selectedWindow);
-            stackToInsert = insertItem(mainInventorySlots, stackToInsert, true, selectedWindow);
-            //If we still have any left then input into the empty stacks in the order of main inventory -> hot bar
-            // Note: Even though we are doing the main inventory, we still need to do both, ignoring empty then not instead of
-            // just directly inserting into the main inventory, in case there are empty slots before the one we can stack with
-            stackToInsert = insertItem(armorSlots, stackToInsert, false, selectedWindow);
-            stackToInsert = insertItem(hotBarSlots, stackToInsert, false, selectedWindow);
-            stackToInsert = insertItem(mainInventorySlots, stackToInsert, false, selectedWindow);
-        } else {
-            //We are in the main inventory or the hot bar
-            //Start by trying to insert it into the tile's inventory slots, first attempting to stack with other items
-            stackToInsert = insertItem(inventoryContainerSlots, stackToInsert, true, selectedWindow);
-            if (slotStack.getCount() == stackToInsert.getCount()) {
-                //Then as long as if we still have the same number of items (failed to insert), try to insert it into the tile's inventory slots allowing for empty items
-                stackToInsert = insertItem(inventoryContainerSlots, stackToInsert, false, selectedWindow);
-                if (slotStack.getCount() == stackToInsert.getCount()) {
-                    //Else if we failed to do that also, try transferring to armor inventory, main inventory or the hot bar, depending on which one we currently are in
-                    if (currentSlot instanceof ArmorSlot || currentSlot instanceof OffhandSlot) {
-                        stackToInsert = insertItem(hotBarSlots, stackToInsert, true, selectedWindow);
-                        stackToInsert = insertItem(mainInventorySlots, stackToInsert, true, selectedWindow);
-                        stackToInsert = insertItem(hotBarSlots, stackToInsert, false, selectedWindow);
-                        stackToInsert = insertItem(mainInventorySlots, stackToInsert, false, selectedWindow);
-                    } else if (currentSlot instanceof MainInventorySlot) {
-                        stackToInsert = insertItem(armorSlots, stackToInsert, false, selectedWindow);
-                        stackToInsert = insertItem(hotBarSlots, stackToInsert, selectedWindow);
-                    } else if (currentSlot instanceof HotBarSlot) {
-                        stackToInsert = insertItem(armorSlots, stackToInsert, false, selectedWindow);
-                        stackToInsert = insertItem(mainInventorySlots, stackToInsert, selectedWindow);
-                    } else {
-                        //TODO: Should we add a warning message so we can find out if we ever end up here. (Given we should never end up here anyways)
+        int inserted;
+        try (Transaction transaction = Transaction.openRoot()) {
+            ItemStack slotStack = currentSlot.getItem();
+            ItemResource itemToInsert = ItemResource.of(slotStack);
+            //TODO: Do we want to add support for limiting how much can be extracted at any one time to slots?
+            // If so it would probably be easiest to just change this line
+            int amountToInsert = slotStack.count();
+            if (currentSlot instanceof InventoryContainerSlot) {
+                //Insert into stacks that already contain an item in the order armor, hot bar -> main inventory
+                // followed by trying to insert into empty slots
+                inserted = insertItem(Iterables.concat(armorSlots, hotBarSlots, mainInventorySlots), itemToInsert, amountToInsert, transaction, selectedWindow);
+            } else {
+                //We are in the main inventory or the hot bar
+                //Start by trying to insert it into the tile's inventory slots, first attempting to stack with other items
+                inserted = insertItem(inventoryContainerSlots, itemToInsert, amountToInsert, transaction, true, selectedWindow);
+                if (inserted == 0) {
+                    //Then as long as if we still have the same number of items (failed to insert), try to insert it into the tile's inventory slots allowing for empty items
+                    inserted = insertItem(inventoryContainerSlots, itemToInsert, amountToInsert, transaction, false, selectedWindow);
+                    if (inserted == 0) {
+                        //Else if we failed to do that also, try transferring to armor inventory, main inventory or the hot bar, depending on which one we currently are in
+                        if (currentSlot instanceof ArmorSlot || currentSlot instanceof OffhandSlot) {
+                            inserted = insertItem(playerSlots, itemToInsert, amountToInsert, transaction, selectedWindow);
+                        } else if (currentSlot instanceof MainInventorySlot || currentSlot instanceof HotBarSlot) {
+                            inserted = insertItem(armorSlots, itemToInsert, amountToInsert, transaction, false, selectedWindow);
+                            if (currentSlot instanceof MainInventorySlot) {
+                                inserted += insertItem(hotBarSlots, itemToInsert, amountToInsert - inserted, transaction, selectedWindow);
+                            } else {//HotBarSlot
+                                inserted += insertItem(mainInventorySlots, itemToInsert, amountToInsert - inserted, transaction, selectedWindow);
+                            }
+                        } else {
+                            //TODO: Should we add a warning message so we can find out if we ever end up here. (Given we should never end up here anyways)
+                        }
                     }
                 }
             }
+            if (inserted == 0) {
+                //If nothing changed then return that fact
+                return ItemStack.EMPTY;
+            }
+            //Otherwise, decrease the stack by the amount we inserted, and return it as a new stack for what is now in the slot
+            transaction.commit();
+            return transferSuccess(currentSlot, player, inserted);
         }
-        if (stackToInsert.getCount() == slotStack.getCount()) {
-            //If nothing changed then return that fact
-            return ItemStack.EMPTY;
-        }
-        //Otherwise, decrease the stack by the amount we inserted, and return it as a new stack for what is now in the slot
-        return transferSuccess(currentSlot, player, slotStack, stackToInsert);
     }
 
-    /**
-     * Helper to first try inserting ignoring empty slots, and then insert not ignoring empty slots
-     *
-     * @param slots          Slots to insert into
-     * @param stack          Stack to insert (do not modify).
-     * @param selectedWindow Selected window, or null if there is no window selected. This mostly only really matters in relation to VirtualInventoryContainerSlots
-     *
-     * @return Remainder
-     */
-    public static <SLOT extends Slot & IInsertableSlot> ItemStack insertItem(List<SLOT> slots, @NotNull ItemStack stack, @Nullable SelectedWindowData selectedWindow) {
-        stack = insertItem(slots, stack, true, selectedWindow);
-        return insertItem(slots, stack, false, selectedWindow);
-    }
-
-    /**
-     * @param slots          Slots to insert into
-     * @param stack          Stack to insert (do not modify).
-     * @param ignoreEmpty    {@code true} to ignore/skip empty slots.
-     * @param selectedWindow Selected window, or null if there is no window selected. This mostly only really matters in relation to VirtualInventoryContainerSlots
-     *
-     * @return Remainder
-     */
-    public static <SLOT extends Slot & IInsertableSlot> ItemStack insertItem(List<SLOT> slots, @NotNull ItemStack stack, boolean ignoreEmpty,
+    /// Helper to first try inserting ignoring empty slots, and then insert not ignoring empty slots
+    ///
+    /// @param slots          Slots to insert into
+    /// @param itemType       Type of item to insert.
+    /// @param amount         Amount of the item to insert.
+    /// @param transaction    The transaction that this operation is part of.
+    /// @param selectedWindow Selected window, or null if there is no window selected. This mostly only really matters in relation to VirtualInventoryContainerSlots
+    ///
+    /// @return Amount inserted
+    public static <SLOT extends Slot & ITransactionalSlot> int insertItem(Iterable<SLOT> slots, ItemResource itemType, int amount, TransactionContext transaction,
           @Nullable SelectedWindowData selectedWindow) {
-        return insertItem(slots, stack, ignoreEmpty, selectedWindow, Action.EXECUTE);
+        int inserted = 0;
+        inserted += insertItem(slots, itemType, amount, transaction, true, selectedWindow);
+        inserted += insertItem(slots, itemType, amount - inserted, transaction, false, selectedWindow);
+        //Return how much was actually inserted
+        return inserted;
     }
 
-    /**
-     * @param slots          Slots to insert into
-     * @param stack          Stack to insert (do not modify).
-     * @param ignoreEmpty    {@code true} to ignore/skip empty slots, {@code false} to ignore/skip non-empty slots.
-     * @param selectedWindow Selected window, or null if there is no window selected. This mostly only really matters in relation to VirtualInventoryContainerSlots
-     *
-     * @return Remainder
-     */
-    @NotNull
-    public static <SLOT extends Slot & IInsertableSlot> ItemStack insertItem(List<SLOT> slots, @NotNull ItemStack stack, boolean ignoreEmpty,
-          @Nullable SelectedWindowData selectedWindow, Action action) {
-        return insertItem(slots, stack, ignoreEmpty, false, selectedWindow, action);
-    }
-
-    /**
-     * Helper to try inserting into any slots that exist empty or otherwise not bothering to try and stack first.
-     *
-     * @param slots          Slots to insert into
-     * @param stack          Stack to insert (do not modify).
-     * @param selectedWindow Selected window, or null if there is no window selected. This mostly only really matters in relation to VirtualInventoryContainerSlots
-     *
-     * @return Remainder
-     */
-    @NotNull
-    public static <SLOT extends Slot & IInsertableSlot> ItemStack insertItemCheckAll(List<SLOT> slots, @NotNull ItemStack stack,
-          @Nullable SelectedWindowData selectedWindow, Action action) {
-        //Ignore empty is ignored when check all is true
-        return insertItem(slots, stack, false, true, selectedWindow, action);
-    }
-
-    /**
-     * @param slots          Slots to insert into
-     * @param stack          Stack to insert (do not modify).
-     * @param ignoreEmpty    {@code true} to ignore/skip empty slots, {@code false} to ignore/skip non-empty slots.
-     * @param checkAll       {@code true} to check all slots regardless of empty state. When this is {@code true}, {@code ignoreEmpty} is ignored.
-     * @param selectedWindow Selected window, or null if there is no window selected. This mostly only really matters in relation to VirtualInventoryContainerSlots
-     * @param action         The action to perform, either {@link Action#EXECUTE} or {@link Action#SIMULATE}
-     *
-     * @return Remainder
-     *
-     * @see mekanism.common.util.InventoryUtils#insertItem(List, ItemStack, boolean, boolean, Action, mekanism.api.AutomationType)
-     */
-    @NotNull
-    public static <SLOT extends Slot & IInsertableSlot> ItemStack insertItem(List<SLOT> slots, @NotNull ItemStack stack, boolean ignoreEmpty, boolean checkAll,
-          @Nullable SelectedWindowData selectedWindow, Action action) {
-        if (stack.isEmpty()) {
-            //Skip doing anything if the stack is already empty.
-            // Makes it easier to chain calls, rather than having to check if the stack is empty after our previous call
-            return stack;
-        }
-        for (SLOT slot : slots) {
-            if (!checkAll && ignoreEmpty != slot.hasItem()) {
-                //Skip checking empty stacks if we want to ignore them, and skip non-empty stacks if we don't want ot ignore them
-                continue;
-            } else if (!slot.exists(selectedWindow)) {
-                // or if the slot doesn't "exist" for the current window configuration
-                continue;
-            }
-            stack = slot.insertItem(stack, action);
-            if (stack.isEmpty()) {
-                break;
+    /// @param slots             Slots to insert into
+    /// @param itemType          Type of item to insert.
+    /// @param amount            Amount of the item to insert.
+    /// @param transaction       The transaction that this operation is part of.
+    /// @param ignoreEmpty`true` to ignore/skip empty slots.
+    /// @param selectedWindow    Selected window, or null if there is no window selected. This mostly only really matters in relation to VirtualInventoryContainerSlots
+    ///
+    /// @return Amount inserted
+    ///
+    /// @see mekanism.api.resource.IMekanismResourceHandler#insert(Resource, int, TransactionContext, AutomationType)
+    public static <SLOT extends Slot & ITransactionalSlot> int insertItem(Iterable<SLOT> slots, ItemResource itemType, final int amount, TransactionContext transaction,
+          boolean ignoreEmpty, @Nullable SelectedWindowData selectedWindow) {
+        int inserted = 0;
+        //Skip doing anything if the stack is already empty.
+        // Makes it easier to chain calls, rather than having to check if the stack is empty after our previous call
+        if (!itemType.isEmpty() && amount > 0) {
+            for (SLOT slot : slots) {
+                if (ignoreEmpty != slot.hasItem()) {
+                    //Skip checking empty stacks if we want to ignore them, and skip non-empty stacks if we don't want ot ignore them
+                    continue;
+                } else if (!slot.exists(selectedWindow)) {
+                    // or if the slot doesn't "exist" for the current window configuration
+                    continue;
+                }
+                //Decrease amount to insert by how much we were able to insert
+                inserted += slot.insert(itemType, amount - inserted, transaction);
+                if (inserted == amount) {
+                    break;
+                }
             }
         }
-        return stack;
+        return inserted;
     }
 
-    @NotNull
-    protected ItemStack transferSuccess(@NotNull Slot currentSlot, @NotNull Player player, @NotNull ItemStack slotStack, @NotNull ItemStack stackToInsert) {
-        int difference = slotStack.getCount() - stackToInsert.getCount();
-        ItemStack newStack = currentSlot.remove(difference);
+    protected ItemStack transferSuccess(Slot currentSlot, Player player, int amountInserted) {
+        //TODO - 26.1: This remove call has the potential to break the contract that mayPickup is called first?
+        // Though all of our callers are from within #quickMoveStack which vanilla checks mayPickup before calling
+        ItemStack newStack = currentSlot.remove(amountInserted);
         currentSlot.onTake(player, newStack);
         return newStack;
     }
 
-    /**
-     * @apiNote Only call on client
-     */
+    /// @apiNote Only call on client
     @Nullable
     public SelectedWindowData getSelectedWindow() {
         return selectedWindow;
     }
 
-    /**
-     * @apiNote Only call on server
-     */
+    /// @apiNote Only call on server
     @Nullable
     public SelectedWindowData getSelectedWindow(UUID player) {
         return selectedWindows.get(player);
     }
 
-    /**
-     * @apiNote Only call on client
-     */
+    /// @apiNote Only call on client
     public void setSelectedWindow(@Nullable SelectedWindowData selectedWindow) {
         if (!Objects.equals(this.selectedWindow, selectedWindow)) {
             this.selectedWindow = selectedWindow;
@@ -440,9 +388,7 @@ public abstract class MekanismContainer extends AbstractContainerMenu implements
         }
     }
 
-    /**
-     * @apiNote Only call on server
-     */
+    /// @apiNote Only call on server
     public void setSelectedWindow(UUID player, @Nullable SelectedWindowData selectedWindow) {
         if (selectedWindow == null) {
             clearSelectedWindow(player);
@@ -451,9 +397,7 @@ public abstract class MekanismContainer extends AbstractContainerMenu implements
         }
     }
 
-    /**
-     * @apiNote Only call on server
-     */
+    /// @apiNote Only call on server
     private void clearSelectedWindow(UUID player) {
         selectedWindows.remove(player);
     }
@@ -463,9 +407,8 @@ public abstract class MekanismContainer extends AbstractContainerMenu implements
         trackedData.add(data);
     }
 
-    @NotNull
     @Override
-    protected DataSlot addDataSlot(@NotNull DataSlot referenceHolder) {
+    protected DataSlot addDataSlot(DataSlot referenceHolder) {
         //Override vanilla's int tracking so that if for some reason this method gets called for our container
         // it properly adds it to our tracking
         track(SyncableInt.create(referenceHolder::get, referenceHolder::set));
@@ -560,8 +503,6 @@ public abstract class MekanismContainer extends AbstractContainerMenu implements
             syncable.set(value);
         } else if (data instanceof SyncableEnum<?> syncable) {
             syncable.set(value);
-        } else if (data instanceof SyncableFluidStack syncable) {
-            syncable.set(value);
         } else if (data instanceof SyncableItemStack syncable) {
             syncable.set(value);
         } else if (data instanceof SyncableRegistryEntry<?> syncable) {
@@ -573,7 +514,7 @@ public abstract class MekanismContainer extends AbstractContainerMenu implements
         ISyncableData data = getTrackedData(property);
         if (data instanceof SyncableLong syncable) {
             syncable.set(value);
-        } else if (data instanceof SyncableChemicalStack syncable) {
+        } else if (data instanceof SyncableLargeResourceStack<?> syncable) {
             syncable.set(value);
         }
     }
@@ -592,17 +533,24 @@ public abstract class MekanismContainer extends AbstractContainerMenu implements
         }
     }
 
-    public void handleWindowProperty(short property, @NotNull ItemStack value) {
+    public void handleWindowProperty(short property, ItemStack value) {
         ISyncableData data = getTrackedData(property);
         if (data instanceof SyncableItemStack syncable) {
             syncable.set(value);
         }
     }
 
-    public void handleWindowProperty(short property, @NotNull FluidStack value) {
+    public <RESOURCE extends Resource> void handleWindowProperty(short property, RESOURCE value) {
         ISyncableData data = getTrackedData(property);
-        if (data instanceof SyncableFluidStack syncable) {
-            syncable.set(value);
+        if (data instanceof SyncableResource) {
+            ((SyncableResource<RESOURCE>) data).set(value);
+        }
+    }
+
+    public <RESOURCE extends Resource> void handleWindowProperty(short property, LargeResourceStack<RESOURCE> value) {
+        ISyncableData data = getTrackedData(property);
+        if (data instanceof SyncableLargeResourceStack) {
+            ((SyncableLargeResourceStack<RESOURCE>) data).set(value);
         }
     }
 
@@ -613,19 +561,11 @@ public abstract class MekanismContainer extends AbstractContainerMenu implements
         }
     }
 
-    public void handleWindowProperty(short property, @NotNull ChemicalStack value) {
-        ISyncableData data = getTrackedData(property);
-        if (data instanceof SyncableChemicalStack syncable) {
-            syncable.set(value);
-        }
-    }
-
     public void handleWindowProperty(short property, byte[] value) {
         ISyncableData data = getTrackedData(property);
         switch (data) {
             case SyncableByteArray syncable -> syncable.set(value);
             case SyncableFrequency<?> syncable -> syncable.set(getLevel().registryAccess(), value);
-            case SyncableList<?> syncable -> syncable.set(getLevel().registryAccess(), value);
             case SyncableCollection<?, ?> syncable -> syncable.set(getLevel().registryAccess(), value);
             case null, default -> Mekanism.logger.error("Unknown byte value type: {}, please report", data == null ? null : data.getClass().getName());
         }

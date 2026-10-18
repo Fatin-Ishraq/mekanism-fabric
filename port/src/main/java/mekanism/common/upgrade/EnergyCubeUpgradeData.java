@@ -7,6 +7,7 @@ import mekanism.common.tile.component.ITileComponent;
 import mekanism.common.tile.interfaces.IRedstoneControl.RedstoneControl;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.ProblemReporter;
 
 public class EnergyCubeUpgradeData implements IUpgradeData {
 
@@ -18,15 +19,12 @@ public class EnergyCubeUpgradeData implements IUpgradeData {
     public final CompoundTag components;
 
     public EnergyCubeUpgradeData(HolderLookup.Provider provider, boolean redstone, RedstoneControl controlType, IEnergyContainer energyContainer,
-          EnergyInventorySlot chargeSlot, EnergyInventorySlot dischargeSlot, List<ITileComponent> components) {
+          EnergyInventorySlot chargeSlot, EnergyInventorySlot dischargeSlot, List<ITileComponent> components, ProblemReporter.PathElement pathElement) {
         this.redstone = redstone;
         this.controlType = controlType;
         this.energyContainer = energyContainer;
         this.chargeSlot = chargeSlot;
         this.dischargeSlot = dischargeSlot;
-        this.components = new CompoundTag();
-        for (ITileComponent component : components) {
-            component.write(this.components, provider);
-        }
+        this.components = IUpgradeData.readComponents(provider, components, pathElement);
     }
 }

@@ -4,7 +4,6 @@ import java.util.Map;
 import mekanism.additions.common.MekanismAdditions;
 import mekanism.additions.common.registries.AdditionsBlocks;
 import mekanism.api.chemical.Chemical;
-import mekanism.api.chemical.ChemicalStack;
 import mekanism.api.datagen.recipe.builder.ItemStackToChemicalRecipeBuilder;
 import mekanism.api.recipes.ingredients.creator.IngredientCreatorAccess;
 import mekanism.api.text.EnumColor;
@@ -12,25 +11,24 @@ import mekanism.common.recipe.ISubRecipeProvider;
 import mekanism.common.recipe.impl.PigmentExtractingRecipeProvider;
 import mekanism.common.registration.impl.DeferredChemical;
 import mekanism.common.registries.MekanismChemicals;
-import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.world.level.ItemLike;
 
 public class PigmentExtractingPlasticRecipeProvider implements ISubRecipeProvider {
 
-    private static final long PLASTIC_BLOCK_RATE = PigmentExtractingRecipeProvider.DYE_RATE * 3 / 16;//48
-    private static final long SLICK_PLASTIC_BLOCK_RATE = PLASTIC_BLOCK_RATE * 7 / 8;//42
-    private static final long PLASTIC_GLOW_BLOCK_RATE = PLASTIC_BLOCK_RATE * 7 / 8;//42
-    private static final long REINFORCED_PLASTIC_BLOCK_RATE = PLASTIC_BLOCK_RATE * 7 / 8;//42
-    private static final long PLASTIC_ROAD_RATE = PLASTIC_BLOCK_RATE * 7 / 8;//42
-    private static final long TRANSPARENT_PLASTIC_BLOCK_RATE = PLASTIC_BLOCK_RATE * 7 / 8;//42
-    private static final long PLASTIC_STAIRS_RATE = PLASTIC_BLOCK_RATE * 2 / 3;//32
-    private static final long PLASTIC_SLAB_RATE = PLASTIC_BLOCK_RATE / 2;//24
-    private static final long PLASTIC_GLOW_STAIRS_RATE = PLASTIC_GLOW_BLOCK_RATE * 2 / 3;//28
-    private static final long PLASTIC_GLOW_SLAB_RATE = PLASTIC_GLOW_BLOCK_RATE / 2;//21
-    private static final long TRANSPARENT_PLASTIC_STAIRS_RATE = TRANSPARENT_PLASTIC_BLOCK_RATE * 2 / 3;//28
-    private static final long TRANSPARENT_PLASTIC_SLAB_RATE = TRANSPARENT_PLASTIC_BLOCK_RATE / 2;//21
+    private static final int PLASTIC_BLOCK_RATE = PigmentExtractingRecipeProvider.DYE_RATE * 3 / 16;//48
+    private static final int SLICK_PLASTIC_BLOCK_RATE = PLASTIC_BLOCK_RATE * 7 / 8;//42
+    private static final int PLASTIC_GLOW_BLOCK_RATE = PLASTIC_BLOCK_RATE * 7 / 8;//42
+    private static final int REINFORCED_PLASTIC_BLOCK_RATE = PLASTIC_BLOCK_RATE * 7 / 8;//42
+    private static final int PLASTIC_ROAD_RATE = PLASTIC_BLOCK_RATE * 7 / 8;//42
+    private static final int TRANSPARENT_PLASTIC_BLOCK_RATE = PLASTIC_BLOCK_RATE * 7 / 8;//42
+    private static final int PLASTIC_STAIRS_RATE = PLASTIC_BLOCK_RATE * 2 / 3;//32
+    private static final int PLASTIC_SLAB_RATE = PLASTIC_BLOCK_RATE / 2;//24
+    private static final int PLASTIC_GLOW_STAIRS_RATE = PLASTIC_GLOW_BLOCK_RATE * 2 / 3;//28
+    private static final int PLASTIC_GLOW_SLAB_RATE = PLASTIC_GLOW_BLOCK_RATE / 2;//21
+    private static final int TRANSPARENT_PLASTIC_STAIRS_RATE = TRANSPARENT_PLASTIC_BLOCK_RATE * 2 / 3;//28
+    private static final int TRANSPARENT_PLASTIC_SLAB_RATE = TRANSPARENT_PLASTIC_BLOCK_RATE / 2;//21
 
     @Override
     public void addRecipes(RecipeOutput consumer, HolderLookup.Provider registries) {
@@ -53,11 +51,11 @@ public class PigmentExtractingPlasticRecipeProvider implements ISubRecipeProvide
         }
     }
 
-    private static void addExtractionRecipe(RecipeOutput consumer, EnumColor color, Map<EnumColor, ? extends ItemLike> input, Holder<Chemical> pigment,
-          long rate, String basePath) {
+    private static void addExtractionRecipe(RecipeOutput consumer, EnumColor color, Map<EnumColor, ? extends ItemLike> input, DeferredChemical<?> pigment,
+          int rate, String basePath) {
         ItemStackToChemicalRecipeBuilder.pigmentExtracting(
               IngredientCreatorAccess.item().from(input.get(color)),
-              new ChemicalStack(pigment, rate)
-        ).build(consumer, MekanismAdditions.rl(basePath + color.getRegistryPrefix()));
+              pigment.asTemplate(rate)
+        ).save(consumer, MekanismAdditions.rl(basePath + color.getRegistryPrefix()));
     }
 }

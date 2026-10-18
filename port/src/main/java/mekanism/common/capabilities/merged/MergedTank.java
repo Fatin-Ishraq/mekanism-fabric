@@ -2,39 +2,48 @@ package mekanism.common.capabilities.merged;
 
 import java.util.Objects;
 import mekanism.api.SerializationConstants;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.chemical.IChemicalTank;
-import mekanism.api.fluid.IExtendedFluidTank;
+import mekanism.api.fluid.IFluidTank;
+import mekanism.api.resource.IResourceContainer;
 import mekanism.common.capabilities.fluid.FluidTankWrapper;
 import mekanism.common.util.NBTUtils;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
-@NothingNullByDefault
 public class MergedTank {
 
-    public static MergedTank create(IExtendedFluidTank fluidTank, IChemicalTank gasTank) {
+    public static MergedTank create(IFluidTank fluidTank, IChemicalTank gasTank) {
         Objects.requireNonNull(fluidTank, "Fluid tank cannot be null");
         Objects.requireNonNull(gasTank, "Gas tank cannot be null");
         return new MergedTank(fluidTank, gasTank);
     }
 
-    private final IExtendedFluidTank fluidTank;
+    private final IFluidTank fluidTank;
     private final IChemicalTank chemicalTank;
 
-    private MergedTank(IExtendedFluidTank fluidTank, IChemicalTank chemicalTank) {
+    private MergedTank(IFluidTank fluidTank, IChemicalTank chemicalTank) {
         this.fluidTank = new FluidTankWrapper(this, fluidTank, chemicalTank);
         this.chemicalTank = new ChemicalTankWrapper(this, chemicalTank, this.fluidTank::isEmpty);
     }
 
     public CurrentType getCurrentType() {
-        if (!getFluidTank().isEmpty()) {
-            return CurrentType.FLUID;
+        if (fluidTank.isEmpty()) {
+            if (chemicalTank.isEmpty()) {
+                return CurrentType.EMPTY;
+            }
+            return CurrentType.CHEMICAL;
         }
-        return chemicalTank.isEmpty() ? CurrentType.EMPTY : CurrentType.CHEMICAL;
+        return CurrentType.FLUID;
     }
 
-    public final IExtendedFluidTank getFluidTank() {
+    public IResourceContainer<?> getCurrentContainer() {
+        if (chemicalTank.isEmpty()) {
+            return fluidTank;
+        }
+        return chemicalTank;
+    }
+
+    public final IFluidTank getFluidTank() {
         return fluidTank;
     }
 
@@ -42,15 +51,14 @@ public class MergedTank {
         return chemicalTank;
     }
 
-    public void addToUpdateTag(HolderLookup.Provider provider, CompoundTag updateTag) {
-        updateTag.put(SerializationConstants.FLUID, fluidTank.getFluid().saveOptional(provider));
-        updateTag.put(SerializationConstants.CHEMICAL, chemicalTank.getStack().saveOptional(provider));
+    public void addToUpdateTag(ValueOutput output) {
+        NBTUtils.storeNonEmpty(output, SerializationConstants.FLUID, fluidTank);
+        NBTUtils.storeNonEmpty(output, SerializationConstants.CHEMICAL, chemicalTank);
     }
 
-    public void readFromUpdateTag(HolderLookup.Provider provider, CompoundTag tag) {
-        NBTUtils.setFluidStackIfPresent(provider, tag, SerializationConstants.FLUID, fluidTank::setStack);
-        NBTUtils.setChemicalStackIfPresent(provider, tag, SerializationConstants.CHEMICAL, chemicalTank::setStack);
-
+    public void readFromUpdateTag(ValueInput input) {
+        NBTUtils.readOrEmpty(input, SerializationConstants.FLUID, fluidTank);
+        NBTUtils.readOrEmpty(input, SerializationConstants.CHEMICAL, chemicalTank);
     }
 
     public enum CurrentType {

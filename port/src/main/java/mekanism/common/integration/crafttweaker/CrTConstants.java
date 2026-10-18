@@ -2,18 +2,16 @@ package mekanism.common.integration.crafttweaker;
 
 import com.blamejared.crafttweaker.api.CraftTweakerAPI;
 import mekanism.common.Mekanism;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.apache.logging.log4j.Logger;
 
-/**
- * Constants we use throughout our CraftTweaker integration.
- */
+/// Constants we use throughout our CraftTweaker integration.
 public class CrTConstants {
 
     public static final Logger CRT_LOGGER = CraftTweakerAPI.getLogger(Mekanism.MOD_NAME);
 
     public static final String CONTENT_LOADER = Mekanism.MODID + "content";
-    public static final ResourceLocation CONTENT_LOADER_SOURCE_ID = Mekanism.rl("content");
+    public static final Identifier CONTENT_LOADER_SOURCE_ID = Mekanism.rl("content");
     public static final String JEI_PLUGIN_NAME = Mekanism.MODID + ":crt_jei";
 
     public static final String BRACKET_CHEMICAL = "chemical";
@@ -26,9 +24,7 @@ public class CrTConstants {
 
     public static final String CLASS_HAS_TRANSLATION = "mods." + Mekanism.MODID + ".api.text.HasTranslation";
     public static final String CLASS_HAS_TEXT_COMPONENT = "mods." + Mekanism.MODID + ".api.text.HasTextComponent";
-    public static final String CLASS_BASE_PROVIDER = "mods." + Mekanism.MODID + ".api.provider.BaseProvider";
 
-    public static final String CLASS_CHEMICAL_PROVIDER = "mods." + Mekanism.MODID + ".api.chemical.ChemicalProvider";
     public static final String CLASS_CHEMICAL = "mods." + Mekanism.MODID + ".api.chemical.Chemical";
     public static final String CLASS_CHEMICAL_STACK = "mods." + Mekanism.MODID + ".api.chemical.ChemicalStack";
 
@@ -39,7 +35,6 @@ public class CrTConstants {
     public static final String CLASS_MODULE_DATA = "mods." + Mekanism.MODID + ".api.gear.ModuleData";
     public static final String CLASS_MODULE_HELPER = "mods." + Mekanism.MODID + ".api.gear.ModuleHelper";
     public static final String CLASS_CUSTOM_MODULE = "mods." + Mekanism.MODID + ".api.gear.CustomModule";
-    public static final String CLASS_MODULE_DATA_PROVIDER = "mods." + Mekanism.MODID + ".api.gear.ModuleDataProvider";
 
     //TODO: Eventually we might want to expose basic chemical ingredients as actually CrT objects. And then make the stack variant basically just be an OR of them,
     // and also make the stacks be instances of an interface so that they can be used directly in place of the ingredients? (Or at least implicit cast to them)
@@ -101,13 +96,6 @@ public class CrTConstants {
     public static final String CLASS_RECIPE_ROTARY_CHEMICAL_TO_FLUID = CLASS_RECIPE_ROTARY + ".ChemicalToFluid";
     public static final String CLASS_RECIPE_ROTARY_FLUID_TO_CHEMICAL = CLASS_RECIPE_ROTARY + ".FluidToChemical";
     public static final String CLASS_RECIPE_SAWING = "mods." + Mekanism.MODID + ".recipe.Sawing";
-
-    public static final String CLASS_ATTRIBUTE_CHEMICAL = "mods." + Mekanism.MODID + ".attribute.ChemicalAttribute";
-    public static final String CLASS_ATTRIBUTE_COOLANT = CLASS_ATTRIBUTE_CHEMICAL + ".Coolant";
-    public static final String CLASS_ATTRIBUTE_COOLED_COOLANT = CLASS_ATTRIBUTE_COOLANT + ".Cooled";
-    public static final String CLASS_ATTRIBUTE_HEATED_COOLANT = CLASS_ATTRIBUTE_COOLANT + "Heated";
-    public static final String CLASS_ATTRIBUTE_FUEL = CLASS_ATTRIBUTE_CHEMICAL + "Fuel";
-    public static final String CLASS_ATTRIBUTE_RADIATION = CLASS_ATTRIBUTE_CHEMICAL + ".Radiation";
 
     public static final String CLASS_BUILDER_CHEMICAL = "mods." + Mekanism.MODID + ".content.builder.ChemicalBuilder";
 

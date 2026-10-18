@@ -2,17 +2,17 @@ package mekanism.client.recipe_viewer.jei;
 
 import java.util.ArrayList;
 import java.util.List;
-import mekanism.api.chemical.ChemicalStack;
-import mekanism.api.chemical.IChemicalHandler;
-import mekanism.api.energy.IStrictEnergyHandler;
-import mekanism.common.attachments.containers.ContainerType;
-import mekanism.common.capabilities.Capabilities;
+import mekanism.api.chemical.ChemicalResource;
+import mekanism.common.component.containers.type.ContainerType;
+import mekanism.common.util.ItemAccessUtils;
 import mezz.jei.api.ingredients.subtypes.ISubtypeInterpreter;
 import mezz.jei.api.ingredients.subtypes.UidContext;
 import net.minecraft.world.item.ItemStack;
-import mekanism.neoshim.neoforge.fluids.FluidStack;
-import mekanism.neoshim.neoforge.fluids.capability.IFluidHandler;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.energy.EnergyHandler;
+import mekanism.neoshim.neoforge.transfer.fluid.FluidResource;
+import org.jspecify.annotations.Nullable;
 
 public class MekanismSubtypeInterpreter implements ISubtypeInterpreter<ItemStack> {
 
@@ -32,142 +32,38 @@ public class MekanismSubtypeInterpreter implements ISubtypeInterpreter<ItemStack
         }
         List<Object> subTypeData = null;
 
-        IChemicalHandler chemicalHandler = getChemicalHandler(stack);
+        ItemAccess itemAccess = ItemAccessUtils.sideEffectFreeAccess(stack);
+        ResourceHandler<ChemicalResource> chemicalHandler = ContainerType.CHEMICAL.getCapOrUnexposed(itemAccess);
         if (chemicalHandler != null) {
-            for (int tank = 0, tanks = chemicalHandler.getChemicalTanks(); tank < tanks; tank++) {
-                ChemicalStack chemicalStack = chemicalHandler.getChemicalInTank(tank);
+            for (int tank = 0, tanks = chemicalHandler.size(); tank < tanks; tank++) {
+                ChemicalResource chemicalType = chemicalHandler.getResource(tank);
                 //Store the type of the chemical. We skip empty chemicals if there is only a single tank
-                if (!chemicalStack.isEmpty() || tanks > 1) {
-                    subTypeData = tryAddData(subTypeData, chemicalStack.getChemical());
+                if (!chemicalType.isEmpty() || tanks > 1) {
+                    subTypeData = tryAddData(subTypeData, chemicalType);
                 }
             }
         }
 
-        IFluidHandler fluidHandler = getFluidHandler(stack);
+        ResourceHandler<FluidResource> fluidHandler = ContainerType.FLUID.getCapOrUnexposed(itemAccess);
         if (fluidHandler != null) {
-            for (int tank = 0, tanks = fluidHandler.getTanks(); tank < tanks; tank++) {
-                FluidStack fluidStack = fluidHandler.getFluidInTank(tank);
+            for (int tank = 0, tanks = fluidHandler.size(); tank < tanks; tank++) {
+                FluidResource fluidType = fluidHandler.getResource(tank);
                 //Store the type of the fluid. We skip empty fluids if there is only a single tank
-                if (!fluidStack.isEmpty() || tanks > 1) {
-                    //TODO: Should this be using the fluidstack's subtype interpretation? (So that it takes fluid components into account?
-                    subTypeData = tryAddData(subTypeData, fluidStack.getFluid());
+                if (!fluidType.isEmpty() || tanks > 1) {
+                    //TODO - 26.1: Should this be using the fluidstack's subtype interpretation? (So that it takes fluid components into account?
+                    subTypeData = tryAddData(subTypeData, fluidType.getFluid());
                 }
             }
         }
 
-        IStrictEnergyHandler energyHandler = getEnergyHandler(stack);
+        EnergyHandler energyHandler = ContainerType.ENERGY.getCapOrUnexposed(itemAccess);
         if (energyHandler != null) {
-            for (int container = 0, containers = energyHandler.getEnergyContainerCount(); container < containers; container++) {
-                //TODO: Should we just be storing the amount of stored energy??
-                long neededEnergy = energyHandler.getNeededEnergy(container);
-                if (neededEnergy == 0L) {
-                    //Energy container is full
-                    subTypeData = tryAddData(subTypeData, true);
-                } else if (containers > 1) {
-                    //Energy container is not full
-                    subTypeData = tryAddData(subTypeData, false);
-                }
+            //TODO: Should we just be storing the amount of stored energy??
+            if (energyHandler.getAmountAsLong() >= energyHandler.getCapacityAsLong()) {
+                //Energy container is full
+                subTypeData = tryAddData(subTypeData, true);
             }
         }
         return subTypeData;
-    }
-
-    @Override
-    @Deprecated
-    public String getLegacyStringSubtypeInfo(ItemStack stack, UidContext context) {
-        if (context == UidContext.Ingredient) {
-            String representation = getChemicalComponent(stack);
-            representation = addInterpretation(representation, getFluidComponent(stack));
-            representation = addInterpretation(representation, getEnergyComponent(stack));
-            return representation;
-        }
-        return "";
-    }
-
-    @Deprecated
-    private static String addInterpretation(String nbtRepresentation, String component) {
-        return nbtRepresentation.isEmpty() ? component : nbtRepresentation + ":" + component;
-    }
-
-    @Deprecated
-    private static String getChemicalComponent(ItemStack stack) {
-        IChemicalHandler chemicalHandler = getChemicalHandler(stack);
-        if (chemicalHandler != null) {
-            String component = "";
-            for (int tank = 0, tanks = chemicalHandler.getChemicalTanks(); tank < tanks; tank++) {
-                ChemicalStack chemicalStack = chemicalHandler.getChemicalInTank(tank);
-                if (!chemicalStack.isEmpty()) {
-                    component = addInterpretation(component, chemicalStack.getChemical().toString());
-                } else if (tanks > 1) {
-                    component = addInterpretation(component, "empty");
-                }
-            }
-            return component;
-        }
-        return "";
-    }
-
-    @Deprecated
-    private static String getFluidComponent(ItemStack stack) {
-        IFluidHandler handler = getFluidHandler(stack);
-        if (handler != null) {
-            String component = "";
-            for (int tank = 0, tanks = handler.getTanks(); tank < tanks; tank++) {
-                FluidStack fluidStack = handler.getFluidInTank(tank);
-                if (!fluidStack.isEmpty()) {
-                    component = addInterpretation(component, fluidStack.getFluid().toString());
-                } else if (tanks > 1) {
-                    component = addInterpretation(component, "empty");
-                }
-            }
-            return component;
-        }
-        return "";
-    }
-
-    @Deprecated
-    private static String getEnergyComponent(ItemStack stack) {
-        IStrictEnergyHandler energyHandlerItem = getEnergyHandler(stack);
-        if (energyHandlerItem != null) {
-            String component = "";
-            int containers = energyHandlerItem.getEnergyContainerCount();
-            for (int container = 0; container < containers; container++) {
-                long neededEnergy = energyHandlerItem.getNeededEnergy(container);
-                if (neededEnergy == 0L) {
-                    component = addInterpretation(component, "filled");
-                } else if (containers > 1) {
-                    component = addInterpretation(component, "empty");
-                }
-            }
-            return component;
-        }
-        return "";
-    }
-
-    @Nullable
-    private static IChemicalHandler getChemicalHandler(ItemStack stack) {
-        IChemicalHandler handler = ContainerType.CHEMICAL.createHandlerIfData(stack);
-        if (handler == null) {
-            return Capabilities.CHEMICAL.getCapability(stack);
-        }
-        return handler;
-    }
-
-    @Nullable
-    private static IFluidHandler getFluidHandler(ItemStack stack) {
-        IFluidHandler handler = ContainerType.FLUID.createHandlerIfData(stack);
-        if (handler == null) {
-            return Capabilities.FLUID.getCapability(stack);
-        }
-        return handler;
-    }
-
-    @Nullable
-    private static IStrictEnergyHandler getEnergyHandler(ItemStack stack) {
-        IStrictEnergyHandler handler = ContainerType.ENERGY.createHandlerIfData(stack);
-        if (handler == null) {
-            return Capabilities.STRICT_ENERGY.getCapability(stack);
-        }
-        return handler;
     }
 }

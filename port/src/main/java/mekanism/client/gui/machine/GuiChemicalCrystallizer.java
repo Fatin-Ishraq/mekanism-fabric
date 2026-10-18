@@ -1,7 +1,7 @@
 package mekanism.client.gui.machine;
 
 import java.lang.ref.WeakReference;
-import mekanism.api.chemical.ChemicalStack;
+import mekanism.api.chemical.ChemicalResource;
 import mekanism.api.recipes.ChemicalCrystallizerRecipe;
 import mekanism.api.recipes.cache.CachedRecipe.OperationTracker.RecipeError;
 import mekanism.client.gui.GuiConfigurableTile;
@@ -17,15 +17,15 @@ import mekanism.client.gui.element.tab.GuiEnergyTab;
 import mekanism.common.inventory.container.tile.MekanismTileContainer;
 import mekanism.common.inventory.warning.WarningTracker.WarningType;
 import mekanism.common.tile.machine.TileEntityChemicalCrystallizer;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class GuiChemicalCrystallizer extends GuiConfigurableTile<TileEntityChemicalCrystallizer, MekanismTileContainer<TileEntityChemicalCrystallizer>> {
 
     private final IOreInfo oreInfo = new OreInfo();
+    @Nullable
     private GuiElement inputGauge;
 
     public GuiChemicalCrystallizer(MekanismTileContainer<TileEntityChemicalCrystallizer> container, Inventory inv, Component title) {
@@ -37,10 +37,10 @@ public class GuiChemicalCrystallizer extends GuiConfigurableTile<TileEntityChemi
     @Override
     protected void addGuiElements() {
         super.addGuiElements();
-        addRenderableWidget(new GuiVerticalPowerBar(this, tile.getEnergyContainer(), 157, 23))
+        addRenderableWidget(new GuiVerticalPowerBar(this, tile.energyContainer(), 157, 23))
               .warning(WarningType.NOT_ENOUGH_ENERGY, tile.getWarningCheck(RecipeError.NOT_ENOUGH_ENERGY));
-        addRenderableWidget(new GuiEnergyTab(this, tile.getEnergyContainer(), tile::getActive));
-        inputGauge = addRenderableWidget(new GuiChemicalGauge(() -> tile.inputTank, () -> tile.getChemicalTanks(null), GaugeType.STANDARD, this, 7, 4))
+        addRenderableWidget(new GuiEnergyTab(this, tile.energyContainer(), tile::getActive));
+        inputGauge = addRenderableWidget(new GuiChemicalGauge(() -> tile.inputTank, tile::getChemicalTanks, GaugeType.STANDARD, this, 7, 4))
               .warning(WarningType.NO_MATCHING_RECIPE, tile.getWarningCheck(RecipeError.NOT_ENOUGH_INPUT));
         addRenderableWidget(new GuiProgress(tile::getScaledProgress, ProgressType.LARGE_RIGHT, this, 53, 61).recipeViewerCategory(tile))
               .warning(WarningType.INPUT_DOESNT_PRODUCE_OUTPUT, tile.getWarningCheck(RecipeError.INPUT_DOESNT_PRODUCE_OUTPUT));
@@ -48,25 +48,25 @@ public class GuiChemicalCrystallizer extends GuiConfigurableTile<TileEntityChemi
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        renderTitleTextWithOffset(guiGraphics, inputGauge.getRelativeRight(), tile.getEnergySlotX());
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
+        renderTitleTextWithOffset(guiGraphics, inputGauge == null ? 0 : inputGauge.getRelativeRight(), tile.getEnergySlotX());
         super.drawForegroundText(guiGraphics, mouseX, mouseY);
     }
 
     private class OreInfo implements IOreInfo {
 
+        @Nullable
         private WeakReference<ChemicalCrystallizerRecipe> cachedRecipe;
 
-        @NotNull
         @Override
-        public ChemicalStack getInputChemical() {
-            return tile.inputTank.getStack();
+        public ChemicalResource getInputChemical() {
+            return tile.inputTank.resource();
         }
 
         @Nullable
         @Override
         public ChemicalCrystallizerRecipe getRecipe() {
-            ChemicalStack input = getInputChemical();
+            ChemicalResource input = getInputChemical();
             if (input.isEmpty()) {
                 return null;
             }
@@ -82,6 +82,7 @@ public class GuiChemicalCrystallizer extends GuiConfigurableTile<TileEntityChemi
             return recipe;
         }
 
+        @Nullable
         private ChemicalCrystallizerRecipe getRecipeAndCache() {
             ChemicalCrystallizerRecipe recipe = tile.getRecipe(0);
             if (recipe == null) {

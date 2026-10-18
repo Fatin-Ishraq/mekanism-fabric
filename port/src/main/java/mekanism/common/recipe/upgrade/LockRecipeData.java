@@ -1,34 +1,28 @@
 package mekanism.common.recipe.upgrade;
 
-import mekanism.api.annotations.NothingNullByDefault;
-import mekanism.common.attachments.containers.item.ComponentBackedBinInventorySlot;
-import mekanism.common.inventory.slot.BinInventorySlot;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.Nullable;
+import mekanism.common.component.LockData;
+import mekanism.common.registries.MekanismDataComponents;
+import mekanism.common.util.ItemAccessUtils;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public class LockRecipeData implements RecipeUpgradeData<LockRecipeData> {
 
-    private final ItemStack lock;
+    private final LockData lockData;
 
-    LockRecipeData(ItemStack lockStack) {
-        this.lock = lockStack;
+    LockRecipeData(LockData lockData) {
+        this.lockData = lockData;
     }
 
     @Nullable
     @Override
     public LockRecipeData merge(LockRecipeData other) {
-        return ItemStack.isSameItemSameComponents(lock, other.lock) ? this : null;
+        return lockData.equals(other.lockData) ? this : null;
     }
 
     @Override
-    public boolean applyToStack(HolderLookup.Provider provider, ItemStack stack) {
-        ComponentBackedBinInventorySlot slot = BinInventorySlot.getForStack(stack);
-        if (slot == null) {
-            return false;
-        }
-        slot.setLockStack(this.lock);
-        return true;
+    public boolean applyToStack(ItemAccess itemAccess, TransactionContext transaction) {
+        return ItemAccessUtils.exchange(itemAccess, itemAccess.getResource().with(MekanismDataComponents.LOCK, lockData), transaction);
     }
 }

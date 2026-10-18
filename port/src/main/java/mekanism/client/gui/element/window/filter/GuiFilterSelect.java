@@ -9,8 +9,8 @@ import mekanism.common.MekanismLang;
 import mekanism.common.inventory.container.SelectedWindowData;
 import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.tile.interfaces.ITileFilterHolder;
-import net.minecraft.client.gui.GuiGraphics;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import org.jspecify.annotations.Nullable;
 
 public abstract class GuiFilterSelect<TILE extends TileEntityMekanism & ITileFilterHolder<?>> extends GuiWindow {
 
@@ -31,12 +31,12 @@ public abstract class GuiFilterSelect<TILE extends TileEntityMekanism & ITileFil
         if (filterSupplier == null) {
             return buttonY;
         }
-        addChild(new TranslationButton(gui(), relativeX + 12, buttonY, 128, FILTER_HEIGHT, translationHelper, (element, mouseX, mouseY) -> {
+        addChild(new TranslationButton(gui(), relativeX + 12, buttonY, 128, FILTER_HEIGHT, translationHelper, (element, event, isDoubleClick) -> {
             //Add the window for the filter dialog to the parent gui
             IGuiWrapper gui = element.gui();
             gui.addWindow(filterSupplier.create(gui, tile));
             //And close the filter select dialog
-            return close(element, mouseX, mouseY);
+            return close(element, event, isDoubleClick);
         }));
         return buttonY + FILTER_HEIGHT;
     }
@@ -57,7 +57,7 @@ public abstract class GuiFilterSelect<TILE extends TileEntityMekanism & ITileFil
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         drawTitleText(guiGraphics, MekanismLang.CREATE_FILTER_TITLE.translate(), 6);
     }

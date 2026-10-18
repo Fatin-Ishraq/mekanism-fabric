@@ -6,7 +6,6 @@ import mekanism.api.heat.HeatAPI;
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.lib.Color;
 import mekanism.common.util.UnitDisplayUtils.TemperatureUnit;
-import net.minecraft.util.Mth;
 
 public class HeatUtils {
 
@@ -17,7 +16,7 @@ public class HeatUtils {
 
     public static final double BASE_BOIL_TEMP = TemperatureUnit.CELSIUS.zeroOffset + 100;
 
-    public static double getWaterThermalEnthalpy() {
+    public static long getWaterThermalEnthalpy() {
         return MekanismConfig.general.maxEnergyPerSteam.get();
     }
 
@@ -75,10 +74,10 @@ public class HeatUtils {
         double alpha = temperature / 1_000;
 
         //clamp to 0 <= n >= 1
-        red = Mth.clamp(red, 0, 1);
-        green = Mth.clamp(green, 0, 1);
-        blue = Mth.clamp(blue, 0, 1);
-        alpha = Mth.clamp(alpha, 0, 1);
+        red = Math.clamp(red, 0, 1);
+        green = Math.clamp(green, 0, 1);
+        blue = Math.clamp(blue, 0, 1);
+        alpha = Math.clamp(alpha, 0, 1);
 
         Color colorTemperature = Color.rgbad(red, green, blue, alpha);
         colorCache.put((int) absTemp, colorTemperature);

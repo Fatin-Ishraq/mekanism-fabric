@@ -10,8 +10,9 @@ import mekanism.common.util.VoxelShapeUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
-import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
@@ -19,7 +20,6 @@ import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.phys.shapes.BooleanOp;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import org.jetbrains.annotations.NotNull;
 
 public class BlockIndustrialAlarm extends BlockTileModel<TileEntityIndustrialAlarm, BlockTypeTile<TileEntityIndustrialAlarm>> {
 
@@ -29,23 +29,26 @@ public class BlockIndustrialAlarm extends BlockTileModel<TileEntityIndustrialAla
         VoxelShapeUtils.setShape(box(5, 0, 5, 11, 16, 11), MIN_SHAPES, true);
     }
 
-    public BlockIndustrialAlarm() {
-        super(MekanismBlockTypes.INDUSTRIAL_ALARM, BlockBehaviour.Properties.of().strength(2, 2.4F).mapColor(MapColor.COLOR_RED));
+    public BlockIndustrialAlarm(BlockBehaviour.Properties properties) {
+        super(MekanismBlockTypes.INDUSTRIAL_ALARM, properties.strength(2, 2.4F).mapColor(MapColor.COLOR_RED));
     }
 
-    @NotNull
     @Override
-    protected BlockState updateShape(BlockState state, @NotNull Direction facing, @NotNull BlockState facingState, @NotNull LevelAccessor world,
-          @NotNull BlockPos currentPos, @NotNull BlockPos facingPos) {
-        if (facing.getOpposite() == Attribute.getFacing(state) && !state.canSurvive(world, currentPos)) {
+    protected BlockState updateShape(BlockState state, LevelReader level, ScheduledTickAccess scheduledTickAccess, BlockPos currentPos,
+          Direction facing, BlockPos facingPos, BlockState facingState, RandomSource random) {
+        if (facing.getOpposite() == Attribute.getFacing(state) && !state.canSurvive(level, currentPos)) {
             return Blocks.AIR.defaultBlockState();
         }
-        return super.updateShape(state, facing, facingState, world, currentPos, facingPos);
+        return super.updateShape(state, level, scheduledTickAccess, currentPos, facing, facingPos, facingState, random);
     }
 
     @Override
-    protected boolean canSurvive(@NotNull BlockState state, @NotNull LevelReader world, @NotNull BlockPos pos) {
+    protected boolean canSurvive(BlockState state, LevelReader world, BlockPos pos) {
         Direction side = Attribute.getFacing(state);
+        if (side == null) {
+            //Something went wrong, and we were passed an invalid state, return that we can't survive
+            return false;
+        }
         Direction sideOn = side.getOpposite();
         BlockPos offsetPos = pos.relative(sideOn);
         VoxelShape projected = world.getBlockState(offsetPos).getBlockSupportShape(world, offsetPos).getFaceShape(side);

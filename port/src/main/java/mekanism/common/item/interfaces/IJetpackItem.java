@@ -6,7 +6,6 @@ import java.util.Locale;
 import java.util.function.IntFunction;
 import java.util.function.Predicate;
 import mekanism.api.IIncrementalEnum;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.gear.config.IHasModeIcon;
 import mekanism.api.text.EnumColor;
 import mekanism.api.text.IHasTextComponent.IHasEnumNameTextComponent;
@@ -15,32 +14,36 @@ import mekanism.common.CommonPlayerTickHandler;
 import mekanism.common.Mekanism;
 import mekanism.common.MekanismLang;
 import mekanism.common.integration.curios.CuriosIntegration;
+import mekanism.common.util.ItemAccessUtils;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.ByIdMap;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.NotNull;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
 public interface IJetpackItem {
 
-    boolean canUseJetpack(ItemStack stack);
+    boolean canUseJetpack(ItemAccess itemAccess);
 
-    JetpackMode getJetpackMode(ItemStack stack);
+    <ITEM extends TypedInstance<Item> & DataComponentGetter> JetpackMode getJetpackMode(ITEM instance);
 
-    double getJetpackThrust(ItemStack stack);
+    ///@return thrust that fuel was consumed for
+    <ITEM extends TypedInstance<Item> & DataComponentGetter> double useJetpackFuel(ItemAccess itemAccess, ITEM primaryInstance, TransactionContext transaction);
 
-    void useJetpackFuel(ItemStack stack);
-
-    @NothingNullByDefault
     enum JetpackMode implements IIncrementalEnum<JetpackMode>, IHasModeIcon, StringRepresentable, IHasEnumNameTextComponent {
         NORMAL(MekanismLang.JETPACK_NORMAL, EnumColor.DARK_GREEN, "jetpack_normal.png"),
         HOVER(MekanismLang.JETPACK_HOVER, EnumColor.DARK_AQUA, "jetpack_hover.png"),
@@ -54,8 +57,8 @@ public interface IJetpackItem {
         private final String serializedName;
         private final ILangEntry langEntry;
         private final EnumColor color;
-        private final ResourceLocation hudIcon;
-        private final ResourceLocation modeIcon;
+        private final Identifier hudIcon;
+        private final Identifier modeIcon;
 
         JetpackMode(ILangEntry langEntry, EnumColor color, String icon) {
             this.serializedName = name().toLowerCase(Locale.ROOT);
@@ -75,12 +78,12 @@ public interface IJetpackItem {
             return BY_ID.apply(index);
         }
 
-        public ResourceLocation getHUDIcon() {
+        public Identifier getHUDIcon() {
             return hudIcon;
         }
 
         @Override
-        public ResourceLocation getModeIcon() {
+        public Identifier getModeIcon() {
             return modeIcon;
         }
 
@@ -90,54 +93,49 @@ public interface IJetpackItem {
         }
     }
 
-    /**
-     * Gets the first found active jetpack from an entity, if one is worn.
-     * <br>
-     * If Curios is loaded, the curio slots will be checked as well.
-     *
-     * @param entity the entity on which to look for the jetpack
-     *
-     * @return the jetpack stack if present, otherwise an empty stack
-     */
-    @NotNull
-    static ItemStack getActiveJetpack(LivingEntity entity) {
+    /// Gets the first found active jetpack from an entity, if one is worn.
+    ///
+    /// If Curios is loaded, the curio slots will be checked as well.
+    ///
+    /// @param entity the entity on which to look for the jetpack
+    ///
+    /// @return the jetpack stack if present, otherwise an empty stack
+    @Nullable
+    static ItemAccess getActiveJetpack(LivingEntity entity) {
         if (entity.isPassenger()) {
-            return ItemStack.EMPTY;
+            return null;
         }
-        ItemStack jetpack = getJetpack(entity, stack -> stack.getItem() instanceof IJetpackItem jetpackItem && jetpackItem.canUseJetpack(stack));
-        if (entity instanceof Player player && player.getCooldowns().isOnCooldown(jetpack.getItem())) {
-            return ItemStack.EMPTY;
+        ItemAccess jetpack = getJetpack(entity, itemAccess -> itemAccess.getResource().getItem() instanceof IJetpackItem jetpackItem && jetpackItem.canUseJetpack(itemAccess));
+        if (jetpack != null && entity instanceof Player player && player.getCooldowns().isOnCooldown(ItemAccessUtils.asStack(jetpack))) {
+            return null;
         }
         return jetpack;
     }
 
-    /**
-     * Gets the first found jetpack from an entity, if one is worn. Purpose of this is to get the correct jetpack mode to use.
-     * <br>
-     * If Curios is loaded, the curio slots will be checked as well.
-     *
-     * @param entity the entity on which to look for the jetpack
-     *
-     * @return the jetpack stack if present, otherwise an empty stack
-     */
-    @NotNull
-    static ItemStack getPrimaryJetpack(LivingEntity entity) {
-        return getJetpack(entity, stack -> stack.getItem() instanceof IJetpackItem);
+    /// Gets the first found jetpack from an entity, if one is worn. Purpose of this is to get the correct jetpack mode to use.
+    ///
+    /// If Curios is loaded, the curio slots will be checked as well.
+    ///
+    /// @param entity the entity on which to look for the jetpack
+    ///
+    /// @return the jetpack stack if present, otherwise an empty stack
+    static ItemResource getPrimaryJetpack(LivingEntity entity) {
+        ItemAccess jetpack = getJetpack(entity, itemAccess -> itemAccess.getResource().getItem() instanceof IJetpackItem);
+        return jetpack == null ? ItemResource.EMPTY : jetpack.getResource();
     }
 
-    private static ItemStack getJetpack(LivingEntity entity, Predicate<ItemStack> matcher) {
-        ItemStack chest = entity.getItemBySlot(EquipmentSlot.CHEST);
+    @Nullable
+    private static ItemAccess getJetpack(LivingEntity entity, Predicate<ItemAccess> matcher) {
+        ItemAccess chest = ItemAccessUtils.forEntitySlot(entity, EquipmentSlot.CHEST);
         if (matcher.test(chest)) {
             return chest;
         } else if (Mekanism.hooks.curios.isLoaded()) {
             return CuriosIntegration.findFirstCurio(entity, matcher);
         }
-        return ItemStack.EMPTY;
+        return null;
     }
 
-    /**
-     * @return If fall distance should get reset or not
-     */
+    /// @return If fall distance should get reset or not
     static <PLAYER extends Player> boolean handleJetpackMotion(PLAYER player, JetpackMode mode, double thrust, Predicate<PLAYER> ascendingCheck) {
         Vec3 motion = player.getDeltaMovement();
         if (mode == JetpackMode.VECTOR && player.isShiftKeyDown()) {

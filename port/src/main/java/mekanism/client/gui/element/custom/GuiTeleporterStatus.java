@@ -9,18 +9,19 @@ import mekanism.client.gui.element.GuiTexturedElement;
 import mekanism.common.tile.TileEntityTeleporter.TeleporterStatus;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
 public class GuiTeleporterStatus extends GuiTexturedElement {
 
-    private static final ResourceLocation NEEDS_ENERGY = MekanismUtils.getResource(ResourceType.GUI, "teleporter_needs_energy.png");
-    private static final ResourceLocation NO_FRAME = MekanismUtils.getResource(ResourceType.GUI, "teleporter_no_frame.png");
-    private static final ResourceLocation NO_FREQUENCY = MekanismUtils.getResource(ResourceType.GUI, "teleporter_no_frequency.png");
-    private static final ResourceLocation NO_DESTINATION = MekanismUtils.getResource(ResourceType.GUI, "teleporter_no_link.png");
-    private static final ResourceLocation READY = MekanismUtils.getResource(ResourceType.GUI, "teleporter_ready.png");
+    private static final Identifier NEEDS_ENERGY = MekanismUtils.getResource(ResourceType.GUI, "teleporter_needs_energy.png");
+    private static final Identifier NO_FRAME = MekanismUtils.getResource(ResourceType.GUI, "teleporter_no_frame.png");
+    private static final Identifier NO_FREQUENCY = MekanismUtils.getResource(ResourceType.GUI, "teleporter_no_frequency.png");
+    private static final Identifier NO_DESTINATION = MekanismUtils.getResource(ResourceType.GUI, "teleporter_no_link.png");
+    private static final Identifier READY = MekanismUtils.getResource(ResourceType.GUI, "teleporter_ready.png");
     private static final Map<TeleporterStatus, Tooltip> CACHED_TOOLTIPS = new EnumMap<>(TeleporterStatus.class);
 
     private final BooleanSupplier hasFrequency;
@@ -33,13 +34,14 @@ public class GuiTeleporterStatus extends GuiTexturedElement {
         setButtonBackground(ButtonBackground.DEFAULT);
     }
 
+    @Nullable
     @Override
-    protected int getButtonTextureY(boolean hoveredOrFocused) {
-        return 1;
+    protected Identifier getButtonVariant(boolean hoveredOrFocused) {
+        return ButtonBackground.DEFAULT.base();//todo - 26.1: check me
     }
 
     @Override
-    protected ResourceLocation getResource() {
+    protected Identifier getResource() {
         if (hasFrequency.getAsBoolean()) {
             return switch (statusSupplier.get()) {
                 case READY -> READY;
@@ -52,9 +54,9 @@ public class GuiTeleporterStatus extends GuiTexturedElement {
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
-        guiGraphics.blit(getResource(), relativeX, relativeY, 0, 0, width, height, width, height);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, getResource(), relativeX, relativeY, 0, 0, width, height, width, height);
     }
 
     @Override

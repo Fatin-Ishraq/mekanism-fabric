@@ -4,7 +4,6 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import io.netty.buffer.ByteBuf;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import mekanism.api.SerializationConstants;
@@ -14,6 +13,8 @@ import mekanism.common.content.filter.ITagFilter;
 import mekanism.common.lib.inventory.Finder;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public class SorterTagFilter extends SorterFilter<SorterTagFilter> implements ITagFilter<SorterTagFilter> {
 
@@ -32,6 +33,7 @@ public class SorterTagFilter extends SorterFilter<SorterTagFilter> implements IT
     private String tagName;
 
     public SorterTagFilter() {
+        tagName = "";
     }
 
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
@@ -46,8 +48,8 @@ public class SorterTagFilter extends SorterFilter<SorterTagFilter> implements IT
     }
 
     @Override
-    public Finder getFinder() {
-        return Finder.tag(tagName);
+    public boolean test(ItemResource toCheck) {
+        return Finder.tag(tagName, toCheck);
     }
 
     @Override
@@ -56,7 +58,7 @@ public class SorterTagFilter extends SorterFilter<SorterTagFilter> implements IT
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) {
             return true;
         } else if (o == null || getClass() != o.getClass() || !super.equals(o)) {

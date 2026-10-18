@@ -12,10 +12,10 @@ import mekanism.client.gui.element.tab.GuiEnergyTab;
 import mekanism.common.inventory.container.tile.MekanismTileContainer;
 import mekanism.common.inventory.warning.WarningTracker.WarningType;
 import mekanism.common.tile.machine.TileEntityPaintingMachine;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.CommonColors;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
 
 public class GuiPaintingMachine extends GuiConfigurableTile<TileEntityPaintingMachine, MekanismTileContainer<TileEntityPaintingMachine>> {
 
@@ -29,17 +29,17 @@ public class GuiPaintingMachine extends GuiConfigurableTile<TileEntityPaintingMa
     @Override
     protected void addGuiElements() {
         super.addGuiElements();
-        addRenderableWidget(new GuiVerticalPowerBar(this, tile.getEnergyContainer(), 164, 15))
+        addRenderableWidget(new GuiVerticalPowerBar(this, tile.energyContainer(), 164, 15))
               .warning(WarningType.NOT_ENOUGH_ENERGY, tile.getWarningCheck(RecipeError.NOT_ENOUGH_ENERGY));
-        addRenderableWidget(new GuiEnergyTab(this, tile.getEnergyContainer(), tile::getActive));
-        addRenderableWidget(new GuiChemicalGauge(() -> tile.pigmentTank, () -> tile.getChemicalTanks(null), GaugeType.STANDARD, this, 25, 13))
+        addRenderableWidget(new GuiEnergyTab(this, tile.energyContainer(), tile::getActive));
+        addRenderableWidget(new GuiChemicalGauge(() -> tile.pigmentTank, tile::getChemicalTanks, GaugeType.STANDARD, this, 25, 13))
               .warning(WarningType.NO_MATCHING_RECIPE, tile.getWarningCheck(RecipeError.NOT_ENOUGH_SECONDARY_INPUT));
         addRenderableWidget(new GuiProgress(tile::getScaledProgress, ProgressType.LARGE_RIGHT, this, 64, 39).recipeViewerCategory(tile).colored(new PigmentColorDetails()))
               .warning(WarningType.INPUT_DOESNT_PRODUCE_OUTPUT, tile.getWarningCheck(RecipeError.INPUT_DOESNT_PRODUCE_OUTPUT));
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         renderTitleText(guiGraphics);
         renderInventoryText(guiGraphics);
         super.drawForegroundText(guiGraphics, mouseX, mouseY);
@@ -51,18 +51,14 @@ public class GuiPaintingMachine extends GuiConfigurableTile<TileEntityPaintingMa
         public int getColorFrom() {
             if (tile == null) {
                 //Should never actually be null, but just in case check it to make intellij happy
-                return 0xFFFFFFFF;
+                return CommonColors.WHITE;
             }
-            int tint = tile.pigmentTank.getStack().getChemicalColorRepresentation();
-            if ((tint & 0xFF000000) == 0) {
-                return 0xFF000000 | tint;
-            }
-            return tint;
+            return tile.pigmentTank.resource().getChemicalColorRepresentation();
         }
 
         @Override
         public int getColorTo() {
-            return 0xFFFFFFFF;
+            return CommonColors.WHITE;
         }
     }
 }

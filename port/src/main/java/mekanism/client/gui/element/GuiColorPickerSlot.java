@@ -10,9 +10,10 @@ import mekanism.client.gui.tooltip.TooltipUtils;
 import mekanism.common.MekanismLang;
 import mekanism.common.lib.Color;
 import mekanism.common.util.text.TextUtils;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.client.input.MouseButtonEvent;
+import org.jspecify.annotations.Nullable;
 
 public class GuiColorPickerSlot extends GuiElement {
 
@@ -45,13 +46,13 @@ public class GuiColorPickerSlot extends GuiElement {
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         GuiUtils.fill(guiGraphics, relativeX + 1, relativeY + 1, width - 2, height - 2, supplier.get().argb());
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY, int button) {
+    public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
         gui().addWindow(new GuiColorWindow(gui(), (getGuiWidth() - 160) / 2, (getGuiHeight() - 120) / 2, handlesAlpha, supplier.get(), consumer));
     }
 }

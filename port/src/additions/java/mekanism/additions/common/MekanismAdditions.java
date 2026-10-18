@@ -23,7 +23,7 @@ import net.minecraft.core.Position;
 import net.minecraft.core.dispenser.BlockSource;
 import net.minecraft.core.dispenser.DefaultDispenseItemBehavior;
 import net.minecraft.network.Connection;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.DispenserBlock;
@@ -36,23 +36,21 @@ import mekanism.neoshim.fml.event.lifecycle.FMLCommonSetupEvent;
 import mekanism.neoshim.neoforge.common.NeoForge;
 import mekanism.neoshim.neoforge.event.server.ServerStartingEvent;
 import mekanism.neoshim.neoforge.event.server.ServerStoppingEvent;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
 @Mod(MekanismAdditions.MODID)
 public class MekanismAdditions implements IModModule {
 
     public static final String MODID = "mekanismadditions";
 
+    @Nullable
     public static MekanismAdditions instance;
 
-    /**
-     * MekanismTools version number
-     */
+    /// MekanismTools version number
     public final Version versionNumber;
 
-    /**
-     * The VoiceServer manager for walkie-talkies
-     */
+    /// The VoiceServer manager for walkie-talkies
+    @Nullable
     public static VoiceServerManager voiceManager;
 
     public MekanismAdditions(ModContainer modContainer, IEventBus modEventBus) {
@@ -76,8 +74,8 @@ public class MekanismAdditions implements IModModule {
         AdditionsStructureModifierSerializers.STRUCTURE_MODIFIER_SERIALIZERS.register(modEventBus);
     }
 
-    public static ResourceLocation rl(String path) {
-        return ResourceLocation.fromNamespaceAndPath(MODID, path);
+    public static Identifier rl(String path) {
+        return Identifier.fromNamespaceAndPath(MODID, path);
     }
 
     @Override
@@ -104,9 +102,8 @@ public class MekanismAdditions implements IModModule {
         event.enqueueWork(() -> {
             //Dispenser behavior
             DispenserBlock.registerBehavior(AdditionsBlocks.OBSIDIAN_TNT, new DefaultDispenseItemBehavior() {
-                @NotNull
                 @Override
-                protected ItemStack execute(@NotNull BlockSource source, @NotNull ItemStack stack) {
+                protected ItemStack execute(BlockSource source, ItemStack stack) {
                     BlockPos blockpos = source.pos().relative(source.state().getValue(DispenserBlock.FACING));
                     if (BlockObsidianTNT.createAndAddEntity(source.level(), blockpos, null)) {
                         source.level().gameEvent(null, GameEvent.ENTITY_PLACE, blockpos);
@@ -118,9 +115,8 @@ public class MekanismAdditions implements IModModule {
                 }
             });
             DefaultDispenseItemBehavior balloonBehavior = new DefaultDispenseItemBehavior() {
-                @NotNull
                 @Override
-                protected ItemStack execute(@NotNull BlockSource source, @NotNull ItemStack stack) {
+                protected ItemStack execute(BlockSource source, ItemStack stack) {
                     ServerLevel level = source.level();
                     Position position = DispenserBlock.getDispensePosition(source, 1, new Vec3(-0.5, -3.5, -0.5));
                     EntityBalloon balloon = EntityBalloon.create(level, position.x(), position.y(), position.z(), ((ItemBalloon) stack.getItem()).getColor());

@@ -6,7 +6,7 @@ import com.blamejared.crafttweaker_annotations.annotations.NativeTypeRegistratio
 import mekanism.api.MekanismAPI;
 import mekanism.api.robit.RobitSkin;
 import mekanism.common.integration.crafttweaker.CrTConstants;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.openzen.zencode.java.ZenCodeType;
 
 @ZenRegister
@@ -14,10 +14,10 @@ import org.openzen.zencode.java.ZenCodeType;
 public class CrTRobitSkin {
 
     @ZenCodeType.Method
-    public static ResourceLocation getRegistryName(RobitSkin _this) {
-        ResourceLocation skinName = CraftTweakerAPI.getAccessibleElementsProvider()
+    public static Identifier getRegistryName(RobitSkin _this) {
+        Identifier skinName = CraftTweakerAPI.getAccessibleElementsProvider()
               .registryAccess()
-              .registryOrThrow(MekanismAPI.ROBIT_SKIN_REGISTRY_NAME)
+              .lookupOrThrow(MekanismAPI.ROBIT_SKIN_REGISTRY_NAME)
               .getKeyOrNull(_this);
         if (skinName == null) {
             throw new IllegalArgumentException("Unregistered robit skin");

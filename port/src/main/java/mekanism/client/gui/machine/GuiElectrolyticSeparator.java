@@ -14,13 +14,14 @@ import mekanism.client.gui.element.tab.GuiEnergyTab;
 import mekanism.common.inventory.container.tile.MekanismTileContainer;
 import mekanism.common.inventory.warning.WarningTracker.WarningType;
 import mekanism.common.tile.machine.TileEntityElectrolyticSeparator;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
 public class GuiElectrolyticSeparator extends GuiConfigurableTile<TileEntityElectrolyticSeparator, MekanismTileContainer<TileEntityElectrolyticSeparator>> {
 
+    @Nullable
     private GuiElement fluidGauge;
 
     public GuiElectrolyticSeparator(MekanismTileContainer<TileEntityElectrolyticSeparator> container, Inventory inv, Component title) {
@@ -31,14 +32,14 @@ public class GuiElectrolyticSeparator extends GuiConfigurableTile<TileEntityElec
     @Override
     protected void addGuiElements() {
         super.addGuiElements();
-        addRenderableWidget(new GuiEnergyTab(this, tile.getEnergyContainer(), tile::getEnergyUsed));
-        fluidGauge = addRenderableWidget(new GuiFluidGauge(() -> tile.fluidTank, () -> tile.getFluidTanks(null), GaugeType.STANDARD, this, 5, 10))
+        addRenderableWidget(new GuiEnergyTab(this, tile.energyContainer(), tile::getEnergyUsed));
+        fluidGauge = addRenderableWidget(new GuiFluidGauge(() -> tile.fluidTank, tile::getFluidTanks, GaugeType.STANDARD, this, 5, 10))
               .warning(WarningType.NO_MATCHING_RECIPE, tile.getWarningCheck(RecipeError.NOT_ENOUGH_INPUT));
-        addRenderableWidget(new GuiChemicalGauge(() -> tile.leftTank, () -> tile.getChemicalTanks(null), GaugeType.SMALL, this, 58, 18))
+        addRenderableWidget(new GuiChemicalGauge(() -> tile.leftTank, tile::getChemicalTanks, GaugeType.SMALL, this, 58, 18))
               .warning(WarningType.NO_SPACE_IN_OUTPUT, tile.getWarningCheck(TileEntityElectrolyticSeparator.NOT_ENOUGH_SPACE_LEFT_OUTPUT_ERROR));
-        addRenderableWidget(new GuiChemicalGauge(() -> tile.rightTank, () -> tile.getChemicalTanks(null), GaugeType.SMALL, this, 100, 18))
+        addRenderableWidget(new GuiChemicalGauge(() -> tile.rightTank, tile::getChemicalTanks, GaugeType.SMALL, this, 100, 18))
               .warning(WarningType.NO_SPACE_IN_OUTPUT, tile.getWarningCheck(TileEntityElectrolyticSeparator.NOT_ENOUGH_SPACE_RIGHT_OUTPUT_ERROR));
-        addRenderableWidget(new GuiVerticalPowerBar(this, tile.getEnergyContainer(), 164, 15))
+        addRenderableWidget(new GuiVerticalPowerBar(this, tile.energyContainer(), 164, 15))
               .warning(WarningType.NOT_ENOUGH_ENERGY, tile.getWarningCheck(RecipeError.NOT_ENOUGH_ENERGY))
               .warning(WarningType.NOT_ENOUGH_ENERGY_REDUCED_RATE, tile.getWarningCheck(RecipeError.NOT_ENOUGH_ENERGY_REDUCED_RATE));
         addRenderableWidget(new GuiProgress(tile::getActive, ProgressType.BI, this, 80, 30).recipeViewerCategory(tile))
@@ -48,8 +49,12 @@ public class GuiElectrolyticSeparator extends GuiConfigurableTile<TileEntityElec
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        renderTitleTextWithOffset(guiGraphics, fluidGauge.getRelativeRight());
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
+        if (fluidGauge == null) {
+            renderTitleText(guiGraphics);
+        } else {
+            renderTitleTextWithOffset(guiGraphics, fluidGauge.getRelativeRight());
+        }
         super.drawForegroundText(guiGraphics, mouseX, mouseY);
     }
 }

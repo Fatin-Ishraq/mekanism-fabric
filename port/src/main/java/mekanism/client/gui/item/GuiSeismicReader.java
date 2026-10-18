@@ -1,6 +1,5 @@
 package mekanism.client.gui.item;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import it.unimi.dsi.fastutil.objects.Reference2IntMap;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import java.util.ArrayList;
@@ -10,18 +9,14 @@ import mekanism.api.text.TextComponentUtil;
 import mekanism.client.gui.GuiMekanism;
 import mekanism.client.gui.element.GuiArrowSelection;
 import mekanism.client.gui.element.GuiInnerScreen;
-import mekanism.client.gui.element.button.MekanismButton;
 import mekanism.client.gui.element.button.MekanismImageButton;
 import mekanism.client.gui.element.scroll.GuiScrollBar;
-import mekanism.client.render.MekanismRenderer;
 import mekanism.common.MekanismLang;
 import mekanism.common.inventory.container.item.SeismicReaderContainer;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -35,10 +30,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
-import net.minecraft.world.phys.BlockHitResult;
-import mekanism.neoshim.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import mekanism.neoshim.neoforge.fluids.FluidType;
-import org.jetbrains.annotations.NotNull;
+import org.joml.Matrix3x2fStack;
+import org.jspecify.annotations.Nullable;
 
 public class GuiSeismicReader extends GuiMekanism<SeismicReaderContainer> {
 
@@ -46,17 +40,14 @@ public class GuiSeismicReader extends GuiMekanism<SeismicReaderContainer> {
     private final Reference2IntMap<Block> blockFrequencies = new Reference2IntOpenHashMap<>();
     private final Reference2IntMap<FluidType> fluidFrequencies = new Reference2IntOpenHashMap<>();
     private final int minHeight;
-    private MekanismButton upButton;
-    private MekanismButton downButton;
+    @Nullable
     private GuiScrollBar scrollBar;
 
     public GuiSeismicReader(SeismicReaderContainer container, Inventory inv, Component title) {
-        super(container, inv, title);
-        imageWidth = 150;
-        imageHeight = 182;
+        super(container, inv, title, DEFAULT_IMAGE_WIDTH - 26, DEFAULT_IMAGE_HEIGHT + 16);
         Player player = inv.player;
         Level level = player.level();
-        this.minHeight = level.getMinBuildHeight();
+        this.minHeight = level.getMinY();
         BlockPos pos = player.blockPosition();
         //Calculate all the blocks in the column
         for (BlockPos p : BlockPos.betweenClosed(new BlockPos(pos.getX(), minHeight, pos.getZ()), pos)) {
@@ -67,7 +58,7 @@ public class GuiSeismicReader extends GuiMekanism<SeismicReaderContainer> {
             Block block = state.getBlock();
             blockFrequencies.mergeInt(block, 1, Integer::sum);
             //Try to get the clone item stack as maybe it has one, though it might not have a corresponding block
-            ItemStack stack = state.getCloneItemStack(new BlockHitResult(p.getCenter().relative(Direction.UP, 0.5), Direction.UP, p, false), level, p, player);
+            ItemStack stack = state.getCloneItemStack(p, level, false, player);
             if (stack.isEmpty()) {
                 Fluid fluid = Fluids.EMPTY;
                 if (block instanceof LiquidBlock liquidBlock) {
@@ -80,11 +71,12 @@ public class GuiSeismicReader extends GuiMekanism<SeismicReaderContainer> {
                 } else {
                     FluidType fluidType = fluid.getFluidType();
                     blockList.add(new BlockInfo<>(state, fluidType, (graphics, f, x, y) -> {
-                        IClientFluidTypeExtensions properties = IClientFluidTypeExtensions.of(f);
-                        MekanismRenderer.color(graphics, properties.getTintColor());
-                        TextureAtlasSprite texture = MekanismRenderer.getSprite(properties.getStillTexture());
-                        graphics.blit(x, y, 0, 16, 16, texture);
-                        MekanismRenderer.resetColor(graphics);
+                        //TODO - 26.1: fluid rendering
+                        //IClientFluidTypeExtensions properties = IClientFluidTypeExtensions.of(f);
+                        //MekanismRenderer.color(graphics, properties.getTintColor());
+                        //TextureAtlasSprite texture = MekanismRenderer.getSprite(properties.getStillTexture());
+                        //graphics.blit(x, y, 0, 16, 16, texture);
+                        //MekanismRenderer.resetColor(graphics);
                     }));
                     fluidFrequencies.mergeInt(fluidType, 1, Integer::sum);
                 }
@@ -129,31 +121,21 @@ public class GuiSeismicReader extends GuiMekanism<SeismicReaderContainer> {
         addRenderableWidget(new GuiInnerScreen(this, 77, 11, 51, 160));
         scrollBar = addRenderableWidget(new GuiScrollBar(this, 129, 25, 132, blockList::size, () -> 1));
         addRenderableWidget(new GuiArrowSelection(this, 79, 81, () -> TextComponentUtil.build(minHeight + getCurrentLayer())));
-        upButton = addRenderableWidget(new MekanismImageButton(this, 129, 11, 14,
-              MekanismUtils.getResource(ResourceType.GUI_BUTTON, "up.png"), (element, mouseX, mouseY) -> scrollBar.adjustScroll(1)));
-        downButton = addRenderableWidget(new MekanismImageButton(this, 129, 157, 14,
-              MekanismUtils.getResource(ResourceType.GUI_BUTTON, "down.png"), (element, mouseX, mouseY) -> scrollBar.adjustScroll(-1)));
-        updateEnabledButtons();
-    }
-
-    @Override
-    public void containerTick() {
-        super.containerTick();
-        updateEnabledButtons();
-    }
-
-    private void updateEnabledButtons() {
-        int currentLayer = scrollBar.getCurrentSelection();
-        upButton.active = currentLayer > 0;
-        downButton.active = currentLayer + 1 < blockList.size();
+        addRenderableWidget(new MekanismImageButton(this, 129, 11, 14,
+              MekanismUtils.getResource(ResourceType.GUI_BUTTON, "up.png"), (_, _, _) -> scrollBar.adjustScroll(1)))
+              .setCheckActive(() -> scrollBar.getCurrentSelection() > 0);
+        addRenderableWidget(new MekanismImageButton(this, 129, 157, 14,
+              MekanismUtils.getResource(ResourceType.GUI_BUTTON, "down.png"), (_, _, _) -> scrollBar.adjustScroll(-1)))
+              .setCheckActive(() -> getCurrentLayer() > 0);
     }
 
     private int getCurrentLayer() {
-        return blockList.size() - scrollBar.getCurrentSelection() - 1;
+        int currentSelection = scrollBar == null ? 0 : scrollBar.getCurrentSelection();
+        return blockList.size() - currentSelection - 1;
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         //TODO - V11: Eventually instead of just rendering the item stacks, it would be nice to be able to render the actual vertical column of blocks
         //Render the item stacks or fluids
         int currentLayer = getCurrentLayer();
@@ -169,17 +151,17 @@ public class GuiSeismicReader extends GuiMekanism<SeismicReaderContainer> {
                 if (i == 4) {
                     info.render(guiGraphics, renderX, renderY);
                 } else {
-                    PoseStack pose = guiGraphics.pose();
-                    pose.pushPose();
-                    pose.translate(renderX, renderY, 0);
+                    Matrix3x2fStack pose = guiGraphics.pose();
+                    pose.pushMatrix();
+                    pose.translate(renderX, renderY);
                     if (i < 4) {
-                        pose.translate(1.7F, 2.5F, 0);
+                        pose.translate(1.7F, 2.5F);
                     } else {
-                        pose.translate(1.5F, 0, 0);
+                        pose.translate(1.5F, 0);
                     }
-                    pose.scale(0.8F, 0.8F, 0.8F);
+                    pose.scale(0.8F, 0.8F);
                     info.render(guiGraphics, 0, 0);
-                    pose.popPose();
+                    pose.popMatrix();
                 }
             }
         }
@@ -188,19 +170,21 @@ public class GuiSeismicReader extends GuiMekanism<SeismicReaderContainer> {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double xDelta, double yDelta) {
-        return super.mouseScrolled(mouseX, mouseY, xDelta, yDelta) || scrollBar.adjustScroll(yDelta);
+        return super.mouseScrolled(mouseX, mouseY, xDelta, yDelta) || scrollBar != null && scrollBar.adjustScroll(yDelta);
     }
 
-    private record BlockInfo<TYPE>(BlockState state, TYPE type, RenderTarget<TYPE> renderTarget) {
+    private record BlockInfo<TYPE>(BlockState state, TYPE type, @Nullable RenderTarget<TYPE> renderTarget) {
 
-        public void render(GuiGraphics guiGraphics, int x, int y) {
-            renderTarget.render(guiGraphics, type, x, y);
+        public void render(GuiGraphicsExtractor guiGraphics, int x, int y) {
+            if (renderTarget != null) {
+                renderTarget.render(guiGraphics, type, x, y);
+            }
         }
     }
 
     @FunctionalInterface
     private interface RenderTarget<TYPE> {
 
-        void render(GuiGraphics guiGraphics, TYPE type, int x, int y);
+        void render(GuiGraphicsExtractor guiGraphics, TYPE type, int x, int y);
     }
 }

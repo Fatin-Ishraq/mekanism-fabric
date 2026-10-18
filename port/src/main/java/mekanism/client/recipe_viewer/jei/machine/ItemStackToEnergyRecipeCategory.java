@@ -21,11 +21,9 @@ import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.RecipeIngredientRole;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeHolder;
-import org.jetbrains.annotations.NotNull;
 
 public class ItemStackToEnergyRecipeCategory extends HolderRecipeCategory<ItemStackToEnergyRecipe> {
 
@@ -42,15 +40,15 @@ public class ItemStackToEnergyRecipeCategory extends HolderRecipeCategory<ItemSt
     }
 
     @Override
-    public void setRecipe(@NotNull IRecipeLayoutBuilder builder, RecipeHolder<ItemStackToEnergyRecipe> recipeHolder, @NotNull IFocusGroup focusGroup) {
-        initItem(builder, RecipeIngredientRole.INPUT, input, recipeHolder.value().getInput().getRepresentations())
+    public void setRecipe(IRecipeLayoutBuilder builder, RecipeHolder<ItemStackToEnergyRecipe> recipeHolder, IFocusGroup focusGroup) {
+        initItem(builder, RecipeIngredientRole.INPUT, input, recipeHolder.value().getInput().getRepresentations(getSlotDisplayContext()))
               .setSlotName(INPUT);
     }
 
     @Override
-    protected void renderElements(RecipeHolder<ItemStackToEnergyRecipe> recipeHolder, IRecipeSlotsView recipeSlotView, GuiGraphics guiGraphics, int x, int y) {
+    protected void renderElements(RecipeHolder<ItemStackToEnergyRecipe> recipeHolder, IRecipeSlotsView recipeSlotView, GuiGraphicsExtractor guiGraphics, int x, int y) {
         super.renderElements(recipeHolder, recipeSlotView, guiGraphics, x, y);
-        if (getOutputEnergy(recipeHolder, recipeSlotView) != 0L) {
+        if (getOutputEnergy(recipeHolder, recipeSlotView) > 0) {
             //Manually draw the contents of the recipe
             gauge.renderContents(guiGraphics);
         }
@@ -59,22 +57,22 @@ public class ItemStackToEnergyRecipeCategory extends HolderRecipeCategory<ItemSt
     @Override
     public void getTooltip(ITooltipBuilder tooltip, RecipeHolder<ItemStackToEnergyRecipe> recipeHolder, IRecipeSlotsView recipeSlotsView, double mouseX, double mouseY) {
         if (gauge.isMouseOver(mouseX, mouseY)) {
-            long energy = getOutputEnergy(recipeHolder, recipeSlotsView);
-            if (energy != 0L) {
+            int energy = getOutputEnergy(recipeHolder, recipeSlotsView);
+            if (energy > 0) {
                 //Manually add the tooltip showing the amounts if the mouse is over the energy gauge
                 tooltip.add(EnergyDisplay.of(energy).getTextComponent());
-                if (Minecraft.getInstance().options.advancedItemTooltips || Screen.hasShiftDown()) {
+                if (Minecraft.getInstance().options.advancedItemTooltips || Minecraft.getInstance().hasShiftDown()) {
                     tooltip.add(TextComponentUtil.build(ChatFormatting.DARK_GRAY, MekanismLang.JEI_RECIPE_ID.translate(recipeHolder.id())));
                 }
             }
         }
     }
 
-    private long getOutputEnergy(RecipeHolder<ItemStackToEnergyRecipe> recipeHolder, IRecipeSlotsView recipeSlotsView) {
+    private int getOutputEnergy(RecipeHolder<ItemStackToEnergyRecipe> recipeHolder, IRecipeSlotsView recipeSlotsView) {
         ItemStack displayedIngredient = getDisplayedStack(recipeSlotsView, INPUT, VanillaTypes.ITEM_STACK, ItemStack.EMPTY);
         if (displayedIngredient.isEmpty()) {
             //Shouldn't happen but if it does just return no energy known so nothing will really show
-            return 0L;
+            return 0;
         }
         return recipeHolder.value().getOutput(displayedIngredient);
     }

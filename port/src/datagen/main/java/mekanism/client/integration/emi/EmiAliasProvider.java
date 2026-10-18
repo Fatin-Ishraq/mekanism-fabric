@@ -23,12 +23,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import mekanism.api.SerializationConstants;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.chemical.Chemical;
 import mekanism.api.text.IHasTranslationKey;
 import mekanism.client.recipe_viewer.alias.IAliasMapping;
 import mekanism.client.recipe_viewer.alias.RVAliasHelper;
-import mekanism.client.recipe_viewer.emi.ChemicalEmiStack;
 import mekanism.common.DataGenSerializationConstants;
 import mekanism.common.Mekanism;
 import mekanism.common.lib.collection.HashList;
@@ -46,7 +44,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.material.Fluid;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
 
-@NothingNullByDefault
 public class EmiAliasProvider implements DataProvider, RVAliasHelper<EmiIngredient, EmiIngredient, EmiIngredient> {
 
     private static boolean emiSerializersInitialized;
@@ -125,7 +122,8 @@ public class EmiAliasProvider implements DataProvider, RVAliasHelper<EmiIngredie
 
     @Override
     public EmiIngredient chemicalIngredient(Holder<Chemical> chemical) {
-        return new ChemicalEmiStack(chemical, 1);
+        throw new UnsupportedOperationException("emi disabled");
+        //return new ChemicalEmiStack(chemical, 1);
     }
 
     @Override

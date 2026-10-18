@@ -1,16 +1,13 @@
 package mekanism.api.recipes.vanilla_input;
 
 import com.mojang.datafixers.util.Either;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.chemical.ChemicalStack;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Simple implementation of a recipe input of for {@link mekanism.api.recipes.RotaryRecipe}.
- *
- * @since 10.6.0
- */
-@NothingNullByDefault
+/// Simple implementation of a recipe input of for [mekanism.api.recipes.RotaryRecipe].
+///
+/// @since 10.6.0
 public record RotaryRecipeInput(Either<FluidStack, ChemicalStack> input) implements FluidChemicalRecipeInput {
 
     @Override
@@ -40,7 +37,7 @@ public record RotaryRecipeInput(Either<FluidStack, ChemicalStack> input) impleme
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (o == this) {
             return true;
         } else if (o == null || getClass() != o.getClass()) {
@@ -58,7 +55,7 @@ public record RotaryRecipeInput(Either<FluidStack, ChemicalStack> input) impleme
     public int hashCode() {
         return input.map(fluid -> {
             int hash = FluidStack.hashFluidAndComponents(fluid);
-            return 31 * hash + fluid.getAmount();
+            return 31 * hash + fluid.amount();
         }, ChemicalStack::hashCode);
     }
 }

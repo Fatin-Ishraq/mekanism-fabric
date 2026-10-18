@@ -8,18 +8,18 @@ import mekanism.common.util.WorldUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.MapColor;
-import org.jetbrains.annotations.NotNull;
 
 public class BlockPersonalChest extends BlockPersonalStorage<TileEntityPersonalChest, BlockTypeTile<TileEntityPersonalChest>> implements IStateFluidLoggable {
 
-    public BlockPersonalChest() {
-        super(MekanismBlockTypes.PERSONAL_CHEST, properties -> properties.mapColor(MapColor.COLOR_GRAY));
+    public BlockPersonalChest(BlockBehaviour.Properties properties) {
+        super(MekanismBlockTypes.PERSONAL_CHEST, defaultProperties(properties).mapColor(MapColor.COLOR_GRAY));
     }
 
     @Override
-    protected void tick(@NotNull BlockState state, @NotNull ServerLevel level, @NotNull BlockPos pos, @NotNull RandomSource random) {
+    protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
         super.tick(state, level, pos, random);
         TileEntityPersonalChest chest = WorldUtils.getTileEntity(TileEntityPersonalChest.class, level, pos);
         if (chest != null) {

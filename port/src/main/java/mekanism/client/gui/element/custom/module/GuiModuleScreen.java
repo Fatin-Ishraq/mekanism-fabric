@@ -1,6 +1,5 @@
 package mekanism.client.gui.element.custom.module;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -21,13 +20,15 @@ import mekanism.client.gui.element.scroll.GuiScrollList;
 import mekanism.client.gui.element.scroll.GuiScrollableElement;
 import mekanism.common.MekanismLang;
 import mekanism.common.content.gear.Module;
-import net.minecraft.Util;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Util;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
+import org.joml.Matrix3x2fStack;
 
 //TODO: Eventually try to add support for defining ways to render custom config types
 public class GuiModuleScreen extends GuiScrollableElement {
@@ -35,19 +36,19 @@ public class GuiModuleScreen extends GuiScrollableElement {
     private static final int ELEMENT_SPACER = 4;
 
     final Consumer<ModuleConfig<?>> saveCallback;
-    private final Supplier<ItemStack> itemSupplier;
+    private final Supplier<ItemResource> itemSupplier;
     private final ArmorPreview armorPreview;
 
     @Nullable
     private Module<?> currentModule;
-    private Map<ResourceLocation, MiniElement<?>> miniElements = new LinkedHashMap<>();
+    private Map<Identifier, MiniElement<?>> miniElements = new LinkedHashMap<>();
     private int maxElements;
 
-    public GuiModuleScreen(IGuiWrapper gui, int x, int y, Supplier<ItemStack> itemSupplier, Consumer<ModuleConfig<?>> saveCallback, ArmorPreview armorPreview) {
+    public GuiModuleScreen(IGuiWrapper gui, int x, int y, Supplier<ItemResource> itemSupplier, Consumer<ModuleConfig<?>> saveCallback, ArmorPreview armorPreview) {
         this(gui, x, y, 108, 134, itemSupplier, saveCallback, armorPreview);
     }
 
-    private GuiModuleScreen(IGuiWrapper gui, int x, int y, int width, int height, Supplier<ItemStack> itemSupplier, Consumer<ModuleConfig<?>> saveCallback, ArmorPreview armorPreview) {
+    private GuiModuleScreen(IGuiWrapper gui, int x, int y, int width, int height, Supplier<ItemResource> itemSupplier, Consumer<ModuleConfig<?>> saveCallback, ArmorPreview armorPreview) {
         super(GuiScrollList.SCROLL_LIST, gui, x, y, width, height, width - 6, 2, 4, 4, height - 4);
         this.itemSupplier = itemSupplier;
         this.saveCallback = saveCallback;
@@ -55,7 +56,7 @@ public class GuiModuleScreen extends GuiScrollableElement {
     }
 
     public void setModule(@Nullable Module<?> module) {
-        Map<ResourceLocation, MiniElement<?>> newElements = new LinkedHashMap<>();
+        Map<Identifier, MiniElement<?>> newElements = new LinkedHashMap<>();
 
         if (module != null) {
             ModuleData<?> untypedData = module.getUntypedData();
@@ -66,7 +67,7 @@ public class GuiModuleScreen extends GuiScrollableElement {
                     continue;
                 }
                 Component description = TextComponentUtil.translate(Util.makeDescriptionId("module", configItem.name()));
-                ResourceLocation name = configItem.name();
+                Identifier name = configItem.name();
                 MiniElement<?> element = switch (configItem) {
                     // Don't show the enabled option if this is enabled by default
                     case ModuleBooleanConfig config when !name.equals(ModuleConfig.ENABLED_KEY) || !untypedData.isNoDisable() ->
@@ -139,7 +140,7 @@ public class GuiModuleScreen extends GuiScrollableElement {
         return currentModule;
     }
 
-    public ItemStack getContainerStack() {
+    public ItemResource getContainerType() {
         return itemSupplier.get();
     }
 
@@ -156,53 +157,54 @@ public class GuiModuleScreen extends GuiScrollableElement {
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY, int button) {
-        super.onClick(mouseX, mouseY, button);
+    public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
+        super.onClick(event, isDoubleClick);
         //Shift the mouse y by the proper amount so that we click the correct spots
-        mouseY += getCurrentSelection();
+        double mouseY = event.y() + getCurrentSelection();
         for (MiniElement<?> element : miniElements.values()) {
-            element.click(mouseX, mouseY);
+            element.click(event.x(), mouseY);
         }
     }
 
     @Override
-    public void onRelease(double mouseX, double mouseY) {
-        super.onRelease(mouseX, mouseY);
+    public void onRelease(MouseButtonEvent event) {
+        super.onRelease(event);
         //Shift the mouse y by the proper amount so that we click the correct spots
-        mouseY += getCurrentSelection();
+        double mouseY = event.y() + getCurrentSelection();
         for (MiniElement<?> element : miniElements.values()) {
-            element.release(mouseX, mouseY);
+            element.release(event.x(), mouseY);
         }
     }
 
     @Override
-    public void onDrag(double mouseX, double mouseY, double deltaX, double deltaY) {
-        super.onDrag(mouseX, mouseY, deltaX, deltaY);
+    protected void onDrag(MouseButtonEvent event, double deltaX, double deltaY) {
+        super.onDrag(event, deltaX, deltaY);
+        double mouseX = event.x();
         //Shift the mouse y by the proper amount so that we click the correct spots
-        mouseY += getCurrentSelection();
+        double mouseY = event.y() + getCurrentSelection();
         for (MiniElement<?> element : miniElements.values()) {
             element.onDrag(mouseX, mouseY, deltaX, deltaY);
         }
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mx, int my, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mx, int my, float partialTicks) {
         super.drawBackground(guiGraphics, mx, my, partialTicks);
-        renderBackgroundTexture(guiGraphics, GuiInnerScreen.SCREEN, GuiInnerScreen.SCREEN_SIZE, GuiInnerScreen.SCREEN_SIZE);
+        guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, GuiInnerScreen.SCREEN, getButtonX(), getButtonY(), getButtonWidth(), getButtonHeight());
         drawScrollBar(guiGraphics, GuiScrollList.TEXTURE_WIDTH, GuiScrollList.TEXTURE_HEIGHT);
         //Draw contents
-        scissorScreen(guiGraphics, mx, my, (g, mouseX, mouseY, module, shift) -> getStartY(module), MiniElement::renderBackground);
+        scissorScreen(guiGraphics, mx, my, (_, module, _) -> getStartY(module), MiniElement::renderBackground);
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mx, int my) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mx, int my) {
         super.renderForeground(guiGraphics, mx, my);
-        scissorScreen(guiGraphics, mx, my, (g, mouseX, mouseY, module, shift) -> {
+        scissorScreen(guiGraphics, mx, my, (g, module, shift) -> {
             int startY = ELEMENT_SPACER + 1;
             if (module != null) {
                 if (module.getUntypedData().isExclusive(ExclusiveFlag.ANY)) {
                     if (startY + 13 > shift) {
-                        drawScaledScrollingString(g, MekanismLang.MODULE_EXCLUSIVE.translate(), 2, startY, TextAlignment.LEFT, 0x635BD4,
+                        drawScaledScrollingString(g, MekanismLang.MODULE_EXCLUSIVE.translate(), 2, startY, TextAlignment.LEFT, 0xFF635BD4,
                               getScreenWidth() - GuiScrollList.TEXTURE_WIDTH, 2, false, 0.8F);
                     }
                     startY += 13;
@@ -219,18 +221,18 @@ public class GuiModuleScreen extends GuiScrollableElement {
         }, MiniElement::renderForeground);
     }
 
-    private void scissorScreen(GuiGraphics guiGraphics, int mouseX, int mouseY, ScissorRender renderer, ScissorMiniElementRender miniElementRender) {
+    private void scissorScreen(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, ScissorRender renderer, ScissorMiniElementRender miniElementRender) {
         //Note: Scissor width at edge of monitor to make it, so we effectively only are scissoring height
-        guiGraphics.enableScissor(0, getY() + 1, guiGraphics.guiWidth(), getBottom() - 1);
-        PoseStack pose = guiGraphics.pose();
-        pose.pushPose();
+        guiGraphics.enableScissor(relativeX, relativeY + 1, guiGraphics.guiWidth() - relativeX, relativeY + height - 1);
+        Matrix3x2fStack matrix = guiGraphics.pose();
+        matrix.pushMatrix();
         int shift = getCurrentSelection();
-        pose.translate(0, -shift, 0);
+        matrix.translate(0, -shift);
         //Shift the mouse y by the proper amount
         mouseY += shift;
 
         //Draw any needed text and calculate where our elements will start rendering
-        int startY = renderer.render(guiGraphics, mouseX, mouseY, currentModule, shift);
+        int startY = renderer.render(guiGraphics, currentModule, shift);
         //Draw elements
         for (MiniElement<?> element : miniElements.values()) {
             if (startY >= shift + height) {
@@ -243,19 +245,19 @@ public class GuiModuleScreen extends GuiScrollableElement {
             startY += element.getNeededHeight() + ELEMENT_SPACER;
         }
 
-        pose.popPose();
+        matrix.popMatrix();
         guiGraphics.disableScissor();
     }
 
     @FunctionalInterface
     private interface ScissorRender {
 
-        int render(GuiGraphics guiGraphics, int mouseX, int mouseY, @Nullable IModule<?> module, int shift);
+        int render(GuiGraphicsExtractor guiGraphics, @Nullable IModule<?> module, int shift);
     }
 
     @FunctionalInterface
     private interface ScissorMiniElementRender {
 
-        void render(MiniElement<?> element, GuiGraphics guiGraphics, int mouseX, int mouseY);
+        void render(MiniElement<?> element, GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY);
     }
 }

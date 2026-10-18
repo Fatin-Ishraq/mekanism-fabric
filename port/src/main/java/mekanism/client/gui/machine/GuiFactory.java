@@ -4,6 +4,7 @@ import mekanism.api.recipes.cache.CachedRecipe.OperationTracker.RecipeError;
 import mekanism.client.gui.GuiConfigurableTile;
 import mekanism.client.gui.element.GuiDumpButton;
 import mekanism.client.gui.element.bar.GuiChemicalBar;
+import mekanism.client.gui.element.bar.GuiTankBar;
 import mekanism.client.gui.element.bar.GuiVerticalPowerBar;
 import mekanism.client.gui.element.progress.GuiProgress;
 import mekanism.client.gui.element.progress.ProgressType;
@@ -16,30 +17,46 @@ import mekanism.common.tile.factory.TileEntityFactory;
 import mekanism.common.tile.factory.TileEntityItemStackChemicalToItemStackFactory;
 import mekanism.common.tile.factory.TileEntitySawingFactory;
 import mekanism.common.tile.interfaces.IHasDumpButton;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class GuiFactory extends GuiConfigurableTile<TileEntityFactory<?>, MekanismTileContainer<TileEntityFactory<?>>> {
 
     @Nullable
     private GuiDumpButton<?> dumpButton;
 
-    public GuiFactory(MekanismTileContainer<TileEntityFactory<?>> container, Inventory inv, Component title) {
-        super(container, inv, title);
+    private static int calcHeight(MekanismTileContainer<TileEntityFactory<?>> container) {
+        TileEntityFactory<?> tile = container.getTileEntity();
+        int imageHeight = DEFAULT_IMAGE_HEIGHT;
         if (tile.hasSecondaryResourceBar()) {
             imageHeight += 11;
-            inventoryLabelY = 85;
         } else if (tile instanceof TileEntitySawingFactory) {
             imageHeight += 21;
+        }
+        return imageHeight;
+    }
+
+    private static int calcWidth(MekanismTileContainer<TileEntityFactory<?>> container) {
+        TileEntityFactory<?> tile = container.getTileEntity();
+        int imageWidth = DEFAULT_IMAGE_WIDTH;
+        if (tile.tier == FactoryTier.ULTIMATE) {
+            imageWidth += 34;
+        }
+        return imageWidth;
+    }
+
+    public GuiFactory(MekanismTileContainer<TileEntityFactory<?>> container, Inventory inv, Component title) {
+        super(container, inv, title, calcWidth(container), calcHeight(container));
+        if (tile.hasSecondaryResourceBar()) {
+            inventoryLabelY = 85;
+        } else if (tile instanceof TileEntitySawingFactory) {
             inventoryLabelY = 95;
         } else {
             inventoryLabelY = 75;
         }
         if (tile.tier == FactoryTier.ULTIMATE) {
-            imageWidth += 34;
             inventoryLabelX = 26;
         }
         titleLabelY = 4;
@@ -50,12 +67,12 @@ public class GuiFactory extends GuiConfigurableTile<TileEntityFactory<?>, Mekani
     protected void addGuiElements() {
         super.addGuiElements();
         addRenderableWidget(new GuiSortingTab(this, tile));
-        addRenderableWidget(new GuiVerticalPowerBar(this, tile.getEnergyContainer(), imageWidth - 12, 16, tile instanceof TileEntitySawingFactory ? 73 : 52))
+        addRenderableWidget(new GuiVerticalPowerBar(this, tile.energyContainer(), imageWidth - 12, 16, tile instanceof TileEntitySawingFactory ? 73 : 52))
               .warning(WarningType.NOT_ENOUGH_ENERGY, tile.getWarningCheck(RecipeError.NOT_ENOUGH_ENERGY, 0));
-        addRenderableWidget(new GuiEnergyTab(this, tile.getEnergyContainer(), tile::getLastUsage));
+        addRenderableWidget(new GuiEnergyTab(this, tile.energyContainer(), tile::getLastUsage));
         if (tile.hasSecondaryResourceBar()) {
             if (tile instanceof TileEntityItemStackChemicalToItemStackFactory factory) {
-                addRenderableWidget(new GuiChemicalBar(this, GuiChemicalBar.getProvider(factory.getChemicalTank(), tile.getChemicalTanks(null)), 7, 76,
+                addRenderableWidget(new GuiChemicalBar(this, GuiTankBar.getProvider(factory.getChemicalTank(), tile.getChemicalTanks()), 7, 76,
                       tile.tier == FactoryTier.ULTIMATE ? 172 : 138, 4, true))
                       .warning(WarningType.NO_MATCHING_RECIPE, tile.getWarningCheck(RecipeError.NOT_ENOUGH_SECONDARY_INPUT, 0));
                 dumpButton = addRenderableWidget(new GuiDumpButton<>(this, (TileEntityFactory<?> & IHasDumpButton) tile, tile.tier == FactoryTier.ULTIMATE ? 182 : 148, 76));
@@ -74,9 +91,9 @@ public class GuiFactory extends GuiConfigurableTile<TileEntityFactory<?>, Mekani
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         renderTitleText(guiGraphics);
-        renderInventoryText(guiGraphics, dumpButton == null ? getXSize() : dumpButton.getRelativeX());
+        renderInventoryText(guiGraphics, dumpButton == null ? getImageWidth() : dumpButton.getRelativeX());
         super.drawForegroundText(guiGraphics, mouseX, mouseY);
     }
 }

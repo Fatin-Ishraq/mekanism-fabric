@@ -1,120 +1,137 @@
 package mekanism.generators.common.tile;
 
-import mekanism.api.Action;
 import mekanism.api.AutomationType;
 import mekanism.api.IContentsListener;
 import mekanism.api.RelativeSide;
 import mekanism.api.SerializationConstants;
-import mekanism.common.attachments.containers.ContainerType;
+import mekanism.api.fluid.IFluidTank;
+import mekanism.api.inventory.IInventorySlot;
+import mekanism.common.component.containers.type.ContainerType;
+import mekanism.common.component.containers.type.IContainerType;
 import mekanism.common.capabilities.fluid.BasicFluidTank;
 import mekanism.common.capabilities.fluid.VariableCapacityFluidTank;
-import mekanism.common.capabilities.holder.fluid.FluidTankHelper;
-import mekanism.common.capabilities.holder.fluid.IFluidTankHolder;
-import mekanism.common.capabilities.holder.slot.IInventorySlotHolder;
-import mekanism.common.capabilities.holder.slot.InventorySlotHelper;
+import mekanism.common.capabilities.holder.container.IContainerHolder;
+import mekanism.common.capabilities.holder.container.MekContainerHelper;
 import mekanism.common.integration.computer.SpecialComputerMethodWrapper.ComputerFluidTankWrapper;
 import mekanism.common.integration.computer.SpecialComputerMethodWrapper.ComputerIInventorySlotWrapper;
 import mekanism.common.integration.computer.annotation.WrappingComputerMethod;
 import mekanism.common.inventory.slot.EnergyInventorySlot;
 import mekanism.common.tags.MekanismTags;
 import mekanism.common.util.MekanismUtils;
-import mekanism.common.util.NBTUtils;
 import mekanism.generators.common.GeneratorTags;
 import mekanism.generators.common.config.MekanismGeneratorsConfig;
 import mekanism.generators.common.registries.GeneratorsBlocks;
 import mekanism.generators.common.registries.GeneratorsFluids;
 import mekanism.generators.common.slot.FluidFuelInventorySlot;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import org.jetbrains.annotations.UnknownNullability;
 
 public class TileEntityBioGenerator extends TileEntityGenerator {
 
+    @UnknownNullability//Initialized via getInitialFluidTanks
     @WrappingComputerMethod(wrapper = ComputerFluidTankWrapper.class, methodNames = {"getBioFuel", "getBioFuelCapacity", "getBioFuelNeeded",
                                                                                      "getBioFuelFilledPercentage"}, docPlaceholder = "biofuel tank")
     public BasicFluidTank bioFuelTank;
+    @UnknownNullability//Initialized via getInitialInventory
     @WrappingComputerMethod(wrapper = ComputerIInventorySlotWrapper.class, methodNames = "getFuelItem", docPlaceholder = "fuel slot")
     FluidFuelInventorySlot fuelSlot;
+    @UnknownNullability//Initialized via getInitialInventory
     @WrappingComputerMethod(wrapper = ComputerIInventorySlotWrapper.class, methodNames = "getEnergyItem", docPlaceholder = "energy item")
     EnergyInventorySlot energySlot;
     private float lastFluidScale;
 
     public TileEntityBioGenerator(BlockPos pos, BlockState state) {
-        super(GeneratorsBlocks.BIO_GENERATOR, pos, state, MekanismGeneratorsConfig.generators.bioGeneration);
+        super(GeneratorsBlocks.BIO_GENERATOR, pos, state);
     }
 
-    @NotNull
+    private static int biofuelFromItem(ItemResource itemType) {
+        if (itemType.is(MekanismTags.Items.FUELS_BIO)) {
+            return MekanismGeneratorsConfig.generators.bioFuelPerItem.getAsInt();
+        } else if (itemType.is(MekanismTags.Items.FUELS_BLOCK_BIO)) {
+            return 9 * MekanismGeneratorsConfig.generators.bioFuelPerItem.getAsInt();
+        }
+        return 0;
+    }
+
     @Override
-    protected IFluidTankHolder getInitialFluidTanks(IContentsListener listener) {
-        FluidTankHelper builder = FluidTankHelper.forSide(facingSupplier);
-        builder.addTank(bioFuelTank = VariableCapacityFluidTank.input(MekanismGeneratorsConfig.generators.bioTankCapacity,
+    protected IContainerHolder<IFluidTank> getInitialFluidTanks(IContentsListener listener) {
+        MekContainerHelper<IFluidTank> builder = MekContainerHelper.forSide(facingSupplier);
+        builder.addContainer(bioFuelTank = VariableCapacityFluidTank.input(MekanismGeneratorsConfig.generators.bioTankCapacity,
                     fluidStack -> fluidStack.is(GeneratorTags.Fluids.BIOETHANOL), listener), RelativeSide.LEFT, RelativeSide.RIGHT,
               RelativeSide.BACK, RelativeSide.TOP, RelativeSide.BOTTOM);
         return builder.build();
     }
 
-    @NotNull
     @Override
-    protected IInventorySlotHolder getInitialInventory(IContentsListener listener) {
-        InventorySlotHelper builder = InventorySlotHelper.forSide(facingSupplier);
-        builder.addSlot(fuelSlot = FluidFuelInventorySlot.forFuel(bioFuelTank, stack -> stack.is(MekanismTags.Items.FUELS_BIO) ? 200 : stack.is(MekanismTags.Items.FUELS_BLOCK_BIO) ? 200 * 9 : 0,
-                    GeneratorsFluids.BIOETHANOL::asStack, listener, 17, 35), RelativeSide.FRONT, RelativeSide.LEFT, RelativeSide.BACK, RelativeSide.TOP,
+    protected IContainerHolder<IInventorySlot> getInitialInventory(IContentsListener listener) {
+        MekContainerHelper<IInventorySlot> builder = MekContainerHelper.forSide(facingSupplier);
+        builder.addContainer(fuelSlot = FluidFuelInventorySlot.forFuel(bioFuelTank, TileEntityBioGenerator::biofuelFromItem, GeneratorsFluids.BIOETHANOL,
+                    listener, 17, 35), RelativeSide.FRONT, RelativeSide.LEFT, RelativeSide.BACK, RelativeSide.TOP,
               RelativeSide.BOTTOM);
-        builder.addSlot(energySlot = EnergyInventorySlot.drain(getEnergyContainer(), listener, 143, 35), RelativeSide.RIGHT);
+        builder.addContainer(energySlot = EnergyInventorySlot.drain(energyContainer(), listener, 143, 35), RelativeSide.RIGHT);
         return builder.build();
     }
 
     @Override
-    protected boolean onUpdateServer() {
-        boolean sendUpdatePacket = super.onUpdateServer();
-        energySlot.drainContainer();
-        fuelSlot.fillOrBurn();
-        if (canFunction() && !bioFuelTank.isEmpty() &&
-            getEnergyContainer().insert(MekanismGeneratorsConfig.generators.bioGeneration.get(), Action.SIMULATE, AutomationType.INTERNAL) == 0L) {
-            setActive(true);
-            MekanismUtils.logMismatchedStackSize(bioFuelTank.shrinkStack(1, Action.EXECUTE), 1);
-            getEnergyContainer().insert(MekanismGeneratorsConfig.generators.bioGeneration.get(), Action.EXECUTE, AutomationType.INTERNAL);
-            float fluidScale = MekanismUtils.getScale(lastFluidScale, bioFuelTank);
-            if (MekanismUtils.scaleChanged(fluidScale, lastFluidScale)) {
-                lastFluidScale = fluidScale;
-                sendUpdatePacket = true;
+    protected boolean onUpdateServer(ServerLevel level) {
+        boolean sendUpdatePacket = super.onUpdateServer(level);
+        energySlot.drainContainerIntoSlot(null);
+        fuelSlot.fillOrBurn(null);
+        boolean isActive = false;
+        if (canFunction() && !bioFuelTank.isEmpty()) {
+            try (Transaction transaction = Transaction.openRoot()) {
+                int toGenerate = MekanismGeneratorsConfig.generators.bioGeneration.get();
+                //If we can insert all the energy we would generate, and can extract 1 mB of fuel
+                if (energyContainer().insert(toGenerate, transaction, AutomationType.INTERNAL) == toGenerate &&
+                    bioFuelTank.extract(bioFuelTank.resource(), 1, transaction, AutomationType.INTERNAL) == 1) {
+                    //Then mark the generator as active and commit the changes
+                    isActive = true;
+                    transaction.commit();
+                    float fluidScale = MekanismUtils.getScale(lastFluidScale, bioFuelTank);
+                    if (MekanismUtils.scaleChanged(fluidScale, lastFluidScale)) {
+                        lastFluidScale = fluidScale;
+                        sendUpdatePacket = true;
+                    }
+                }
             }
-        } else {
-            setActive(false);
         }
+        setActive(isActive);
         return sendUpdatePacket;
     }
 
-    @NotNull
     @Override
-    public CompoundTag getReducedUpdateTag(@NotNull HolderLookup.Provider provider) {
-        CompoundTag updateTag = super.getReducedUpdateTag(provider);
-        updateTag.put(SerializationConstants.FLUID, bioFuelTank.serializeNBT(provider));
-        return updateTag;
+    public void writeReducedUpdatedTag(ValueOutput output) {
+        super.writeReducedUpdatedTag(output);
+        //TODO - 26.1: Do we want to further trim this and similar cases by skipping adding the fluid key if the tank is empty?
+        output.putChild(SerializationConstants.FLUID, bioFuelTank);
     }
 
     @Override
-    public void handleUpdateTag(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider provider) {
-        super.handleUpdateTag(tag, provider);
-        NBTUtils.setCompoundIfPresent(tag, SerializationConstants.FLUID, nbt -> bioFuelTank.deserializeNBT(provider, nbt));
+    public void handleUpdateTag(ValueInput input) {
+        super.handleUpdateTag(input);
+        input.readChild(SerializationConstants.FLUID, bioFuelTank);
     }
 
     @Override
     public int getRedstoneLevel() {
-        return MekanismUtils.redstoneLevelFromContents(bioFuelTank.getFluidAmount(), bioFuelTank.getCapacity());
+        return ContainerType.FLUID.getRedstoneSignalFromContainer(bioFuelTank);
     }
 
     @Override
-    protected boolean makesComparatorDirty(ContainerType<?, ?, ?> type) {
+    protected boolean makesComparatorDirty(IContainerType<?, ?> type) {
         return type == ContainerType.FLUID;
     }
 
     //Methods relating to IComputerTile
     @Override
-    long getProductionRate() {
-        return getActive() ? MekanismGeneratorsConfig.generators.bioGeneration.get() : 0L;
+    int getProductionRate() {
+        return getActive() ? MekanismGeneratorsConfig.generators.bioGeneration.get() : 0;
     }
     //End methods IComputerTile
 }

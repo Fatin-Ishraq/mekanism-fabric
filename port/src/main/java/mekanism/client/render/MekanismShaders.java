@@ -1,17 +1,15 @@
 package mekanism.client.render;
 
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+//TODO - 26.1 shaders
+/*import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import java.io.IOException;
 import java.util.function.Supplier;
 import mekanism.common.Mekanism;
-import net.minecraft.client.renderer.RenderStateShard.ShaderStateShard;
-import net.minecraft.client.renderer.ShaderInstance;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import mekanism.neoshim.api.distmarker.Dist;
 import mekanism.neoshim.bus.api.SubscribeEvent;
 import mekanism.neoshim.fml.common.EventBusSubscriber;
-import mekanism.neoshim.neoforge.client.event.RegisterShadersEvent;
 
 @EventBusSubscriber(modid = Mekanism.MODID, value = Dist.CLIENT)
 public class MekanismShaders {
@@ -29,7 +27,7 @@ public class MekanismShaders {
         registerShader(event, Mekanism.rl("rendertype_sps"), DefaultVertexFormat.POSITION_TEX_COLOR, SPS);
     }
 
-    private static void registerShader(RegisterShadersEvent event, ResourceLocation shaderLocation, VertexFormat vertexFormat, ShaderTracker tracker) throws IOException {
+    private static void registerShader(RegisterShadersEvent event, Identifier shaderLocation, VertexFormat vertexFormat, ShaderTracker tracker) throws IOException {
         event.registerShader(new ShaderInstance(event.getResourceProvider(), shaderLocation, vertexFormat), tracker::setInstance);
     }
 
@@ -50,4 +48,4 @@ public class MekanismShaders {
             return instance;
         }
     }
-}
+}*/

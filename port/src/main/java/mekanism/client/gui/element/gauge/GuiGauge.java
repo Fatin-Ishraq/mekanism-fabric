@@ -9,9 +9,7 @@ import mekanism.client.gui.GuiMekanismTile;
 import mekanism.client.gui.GuiUtils.TilingDirection;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.GuiTexturedElement;
-import mekanism.client.gui.element.slot.GuiSlot;
 import mekanism.client.gui.tooltip.TooltipUtils;
-import mekanism.client.render.MekanismRenderer;
 import mekanism.common.MekanismLang;
 import mekanism.common.inventory.warning.ISupportsWarning;
 import mekanism.common.inventory.warning.WarningTracker.WarningType;
@@ -20,15 +18,15 @@ import mekanism.common.lib.transmitter.TransmissionType;
 import mekanism.common.tile.component.config.ConfigInfo;
 import mekanism.common.tile.component.config.DataType;
 import mekanism.common.tile.interfaces.ISideConfiguration;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-public abstract class GuiGauge<T> extends GuiTexturedElement implements ISupportsWarning<GuiGauge<T>> {
+public abstract class GuiGauge<T extends @Nullable Object> extends GuiTexturedElement implements ISupportsWarning<GuiGauge<T>> {
 
     private final GaugeType gaugeType;
     protected boolean dummy;
@@ -50,7 +48,7 @@ public abstract class GuiGauge<T> extends GuiTexturedElement implements ISupport
     }
 
     @Override
-    public GuiGauge<T> warning(@NotNull WarningType type, @NotNull BooleanSupplier warningSupplier) {
+    public GuiGauge<T> warning(WarningType type, BooleanSupplier warningSupplier) {
         this.warningSupplier = ISupportsWarning.compound(this.warningSupplier, gui().trackWarning(type, warningSupplier));
         return this;
     }
@@ -60,6 +58,7 @@ public abstract class GuiGauge<T> extends GuiTexturedElement implements ISupport
     @Nullable
     public abstract TextureAtlasSprite getIcon();
 
+    @Nullable
     public abstract Component getLabel();
 
     public abstract List<Component> getTooltipText();
@@ -72,46 +71,45 @@ public abstract class GuiGauge<T> extends GuiTexturedElement implements ISupport
         return gaugeType.getGaugeInfo();
     }
 
-    protected void applyRenderColor(GuiGraphics guiGraphics) {
+    protected int getRenderColor() {
+        return -1;
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
         GaugeInfo color = getGaugeColor();
-        renderExtendedTexture(guiGraphics, color.getResourceLocation(), color.getSideWidth(), color.getSideHeight());
+        guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, color.getResourceLocation(), getButtonX(), getButtonY(), getButtonWidth(), getButtonHeight());
         if (!dummy) {
             renderContents(guiGraphics);
         }
     }
 
-    public void renderContents(GuiGraphics guiGraphics) {
+    public void renderContents(GuiGraphicsExtractor guiGraphics) {
         boolean warning = warningSupplier != null && warningSupplier.getAsBoolean();
         if (warning) {
             //Draw background (we do it regardless of if we are full or not as if the thing being drawn has transparency
             // we may as well show the background)
-            guiGraphics.blit(WARNING_BACKGROUND_TEXTURE, relativeX + 1, relativeY + 1, 0, 0, width - 2, height - 2, 256, 256);
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WARNING_BACKGROUND_TEXTURE, relativeX + 1, relativeY + 1, 0, 0, width - 2, height - 2, 256, 256);
         }
         int scale = getScaledLevel();
         TextureAtlasSprite icon = getIcon();
         if (scale > 0 && icon != null) {
-            applyRenderColor(guiGraphics);
-            drawTiledSprite(guiGraphics, relativeX + 1, relativeY + 1, height - 2, width - 2, scale, icon, TilingDirection.UP_RIGHT);
-            MekanismRenderer.resetColor(guiGraphics);
+            drawTiledSprite(guiGraphics, relativeX + 1, relativeY + 1, height - 2, width - 2, scale, icon, TilingDirection.UP_RIGHT, getRenderColor());
             if (warning && (scale / (double) (height - 2)) > 0.98) {
                 //If we have a warning and the gauge is entirely filled (or almost completely filled, > 95%), draw a warning vertically next to it
                 int halfWidth = (width - 2) / 2;
                 //Note: We also start the drawing after half the width so that we are sure it will properly line up with the background
-                guiGraphics.blit(WARNING_TEXTURE, relativeX + 1 + halfWidth, relativeY + 1, halfWidth, 0, halfWidth, height - 2, 256, 256);
+                guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WARNING_TEXTURE, relativeX + 1 + halfWidth, relativeY + 1, halfWidth, 0, halfWidth, height - 2, 256, 256);
             }
         }
         //Draw the bar overlay
         drawBarOverlay(guiGraphics);
     }
 
-    public void drawBarOverlay(GuiGraphics guiGraphics) {
+    public void drawBarOverlay(GuiGraphicsExtractor guiGraphics) {
         GaugeOverlay gaugeOverlay = getGaugeOverlay();
-        guiGraphics.blit(getResource(), relativeX + 1, relativeY + 1, getWidth() - 2, getHeight() - 2, 0, 0, gaugeOverlay.getWidth(), gaugeOverlay.getHeight(), gaugeOverlay.getWidth(), gaugeOverlay.getHeight());
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, getResource(), relativeX + 1, relativeY + 1, 0, 0, getWidth() - 2, getHeight() - 2, gaugeOverlay.getWidth(), gaugeOverlay.getHeight(), gaugeOverlay.getWidth(), gaugeOverlay.getHeight());
     }
 
     @Override
@@ -144,8 +142,9 @@ public abstract class GuiGauge<T> extends GuiTexturedElement implements ISupport
             }
         } else {
             list = new ArrayList<>(getTooltipText());
-            if (getLabel() != null) {
-                list.addFirst(getLabel());
+            Component label = getLabel();
+            if (label != null) {
+                list.addFirst(label);
             }
         }
         if (!list.equals(lastInfo)) {
@@ -157,8 +156,4 @@ public abstract class GuiGauge<T> extends GuiTexturedElement implements ISupport
 
     @Nullable
     public abstract TransmissionType getTransmission();
-
-    public void setDummyType(T type) {
-        dummyType = type;
-    }
 }

@@ -5,32 +5,28 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import mekanism.common.integration.computer.FactoryRegistry;
 import mekanism.common.integration.computer.computercraft.CCCapabilityHelper;
-import mekanism.common.integration.crafttweaker.content.CrTContentUtils;
 import mekanism.common.integration.curios.CuriosIntegration;
-import mekanism.common.integration.energy.EnergyCompatUtils;
 import mekanism.common.integration.framedblocks.FramedBlocksIntegration;
 import mekanism.common.integration.gender.MekanismGenderArmor;
 import mekanism.common.integration.jsonthings.JsonThingsIntegration;
-import mekanism.common.integration.lookingat.theoneprobe.TOPProvider;
-import mekanism.common.integration.projecte.MekanismNormalizedSimpleStacks;
 import mekanism.common.recipe.bin.BinInsertRecipe;
 import mekanism.common.registries.MekanismItems;
-import net.minecraft.resources.ResourceLocation;
-import mekanism.neoshim.bus.api.EventPriority;
+import net.minecraft.resources.Identifier;
 import mekanism.neoshim.bus.api.IEventBus;
 import mekanism.neoshim.fml.InterModComms;
 import mekanism.neoshim.fml.ModList;
 import mekanism.neoshim.fml.event.lifecycle.InterModEnqueueEvent;
 import mekanism.neoshim.neoforge.capabilities.RegisterCapabilitiesEvent;
 import mekanism.neoshim.neoforge.common.NeoForge;
-import mekanism.neoshim.neoforge.data.loading.DatagenModLoader;
 
-/**
- * Hooks for Mekanism. Use to grab items or blocks out of different mods.
- *
- * @author AidanBrady
- */
+/// Hooks for Mekanism. Use to grab items or blocks out of different mods.
 public final class MekanismHooks {
+
+    //Note: These have to be static for use in CraftTweaker/Mod entrypoint annotations
+    public static final String CRAFT_TWEAKER_MOD_ID = "crafttweaker";
+    public static final String JEITWEAKER_MOD_ID = "jeitweaker";
+    public static final String PROJECTE_MOD_ID = "projecte";
+    public static final String TOP_MOD_ID = "theoneprobe";
 
     public record IntegrationInfo(String modid, boolean isLoaded) {
 
@@ -38,12 +34,12 @@ public final class MekanismHooks {
             this(modid, loadedCheck.test(modid));
         }
 
-        private void sendImc(String method, Supplier<?> toSend) {
+        public void sendImc(String method, Supplier<?> toSend) {
             InterModComms.sendTo(modid, method, toSend);
         }
 
-        public ResourceLocation rl(String path) {
-            return ResourceLocation.fromNamespaceAndPath(modid, path);
+        public Identifier rl(String path) {
+            return Identifier.fromNamespaceAndPath(modid, path);
         }
 
         public void assertLoaded() {
@@ -58,65 +54,52 @@ public final class MekanismHooks {
     public final IntegrationInfo curios;
     public final IntegrationInfo darkModeEverywhere;
     public final IntegrationInfo emi;
-    public final IntegrationInfo fluxNetworks;
     public final IntegrationInfo framedBlocks;
     public final IntegrationInfo genderMod;
-    public final IntegrationInfo grandPower;
     public final IntegrationInfo jei;
     public final IntegrationInfo jeiTweaker;
     public final IntegrationInfo jsonThings;
-    public final IntegrationInfo oc2;
     public final IntegrationInfo projecte;
     public final IntegrationInfo recipeStages;
     public final IntegrationInfo theOneProbe;
-
-    //Note: These have to be static for use in CraftTweaker annotations
-    public static final String JEITWEAKER_MOD_ID = "jeitweaker";
-    public static final String PROJECTE_MOD_ID = "projecte";
 
     public MekanismHooks() {
         ModList modList = ModList.get();
         //Note: The modlist is null when running tests
         Predicate<String> loadedCheck = modList == null ? modid -> false : modList::isLoaded;
         computerCraft = new IntegrationInfo("computercraft", loadedCheck);
-        craftTweaker = new IntegrationInfo("crafttweaker", loadedCheck);
+        craftTweaker = new IntegrationInfo(CRAFT_TWEAKER_MOD_ID, loadedCheck);
         curios = new IntegrationInfo("curios", loadedCheck);
         darkModeEverywhere = new IntegrationInfo("darkmodeeverywhere", loadedCheck);
-        fluxNetworks = new IntegrationInfo("fluxnetworks", loadedCheck);
-        grandPower = new IntegrationInfo("grandpower", loadedCheck);
         jei = new IntegrationInfo("jei", loadedCheck);
         emi = new IntegrationInfo("emi", loadedCheck);
-        jeiTweaker = new IntegrationInfo("jeitweaker", loadedCheck);
+        jeiTweaker = new IntegrationInfo(JEITWEAKER_MOD_ID, loadedCheck);
         jsonThings = new IntegrationInfo("jsonthings", loadedCheck);
-        oc2 = new IntegrationInfo("oc2", loadedCheck);
-        projecte = new IntegrationInfo("projecte", loadedCheck);
+        projecte = new IntegrationInfo(PROJECTE_MOD_ID, loadedCheck);
         recipeStages = new IntegrationInfo("recipestages", loadedCheck);
-        theOneProbe = new IntegrationInfo("theoneprobe", loadedCheck);
+        theOneProbe = new IntegrationInfo("TOP_MOD_ID", loadedCheck);
         genderMod = new IntegrationInfo("wildfire_gender", loadedCheck);
         framedBlocks = new IntegrationInfo("framedblocks", loadedCheck);
     }
 
     public void hookConstructor(final IEventBus modEventBus) {
+        //TODO: Evaluate if we want to move any of these into their own class and just have them in a constructor as another entrypoint
         if (curios.isLoaded()) {
             CuriosIntegration.addListeners(modEventBus);
-        }
-        if (craftTweaker.isLoaded() && !DatagenModLoader.isRunningDataGen()) {
-            //Register our CrT listener at lowest priority to try and ensure they get later ids than our normal registries
-            modEventBus.addListener(EventPriority.LOWEST, CrTContentUtils::registerCrTContent);
         }
         if (jsonThings.isLoaded()) {
             JsonThingsIntegration.hook(modEventBus);
         }
-        if (projecte.isLoaded()) {
-            MekanismNormalizedSimpleStacks.NSS_SERIALIZERS.register(modEventBus);
-        }
+        //TODO - 26.1: projectE
+        //if (projecte.isLoaded()) {
+        //    MekanismNormalizedSimpleStacks.NSS_SERIALIZERS.register(modEventBus);
+        //}
         if (framedBlocks.isLoaded()) {
             FramedBlocksIntegration.init(modEventBus);
         }
     }
 
     public void hookCapabilityRegistration(RegisterCapabilitiesEvent event) {
-        EnergyCompatUtils.initLoadedCache();
         if (genderMod.isLoaded()) {
             MekanismGenderArmor.HAZMAT.register(event, MekanismItems.HAZMAT_GOWN);
             MekanismGenderArmor.OPEN_FRONT.register(event, MekanismItems.JETPACK, MekanismItems.SCUBA_TANK);
@@ -145,22 +128,17 @@ public final class MekanismHooks {
             // we add this check here, so we can skip iterating the list of things we want to blacklist when it is not present
             sendDarkModeEverywhereIMC();
         }
-        if (theOneProbe.isLoaded()) {
-            theOneProbe.sendImc("getTheOneProbe", TOPProvider::new);
-        }
     }
 
     public boolean computerCompatEnabled() {
-        return computerCraft.isLoaded() || oc2.isLoaded();
+        return computerCraft.isLoaded();
     }
 
     public boolean recipeViewerCompatEnabled() {
         return emi.isLoaded() || jei.isLoaded();
     }
 
-    /**
-     * @apiNote DME only uses strings in IMC, so we can safely just include them here without worrying about classloading issues
-     */
+    /// @apiNote DME only uses strings in IMC, so we can safely just include them here without worrying about classloading issues
     private void sendDarkModeEverywhereIMC() {
         List<Supplier<String>> methodBlacklist = List.of(
               //Used for drawing fluids and chemicals in various GUIs including JEI as well as similar styled things

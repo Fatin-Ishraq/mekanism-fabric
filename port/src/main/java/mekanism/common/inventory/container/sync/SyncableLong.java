@@ -2,12 +2,11 @@ package mekanism.common.inventory.container.sync;
 
 import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
+import mekanism.api.energy.IEnergyContainer;
 import mekanism.common.network.to_client.container.property.LongPropertyData;
 import net.minecraft.core.RegistryAccess;
 
-/**
- * Version of {@link net.minecraft.world.inventory.DataSlot} for handling longs
- */
+/// Version of [net.minecraft.world.inventory.DataSlot] for handling longs
 public abstract class SyncableLong implements ISyncableData {
 
     private long lastKnownValue;
@@ -41,6 +40,10 @@ public abstract class SyncableLong implements ISyncableData {
                 longArray[idx] = value;
             }
         };
+    }
+
+    public static SyncableLong create(IEnergyContainer energyContainer) {
+        return create(energyContainer::getAmountAsLong, energy -> energyContainer.setEnergy(energy, null));
     }
 
     public static SyncableLong create(LongSupplier getter, LongConsumer setter) {

@@ -5,22 +5,20 @@ import java.util.function.BooleanSupplier;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.GuiTexturedElement;
 import mekanism.client.gui.element.bar.GuiBar.IBarInfoHandler;
-import mekanism.client.gui.element.slot.GuiSlot;
 import mekanism.client.gui.tooltip.TooltipUtils;
+import mekanism.common.Mekanism;
 import mekanism.common.inventory.warning.ISupportsWarning;
 import mekanism.common.inventory.warning.WarningTracker.WarningType;
-import mekanism.common.util.MekanismUtils;
-import mekanism.common.util.MekanismUtils.ResourceType;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
 public abstract class GuiBar<INFO extends IBarInfoHandler> extends GuiTexturedElement implements ISupportsWarning<GuiBar<INFO>> {
 
-    public static final ResourceLocation BAR = MekanismUtils.getResource(ResourceType.GUI_BAR, "base.png");
+    public static final Identifier BAR = Mekanism.rl("bar/base");
 
     private final INFO handler;
     protected final boolean horizontal;
@@ -31,14 +29,14 @@ public abstract class GuiBar<INFO extends IBarInfoHandler> extends GuiTexturedEl
     @Nullable
     private Tooltip lastTooltip;
 
-    public GuiBar(ResourceLocation resource, IGuiWrapper gui, INFO handler, int x, int y, int width, int height, boolean horizontal) {
+    public GuiBar(Identifier resource, IGuiWrapper gui, INFO handler, int x, int y, int width, int height, boolean horizontal) {
         super(resource, gui, x, y, width + 2, height + 2);
         this.handler = handler;
         this.horizontal = horizontal;
     }
 
     @Override
-    public GuiBar<INFO> warning(@NotNull WarningType type, @NotNull BooleanSupplier warningSupplier) {
+    public GuiBar<INFO> warning(WarningType type, BooleanSupplier warningSupplier) {
         this.warningSupplier = ISupportsWarning.compound(this.warningSupplier, gui().trackWarning(type, warningSupplier));
         return this;
     }
@@ -48,20 +46,20 @@ public abstract class GuiBar<INFO extends IBarInfoHandler> extends GuiTexturedEl
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         //Render the bar
-        renderExtendedTexture(guiGraphics, BAR, 2, 2);
+        guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, BAR, getButtonX(), getButtonY(), getButtonWidth(), getButtonHeight());
         boolean warning = warningSupplier != null && warningSupplier.getAsBoolean();
         if (warning) {
             //Draw background (we do it regardless of if we are full or not as if the thing being drawn has transparency
             // we may as well show the background)
-            guiGraphics.blit(WARNING_BACKGROUND_TEXTURE, relativeX + 1, relativeY + 1, 0, 0, width - 2, height - 2, 256, 256);
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WARNING_BACKGROUND_TEXTURE, relativeX + 1, relativeY + 1, 0, 0, width - 2, height - 2, 256, 256);
         }
         //Render Contents
         drawContentsChecked(guiGraphics, mouseX, mouseY, partialTicks, handler.getLevel(), warning);
     }
 
-    void drawContentsChecked(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks, double handlerLevel, boolean warning) {
+    void drawContentsChecked(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks, double handlerLevel, boolean warning) {
         //If there are any contents render them
         if (handlerLevel > 0) {
             renderBarOverlay(guiGraphics, mouseX, mouseY, partialTicks, handlerLevel);
@@ -71,16 +69,16 @@ public abstract class GuiBar<INFO extends IBarInfoHandler> extends GuiTexturedEl
                 // the one drawn to the background if the contents of things are translucent
                 if (horizontal) {
                     int halfHeight = (height - 2) / 2;
-                    guiGraphics.blit(WARNING_TEXTURE, relativeX + 1, relativeY + 1 + halfHeight, 0, halfHeight, width - 2, halfHeight, 256, 256);
+                    guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WARNING_TEXTURE, relativeX + 1, relativeY + 1 + halfHeight, 0, halfHeight, width - 2, halfHeight, 256, 256);
                 } else {//vertical
                     int halfWidth = (width - 2) / 2;
-                    guiGraphics.blit(WARNING_TEXTURE, relativeX + 1 + halfWidth, relativeY + 1, halfWidth, 0, halfWidth, height - 2, 256, 256);
+                    guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WARNING_TEXTURE, relativeX + 1 + halfWidth, relativeY + 1, halfWidth, 0, halfWidth, height - 2, 256, 256);
                 }
             }
         }
     }
 
-    protected abstract void renderBarOverlay(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks, double handlerLevel);
+    protected abstract void renderBarOverlay(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks, double handlerLevel);
 
     @Override
     public void updateTooltip(int mouseX, int mouseY) {

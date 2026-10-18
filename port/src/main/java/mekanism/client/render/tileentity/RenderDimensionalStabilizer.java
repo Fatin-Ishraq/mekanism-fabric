@@ -1,55 +1,45 @@
 package mekanism.client.render.tileentity;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.client.render.MekanismRenderer;
-import mekanism.client.render.MekanismRenderer.LazyModel;
-import mekanism.client.render.MekanismRenderer.Model3D;
+import mekanism.client.render.RenderResizableCuboid;
 import mekanism.client.render.RenderResizableCuboid.FaceDisplay;
+import mekanism.client.render.RenderResizableCuboid.SideRender;
+import mekanism.client.render.tileentity.RenderDimensionalStabilizer.StabilizerRenderState;
 import mekanism.common.base.ProfilerConstants;
 import mekanism.common.tile.machine.TileEntityDimensionalStabilizer;
-import mekanism.common.util.EnumUtils;
-import net.minecraft.client.Camera;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.Sheets;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
+import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
-import net.minecraft.util.profiling.ProfilerFiller;
+import net.minecraft.util.ARGB;
+import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
-public class RenderDimensionalStabilizer extends MekanismTileEntityRenderer<TileEntityDimensionalStabilizer> {
-
-    private static final MekanismRenderer.LazyModel model = new LazyModel(() -> new Model3D()
-          .setTexture(MekanismRenderer.whiteIcon)
-          .bounds(0, 1)
-          //Don't bother rendering the top or the bottom as it is always at world bounds
-          .setSideRender(direction -> direction.getAxis().isHorizontal())
-    );
-    private static final int[] colors = new int[EnumUtils.DIRECTIONS.length];
-
-    static {
-        //Note: We skip up and down as we never render them so no need to set the color
-        colors[Direction.SOUTH.ordinal()] = colors[Direction.NORTH.ordinal()] = MekanismRenderer.getColorARGB(0xFFFFFF, 0.82F);
-        colors[Direction.EAST.ordinal()] = colors[Direction.WEST.ordinal()] = MekanismRenderer.getColorARGB(0xFFFFFF, 0.78F);
-        //TODO: At some point experiment with different colors to try and improve rendering of it when in a checkerboard pattern
-        // so that it is clearer which ones are rendering and which are not, or maybe evaluate actually having the top and bottom render
-    }
+public class RenderDimensionalStabilizer extends MekanismTileEntityRenderer<TileEntityDimensionalStabilizer, StabilizerRenderState> {
+    
+    //TODO: At some point experiment with different colors to try and improve rendering of it when in a checkerboard pattern
+    // so that it is clearer which ones are rendering and which are not, or maybe evaluate actually having the top and bottom render
+    private static final int NORTH_SOUTH_COLOR = ARGB.white(0.82F);
+    private static final int EAST_WEST_COLOR = ARGB.white(0.78F);
 
     public static void resetCachedVisuals() {
-        model.reset();
     }
 
     public RenderDimensionalStabilizer(BlockEntityRendererProvider.Context context) {
@@ -57,8 +47,14 @@ public class RenderDimensionalStabilizer extends MekanismTileEntityRenderer<Tile
     }
 
     @Override
-    protected void render(TileEntityDimensionalStabilizer stabilizer, float partialTick, PoseStack matrix, MultiBufferSource renderer, int light, int overlayLight,
-          ProfilerFiller profiler) {
+    public StabilizerRenderState createRenderState() {
+        return new StabilizerRenderState();
+    }
+
+    @Override
+    public void extractRenderState(TileEntityDimensionalStabilizer stabilizer, StabilizerRenderState state, float partialTick, Vec3 cameraPosition,
+          ModelFeatureRenderer.@Nullable CrumblingOverlay breakProgress) {
+        super.extractRenderState(stabilizer, state, partialTick, cameraPosition, breakProgress);
         //Calculate the different sides that should be rendered, as a 3D array. The last parameter is of length 5 to support the four cardinal directions
         // PLUS a marker for if the chunk is loaded and should be rendered at all. As if a chunk is surrounded on all sides by other chunks, then none of
         // its sides will actually need to be drawn, but it still should be able to combine with neighboring pieces
@@ -89,24 +85,23 @@ public class RenderDimensionalStabilizer extends MekanismTileEntityRenderer<Tile
             }
         }
         Level level = stabilizer.getLevel();
-        int minY = level.getMinBuildHeight();
-        int height = level.getMaxBuildHeight() - minY;
-        BlockPos pos = stabilizer.getBlockPos();
-        int chunkX = SectionPos.blockToSectionCoord(pos.getX());
-        int chunkZ = SectionPos.blockToSectionCoord(pos.getZ());
-        Model3D model = RenderDimensionalStabilizer.model.get();
-        VertexConsumer buffer = renderer.getBuffer(Sheets.translucentCullBlockSheet());
-        Camera camera = getCamera();
-        for (RenderPiece piece : calculateRenderPieces(allRenderSides)) {
-            //Set the visibility of the sides that are going to render for this piece
-            model.setSideRender(Direction.NORTH, piece.renderNorth)
-                  .setSideRender(Direction.EAST, piece.renderEast)
-                  .setSideRender(Direction.SOUTH, piece.renderSouth)
-                  .setSideRender(Direction.WEST, piece.renderWest);
+        int minY = level.getMinY();
+        state.minY = minY;
+        state.height = level.getMaxY() - minY + 1;
+        BlockPos pos = state.blockPos;
+        state.chunkX = SectionPos.blockToSectionCoord(pos.getX());
+        state.chunkZ = SectionPos.blockToSectionCoord(pos.getZ());
+        state.renderPieces = calculateRenderPieces(allRenderSides);
+    }
+
+    @Override
+    public void submit(StabilizerRenderState state, PoseStack poseStack, SubmitNodeCollector nodeCollector, CameraRenderState camera) {
+        BlockPos pos = state.blockPos;
+        for (RenderPiece piece : state.renderPieces) {
             int xChunkOffset = piece.x - TileEntityDimensionalStabilizer.MAX_LOAD_RADIUS;
             int zChunkOffset = piece.z - TileEntityDimensionalStabilizer.MAX_LOAD_RADIUS;
-            ChunkPos startChunk = new ChunkPos(chunkX + xChunkOffset, chunkZ + zChunkOffset);
-            ChunkPos endChunk = new ChunkPos(startChunk.x + piece.xLength - 1, startChunk.z + piece.zLength - 1);
+            ChunkPos startChunk = new ChunkPos(state.chunkX + xChunkOffset, state.chunkZ + zChunkOffset);
+            ChunkPos endChunk = new ChunkPos(startChunk.x() + piece.xLength - 1, startChunk.z() + piece.zLength - 1);
             //Adjust translation and scale ever so slightly so that no z-fighting happens at the edges if there are blocks there
             double xShift = 0.01, zShift = 0.01;
             float xScaleShift = 0.02F, zScaleShift = 0.02F;
@@ -129,15 +124,16 @@ public class RenderDimensionalStabilizer extends MekanismTileEntityRenderer<Tile
                 zShift = -0.01;
                 zScaleShift = 0;
             }
-            matrix.pushPose();
-            matrix.translate(startChunk.getMinBlockX() - pos.getX() + xShift, minY - pos.getY(), startChunk.getMinBlockZ() - pos.getZ() + zShift);
-            matrix.scale(16 * piece.xLength - xScaleShift, height, 16 * piece.zLength - zScaleShift);
             //If we are inside the visualization we don't have to render the "front" face, otherwise we need to render both given how the visualization works
             // we want to be able to see all faces easily
-            FaceDisplay faceDisplay = isInsideBounds(startChunk.getMinBlockX(), Double.NEGATIVE_INFINITY, startChunk.getMinBlockZ(),
+            FaceDisplay faceDisplay = RenderResizableCuboid.isInsideBounds(camera.pos, startChunk.getMinBlockX(), Double.NEGATIVE_INFINITY, startChunk.getMinBlockZ(),
                   endChunk.getMaxBlockX() + 1, Double.POSITIVE_INFINITY, endChunk.getMaxBlockZ() + 1) ? FaceDisplay.BACK : FaceDisplay.BOTH;
-            MekanismRenderer.renderObject(model, matrix, buffer, colors, LightTexture.FULL_BRIGHT, overlayLight, faceDisplay, camera);
-            matrix.popPose();
+            poseStack.pushPose();
+            poseStack.translate(startChunk.getMinBlockX() - pos.getX() + xShift, state.minY - pos.getY(), startChunk.getMinBlockZ() - pos.getZ() + zShift);
+            poseStack.scale(16 * piece.xLength - xScaleShift, state.height, 16 * piece.zLength - zScaleShift);
+
+            RenderResizableCuboid.renderCube(piece.sidesToRender(), 0, 0, 0, 1, 1, 1, poseStack, Sheets.translucentBlockSheet(), nodeCollector, LightCoordsUtil.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, faceDisplay, camera.pos, null, EAST_WEST_COLOR, EAST_WEST_COLOR, 0, 0, NORTH_SOUTH_COLOR, NORTH_SOUTH_COLOR, MekanismRenderer.WHITE_ICON_GETTER);
+            poseStack.popPose();
         }
     }
 
@@ -147,7 +143,7 @@ public class RenderDimensionalStabilizer extends MekanismTileEntityRenderer<Tile
     }
 
     @Override
-    public boolean shouldRenderOffScreen(TileEntityDimensionalStabilizer tile) {
+    public boolean shouldRenderOffScreen() {
         return true;
     }
 
@@ -172,24 +168,22 @@ public class RenderDimensionalStabilizer extends MekanismTileEntityRenderer<Tile
             );
             return new AABB(
                   minChunk.getMinBlockX(),
-                  level.getMinBuildHeight(),
+                  level.getMinY(),
                   minChunk.getMinBlockZ(),
                   maxChunk.getMaxBlockX() + 1,
-                  level.getMaxBuildHeight(),
+                  level.getMaxY() + 1,
                   maxChunk.getMaxBlockZ() + 1
             );
         }
         return super.getRenderBoundingBox(tile);
     }
 
-    /**
-     * Combines the sides that should be rendered for each chunk's position into a list of pieces that should be rendered. This allows for doing less draw calls and
-     * overall better performance.
-     *
-     * @param allRenderSides 3D array of ROW, COLUMN, RENDER
-     *
-     * @return List of render pieces.
-     */
+    /// Combines the sides that should be rendered for each chunk's position into a list of pieces that should be rendered. This allows for doing less draw calls and
+    /// overall better performance.
+    ///
+    /// @param allRenderSides 3D array of ROW, COLUMN, RENDER
+    ///
+    /// @return List of render pieces.
     private List<RenderPiece> calculateRenderPieces(boolean[][][] allRenderSides) {
         //Keep track of the minimal amount of data that is needed to match in order to merge two column pieces across rows
         record MinimalColumnPieceData(int z, int zLength, boolean renderNorth, boolean renderSouth) {
@@ -261,6 +255,20 @@ public class RenderDimensionalStabilizer extends MekanismTileEntityRenderer<Tile
         return pieces;
     }
 
-    private record RenderPiece(int x, int xLength, int z, int zLength, boolean renderNorth, boolean renderSouth, boolean renderEast, boolean renderWest) {
+    public record RenderPiece(int x, int xLength, int z, int zLength, boolean renderNorth, boolean renderSouth, boolean renderEast, boolean renderWest) {
+
+        @SideRender.SideRenderFlags
+        public byte sidesToRender() {
+            return RenderResizableCuboid.SideRender.from(false, false, renderNorth, renderSouth, renderWest, renderEast);
+        }
+    }
+    
+    public static class StabilizerRenderState extends BlockEntityRenderState {
+
+        public List<RenderPiece> renderPieces = Collections.emptyList();
+        public int chunkX;
+        public int chunkZ;
+        public int minY;
+        public int height;
     }
 }

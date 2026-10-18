@@ -11,21 +11,20 @@ import mekanism.common.content.entangloporter.InventoryFrequency;
 import mekanism.common.inventory.container.tile.MekanismTileContainer;
 import mekanism.common.inventory.warning.IWarningTracker;
 import mekanism.common.lib.frequency.FrequencyType;
+import mekanism.common.lib.frequency.FrequencyTypes;
 import mekanism.common.tile.TileEntityQuantumEntangloporter;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.UnitDisplayUtils.TemperatureUnit;
 import mekanism.common.util.text.EnergyDisplay;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
 
 public class GuiQuantumEntangloporter extends GuiConfigurableTile<TileEntityQuantumEntangloporter, MekanismTileContainer<TileEntityQuantumEntangloporter>>
       implements ITileGuiFrequencySelector<InventoryFrequency, TileEntityQuantumEntangloporter> {
 
     public GuiQuantumEntangloporter(MekanismTileContainer<TileEntityQuantumEntangloporter> container, Inventory inv, Component title) {
-        super(container, inv, title);
-        imageHeight += 74;
+        super(container, inv, title, DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT + 74);
         titleLabelY = 4;
         inventoryLabelY = imageHeight - 93;
         dynamicSlots = true;
@@ -49,7 +48,7 @@ public class GuiQuantumEntangloporter extends GuiConfigurableTile<TileEntityQuan
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         renderTitleText(guiGraphics);
         renderInventoryText(guiGraphics);
         super.drawForegroundText(guiGraphics, mouseX, mouseY);
@@ -57,7 +56,7 @@ public class GuiQuantumEntangloporter extends GuiConfigurableTile<TileEntityQuan
 
     @Override
     public FrequencyType<InventoryFrequency> getFrequencyType() {
-        return FrequencyType.INVENTORY;
+        return FrequencyTypes.INVENTORY;
     }
 
     @Override

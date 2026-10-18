@@ -1,20 +1,20 @@
 package mekanism.common.content.gear.mekatool;
 
-import java.util.function.Predicate;
-import mekanism.api.Action;
-import mekanism.api.AutomationType;
-import mekanism.api.annotations.ParametersAreNotNullByDefault;
-import mekanism.api.energy.IEnergyContainer;
 import mekanism.api.gear.ICustomModule;
 import mekanism.api.gear.IModule;
 import mekanism.api.gear.IModuleContainer;
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.item.gear.ItemMekaTool;
+import mekanism.common.registries.MekanismItems;
 import mekanism.common.registries.MekanismModules;
+import mekanism.common.util.ItemAccessUtils;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.core.dispenser.BlockSource;
+import net.minecraft.core.dispenser.ShearsDispenseItemBehavior;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -22,6 +22,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
@@ -33,24 +34,24 @@ import mekanism.neoshim.neoforge.common.CommonHooks;
 import mekanism.neoshim.neoforge.common.IShearable;
 import mekanism.neoshim.neoforge.common.ItemAbilities;
 import mekanism.neoshim.neoforge.common.ItemAbility;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-//TODO - 1.21: Look at ShearsItem#createToolProperties and see if we need to or can somehow apply those overrides?
+//TODO - 26.1: Look at ShearsItem#createToolProperties and see if we need to or can somehow apply those overrides?
 // Also double check the stuff we override as it looks like some of it might have changed in vanilla
-@ParametersAreNotNullByDefault
 public class ModuleShearingUnit implements ICustomModule<ModuleShearingUnit> {
 
-    private static final Predicate<Entity> SHEARABLE = entity -> !entity.isSpectator() && entity instanceof IShearable;
-
     @Override
-    public boolean canPerformAction(IModule<ModuleShearingUnit> module, IModuleContainer container, ItemStack stack, ItemAbility action) {
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter> boolean canPerformAction(IModule<ModuleShearingUnit> module, IModuleContainer container, ITEM instance,
+          ItemAbility action) {
         if (action == ItemAbilities.SHEARS_DISARM) {
-            if (stack.getItem() instanceof ItemMekaTool) {
+            if (instance.is(MekanismItems.MEKA_TOOL)) {
                 //Only require energy if we are installed on a Meka-Tool and can thus calculate the energy required to break the block "safely"
                 // Note: We assume hardness is zero like the default is for tripwires as we don't have the target block in our current context
-                long cost = ItemMekaTool.getDestroyEnergy(container, 0, container.hasEnabled(MekanismModules.SILK_TOUCH_UNIT));
-                return module.hasEnoughEnergy(stack, cost);
+                int cost = ItemMekaTool.getDestroyEnergy(container, 0, container.hasEnabled(MekanismModules.SILK_TOUCH_UNIT));
+                return module.hasEnoughEnergy(ItemAccessUtils.sideEffectFreeAccess(instance), cost);
             }
             //Note: If for some reason we are installed on something that is not the Meka-Tool don't stop the action from being enabled
             // as it may not actually require energy
@@ -58,89 +59,97 @@ public class ModuleShearingUnit implements ICustomModule<ModuleShearingUnit> {
         } else if (action == ItemAbilities.SHEARS_DIG) {
             //Note: If for some reason we are installed on something that is not the Meka-Tool don't stop the action from being enabled
             // as it may not actually require energy
-            return !(stack.getItem() instanceof ItemMekaTool) || ItemMekaTool.hasEnergyForDigAction(container, module.getEnergyContainer(stack));
+            return !instance.is(MekanismItems.MEKA_TOOL) || ItemMekaTool.hasEnergyForDigAction(container, module.getEnergyHandler(ItemAccessUtils.sideEffectFreeAccess(instance), true));
         } else if (action == ItemAbilities.SHEARS_TRIM) {
-            return module.hasEnoughEnergy(stack, MekanismConfig.gear.mekaToolEnergyUsageShearTrim);
+            return module.hasEnoughEnergy(ItemAccessUtils.sideEffectFreeAccess(instance), MekanismConfig.gear.mekaToolEnergyUsageShearTrim);
         }
         return ItemAbilities.DEFAULT_SHEARS_ACTIONS.contains(action);
     }
 
-    @NotNull
     @Override
-    public InteractionResult onInteract(IModule<ModuleShearingUnit> module, Player player, LivingEntity entity, InteractionHand hand, IModuleContainer moduleContainer, ItemStack stack) {
-        if (entity instanceof IShearable) {
-            long cost = MekanismConfig.gear.mekaToolEnergyUsageShearEntity.get();
-            IEnergyContainer energyContainer = module.getEnergyContainer(stack);
-            if (cost == 0L || energyContainer != null && energyContainer.getEnergy() >= cost &&
-                              shearEntity(energyContainer, entity, player, stack, entity.level(), entity.blockPosition())) {
-                return InteractionResult.SUCCESS;
+    public InteractionResult onInteract(IModule<ModuleShearingUnit> module, Player player, LivingEntity entity, InteractionHand hand, ItemAccess itemAccess,
+          TransactionContext transaction) {
+        if (entity instanceof IShearable shearable) {
+            try (Transaction subTransaction = Transaction.open(transaction)) {
+                Level level = entity.level();
+                int cost = MekanismConfig.gear.mekaToolEnergyUsageShearEntity.get();
+                if (module.useAllEnergy(player, itemAccess, cost, subTransaction) && shearEntity(shearable, player, ItemAccessUtils.asStack(itemAccess), level, entity.blockPosition())) {
+                    //Fire the game event on both sides
+                    entity.gameEvent(GameEvent.SHEAR, player);
+                    if (!level.isClientSide()) {
+                        subTransaction.commit();
+                    }
+                    return InteractionResult.SUCCESS.heldItemTransformedTo(ItemAccessUtils.asStack(itemAccess));
+                }
             }
         }
         return InteractionResult.PASS;
     }
 
-    @NotNull
     @Override
-    public InteractionResult onItemUse(IModule<ModuleShearingUnit> module, UseOnContext context) {
-        long cost = MekanismConfig.gear.mekaToolEnergyUsageShearTrim.get();
+    public InteractionResult onItemUse(IModule<ModuleShearingUnit> module, UseOnContext context, TransactionContext transaction) {
+        int cost = MekanismConfig.gear.mekaToolEnergyUsageShearTrim.get();
         ItemStack stack = context.getItemInHand();
-        IEnergyContainer energyContainer = module.getEnergyContainer(stack);
-        if (cost == 0L || energyContainer != null && energyContainer.getEnergy() >= cost) {
-            //Copy of ShearsItem#useOn
-            Level level = context.getLevel();
-            BlockPos blockpos = context.getClickedPos();
-            BlockState state = level.getBlockState(blockpos);
-            BlockState trimmedState = state.getToolModifiedState(context, ItemAbilities.SHEARS_TRIM, false);
-            if (trimmedState != null) {
-                if (context.getPlayer() instanceof ServerPlayer player) {
-                    CriteriaTriggers.ITEM_USED_ON_BLOCK.trigger(player, blockpos, stack);
+        Player player = context.getPlayer();
+        try (Transaction subTransaction = Transaction.open(transaction)) {
+            if (module.useAllEnergy(player, ItemAccess.forStack(stack), cost, subTransaction)) {
+                //Copy of ShearsItem#useOn
+                Level level = context.getLevel();
+                BlockPos blockpos = context.getClickedPos();
+                BlockState state = level.getBlockState(blockpos);
+                BlockState trimmedState = state.getToolModifiedState(context, ItemAbilities.SHEARS_TRIM, false);
+                if (trimmedState != null) {
+                    if (player instanceof ServerPlayer serverPlayer) {
+                        CriteriaTriggers.ITEM_USED_ON_BLOCK.trigger(serverPlayer, blockpos, stack);
+                    }
+                    level.setBlockAndUpdate(blockpos, trimmedState);
+                    level.gameEvent(GameEvent.BLOCK_CHANGE, blockpos, GameEvent.Context.of(player, trimmedState));
+                    if (!level.isClientSide()) {
+                        subTransaction.commit();
+                    }
+                    return InteractionResult.SUCCESS.heldItemTransformedTo(stack);
                 }
-                level.setBlockAndUpdate(blockpos, trimmedState);
-                level.gameEvent(GameEvent.BLOCK_CHANGE, blockpos, GameEvent.Context.of(context.getPlayer(), trimmedState));
-                if (cost > 0) {
-                    energyContainer.extract(cost, Action.EXECUTE, AutomationType.MANUAL);
-                }
-                return InteractionResult.sidedSuccess(level.isClientSide);
             }
         }
         return InteractionResult.PASS;
     }
 
-    @NotNull
     @Override
-    public ModuleDispenseResult onDispense(IModule<ModuleShearingUnit> module, IModuleContainer moduleContainer, ItemStack stack, BlockSource source) {
+    public ModuleDispenseResult onDispense(IModule<ModuleShearingUnit> module, ItemAccess itemAccess, BlockSource source, TransactionContext transaction) {
         ServerLevel world = source.level();
         Direction facing = source.state().getValue(DispenserBlock.FACING);
         BlockPos pos = source.pos().relative(facing);
-        if (CommonHooks.tryDispenseShearsHarvestBlock(source, stack, world, pos) || tryShearLivingEntity(module.getEnergyContainer(stack), world, pos, stack)) {
+        ItemStack accessAsStack = ItemAccessUtils.asStack(itemAccess);
+        if (CommonHooks.tryDispenseShearsHarvestBlock(source, accessAsStack, world, pos) || ShearsDispenseItemBehavior.tryShearBeehive(world, accessAsStack, pos)) {
+            //Handle shearing via tool modified state or on a beehive as tool modified state doesn't get it
             return ModuleDispenseResult.HANDLED;
+        }
+        //Modified copy of ShearsDispenseItemBehavior#tryShearEntity to handle energy usage when shearing
+        try (Transaction subTransaction = Transaction.open(transaction)) {
+            //If we are able to use the energy we need to (or there is no cost) then try to see if any of the entities can be sheared
+            boolean usedEnergy = module.useAllEnergy(null, itemAccess, MekanismConfig.gear.mekaToolEnergyUsageShearEntity.get(), subTransaction);
+            for (Entity entity : world.getEntities(null, new AABB(pos))) {
+                if (entity.shearOffAllLeashConnections(null)) {
+                    //Note: We don't commit energy usage here (or even check for it), as shearing leashes is normally handled by
+                    // the entity and the SHEARS_HARVEST item ability. We just need to implement it here for dispenser usage
+                    return ModuleDispenseResult.HANDLED;
+                } else if (usedEnergy && entity instanceof IShearable target && shearEntity(target, null, accessAsStack, world, pos)) {
+                    if (!world.isClientSide()) {
+                        subTransaction.commit();
+                    }
+                    entity.gameEvent(GameEvent.SHEAR, entity);
+                    return ModuleDispenseResult.HANDLED;
+                }
+            }
         }
         return ModuleDispenseResult.FAIL_PREVENT_DROP;
     }
 
-    //Modified copy of ShearsDispenseItemBehavior#tryShearLivingEntity to work with IForgeShearable
-    private boolean tryShearLivingEntity(@Nullable IEnergyContainer energyContainer, ServerLevel world, BlockPos pos, ItemStack stack) {
-        long cost = MekanismConfig.gear.mekaToolEnergyUsageShearEntity.get();
-        if (cost == 0L || energyContainer != null && energyContainer.getEnergy() >= MekanismConfig.gear.mekaToolEnergyUsageShearEntity.get()) {
-            for (LivingEntity entity : world.getEntitiesOfClass(LivingEntity.class, new AABB(pos), SHEARABLE)) {
-                if (shearEntity(energyContainer, entity, null, stack, world, pos)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private boolean shearEntity(@Nullable IEnergyContainer energyContainer, LivingEntity entity, @Nullable Player player, ItemStack stack, Level world, BlockPos pos) {
-        IShearable target = (IShearable) entity;
+    private boolean shearEntity(IShearable target, @Nullable Player player, ItemStack stack, Level world, BlockPos pos) {
         if (target.isShearable(player, stack, world, pos)) {
-            if (!world.isClientSide) {
-                for (ItemStack drop : target.onSheared(player, stack, world, pos)) {
-                    target.spawnShearedDrop(world, pos, drop);
-                }
-                entity.gameEvent(GameEvent.SHEAR, player);
-                if (energyContainer != null) {
-                    energyContainer.extract(MekanismConfig.gear.mekaToolEnergyUsageShearEntity.get(), Action.EXECUTE, AutomationType.MANUAL);
+            if (!world.isClientSide() && world instanceof ServerLevel level) {
+                for (ItemStack drop : target.onSheared(player, stack, level, pos)) {
+                    target.spawnShearedDrop(level, pos, drop);
                 }
             }
             return true;

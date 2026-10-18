@@ -9,9 +9,10 @@ import java.util.function.Supplier;
 import mekanism.common.Mekanism;
 import mekanism.common.lib.Color;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.FastColor;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
+import net.minecraft.util.CommonColors;
+import org.jspecify.annotations.Nullable;
 
 public class ColorAtlas {
 
@@ -26,7 +27,7 @@ public class ColorAtlas {
 
     public ColorRegistryObject register() {
         //Default to white as the fallback
-        return register(0xFFFFFFFF);
+        return register(CommonColors.WHITE);
     }
 
     public ColorRegistryObject register(int defaultARGB) {
@@ -35,8 +36,8 @@ public class ColorAtlas {
         return obj;
     }
 
-    public void parse(ResourceLocation rl) {
-        List<Color> parsed = load(rl, colors.size());
+    public void parse(Identifier rl) {
+        List<@Nullable Color> parsed = load(rl, colors.size());
         if (parsed.size() < colors.size()) {
             Mekanism.logger.error("Failed to parse '{}' color atlas.", name);
             return;
@@ -46,8 +47,8 @@ public class ColorAtlas {
         }
     }
 
-    public static List<Color> load(ResourceLocation rl, int count) {
-        List<Color> ret = new ArrayList<>();
+    public static List<@Nullable Color> load(Identifier rl, int count) {
+        List<@Nullable Color> ret = new ArrayList<>();
         try {
             loadColorAtlas(rl, count, ret);
         } catch (Exception e) {
@@ -56,12 +57,12 @@ public class ColorAtlas {
         return ret;
     }
 
-    private static void loadColorAtlas(ResourceLocation rl, int count, List<Color> ret) throws IOException {
+    private static void loadColorAtlas(Identifier rl, int count, List<@Nullable Color> ret) throws IOException {
         try (InputStream input = Minecraft.getInstance().getResourceManager().open(rl);
              NativeImage image = NativeImage.read(input)) {
             for (int i = 0; i < count; i++) {
-                int argb = Color.argbToFromABGR(image.getPixelRGBA(i % ATLAS_SIZE, i / ATLAS_SIZE));
-                if (FastColor.ARGB32.alpha(argb) == 0) {
+                int argb = image.getPixel(i % ATLAS_SIZE, i / ATLAS_SIZE);
+                if (ARGB.alpha(argb) == 0) {
                     //Don't allow fully transparent colors, fallback to default color.
                     // Mark as null for now so that it can default to the proper color
                     ret.add(null);

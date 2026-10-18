@@ -6,7 +6,10 @@
 		"2": "mekanism:block/models/ports_led",
 		"particle": "mekanismgenerators:block/model/advanced_solar_generator"
 	},
-	"render_type": "minecraft:cutout",
+	"__comment": "this exists because the model is at Y-1 to fit inside vanilla size restrictions",
+	"transform": {
+		"translation": [0, 1, 0]
+	},
 	"elements": [
 		{
 			"name": "pole",
@@ -182,10 +185,7 @@
 			"faces": {
 				"north": {"uv": [8, 8, 16, 16], "texture": "#2", "cullface": "north"}
 			},
-			"neoforge_data": {
-				"block_light": 15,
-				"sky_light": 15
-			}
+      "light_emission": 15
 		},
 		{
 			"name": "port_down",
@@ -202,10 +202,7 @@
 			"faces": {
 				"down": {"uv": [8, 8, 16, 16], "texture": "#2", "cullface": "down"}
 			},
-			"neoforge_data": {
-				"block_light": 15,
-				"sky_light": 15
-			}
+      "light_emission": 15
 		},
 		{
 			"name": "solar_panel_east",

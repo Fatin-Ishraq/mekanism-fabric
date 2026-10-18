@@ -1,39 +1,30 @@
 package mekanism.additions.client.model;
 
-import java.util.List;
-import mekanism.additions.common.entity.baby.EntityBabyEnderman;
-import net.minecraft.client.model.EndermanModel;
+import java.util.Set;
+import mekanism.additions.common.MekanismAdditions;
+import net.minecraft.client.model.BabyModelTransform;
+import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.model.geom.ModelPart;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.client.model.monster.enderman.EndermanModel;
+import net.minecraft.client.renderer.entity.state.EndermanRenderState;
 
-public class ModelBabyEnderman extends EndermanModel<EntityBabyEnderman> {
+public class ModelBabyEnderman extends EndermanModel<EndermanRenderState> {
+
+    public static final ModelLayerLocation BABY_ENDERMAN_LAYER = new ModelLayerLocation(MekanismAdditions.rl("baby_enderman"), "main");
+    public static final BabyModelTransform BABY_MODEL_TRANSFORM = new BabyModelTransform(false, 18.5F, 2.0F, 2.0F, 2.0F, 24.0F, Set.of("head"));
 
     public ModelBabyEnderman(ModelPart part) {
         super(part);
     }
 
-    @NotNull
     @Override
-    protected Iterable<ModelPart> headParts() {
-        //Make the "hat" (the jaw) be part of the head for scaling purposes
-        return List.of(this.head, this.hat);
-    }
-
-    @NotNull
-    @Override
-    protected Iterable<ModelPart> bodyParts() {
-        return List.of(this.body, this.rightArm, this.leftArm, this.rightLeg, this.leftLeg);
-    }
-
-    @Override
-    public void setupAnim(@NotNull EntityBabyEnderman enderman, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        super.setupAnim(enderman, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
-        //Shift the head and the "hat" (jaw) be in the proper place for baby endermen
-        head.y += 5.0F;
-        hat.y += 5.0F;
-        if (creepy) {
+    public void setupAnim(EndermanRenderState state) {
+        super.setupAnim(state);
+        if (state.isCreepy) {
             //Shift the head when angry to only the third the distance it goes up when it is an adult
-            head.y += 1.67F;
+            float amt = 5.0F / 3;
+            this.head.y -= amt;
+            this.hat.y += amt;
         }
     }
 }

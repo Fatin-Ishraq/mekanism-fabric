@@ -1,45 +1,45 @@
 package mekanism.common.capabilities.proxy;
 
 import mekanism.api.IConfigurable;
-import mekanism.api.annotations.NothingNullByDefault;
+import mekanism.common.capabilities.holder.IHolder;
 import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.level.Level;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
-public class ProxyConfigurable extends ProxyHandler implements IConfigurable {
+public class ProxyConfigurable extends ProxyHandler<@Nullable IHolder> implements IConfigurable {
 
     private final ISidedConfigurable configurable;
 
-    public ProxyConfigurable(ISidedConfigurable configurable, @Nullable Direction side) {
+    public ProxyConfigurable(@Nullable Direction side, ISidedConfigurable configurable) {
         super(side, null);
         this.configurable = configurable;
     }
 
     @Override
-    public InteractionResult onSneakRightClick(Player player) {
-        return readOnly || side == null ? InteractionResult.PASS : configurable.onSneakRightClick(player, side);
+    public InteractionResult onSneakRightClick(Level level, Player player) {
+        return readOnly || side == null ? InteractionResult.PASS : configurable.onSneakRightClick(level, player, side);
     }
 
     @Override
-    public InteractionResult onRightClick(Player player) {
-        return readOnly || side == null ? InteractionResult.PASS : configurable.onRightClick(player, side);
+    public InteractionResult onRightClick(Level level, Player player) {
+        return readOnly || side == null ? InteractionResult.PASS : configurable.onRightClick(level, player, side);
     }
 
     public interface ISidedConfigurable extends IConfigurable {
 
-        InteractionResult onSneakRightClick(Player player, Direction side);
+        InteractionResult onSneakRightClick(Level level, Player player, Direction side);
 
         @Override
-        default InteractionResult onSneakRightClick(Player player) {
+        default InteractionResult onSneakRightClick(Level level, Player player) {
             return InteractionResult.PASS;
         }
 
-        InteractionResult onRightClick(Player player, Direction side);
+        InteractionResult onRightClick(Level level, Player player, Direction side);
 
         @Override
-        default InteractionResult onRightClick(Player player) {
+        default InteractionResult onRightClick(Level level, Player player) {
             return InteractionResult.PASS;
         }
     }

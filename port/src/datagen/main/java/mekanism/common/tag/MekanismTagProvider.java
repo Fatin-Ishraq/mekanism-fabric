@@ -42,21 +42,17 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.BannerBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import mekanism.neoshim.neoforge.common.Tags;
-import mekanism.neoshim.neoforge.common.data.ExistingFileHelper;
 import mekanism.neoshim.neoforge.registries.DeferredHolder;
-import org.jetbrains.annotations.Nullable;
 
 public class MekanismTagProvider extends BaseTagProvider {
 
-    public MekanismTagProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider, @Nullable ExistingFileHelper existingFileHelper) {
-        super(output, lookupProvider, Mekanism.MODID, existingFileHelper);
+    public MekanismTagProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider) {
+        super(output, lookupProvider, Mekanism.MODID);
     }
 
     @Override
@@ -100,13 +96,13 @@ public class MekanismTagProvider extends BaseTagProvider {
         getBuilder(ItemTags.PIGLIN_LOVED).add(
               MekanismBlocks.REFINED_GLOWSTONE_BLOCK.getItemHolder(),
               MekanismItems.REFINED_GLOWSTONE_INGOT,
-              MekanismItems.PROCESSED_RESOURCES.get(ResourceType.DUST, PrimaryResource.GOLD)
+              MekanismItems.getProcessedResource(ResourceType.DUST, PrimaryResource.GOLD)
         ).add(
               MekanismTags.Items.ENRICHED_GOLD,
-              MekanismTags.Items.PROCESSED_RESOURCES.get(ResourceType.SHARD, PrimaryResource.GOLD),
-              MekanismTags.Items.PROCESSED_RESOURCES.get(ResourceType.CRYSTAL, PrimaryResource.GOLD),
-              MekanismTags.Items.PROCESSED_RESOURCES.get(ResourceType.DIRTY_DUST, PrimaryResource.GOLD),
-              MekanismTags.Items.PROCESSED_RESOURCES.get(ResourceType.CLUMP, PrimaryResource.GOLD)
+              MekanismTags.Items.getProcessedResource(ResourceType.SHARD, PrimaryResource.GOLD),
+              MekanismTags.Items.getProcessedResource(ResourceType.CRYSTAL, PrimaryResource.GOLD),
+              MekanismTags.Items.getProcessedResource(ResourceType.DIRTY_DUST, PrimaryResource.GOLD),
+              MekanismTags.Items.getProcessedResource(ResourceType.CLUMP, PrimaryResource.GOLD)
         );
         getBuilder(MekanismTags.Items.MEKASUIT_HUD_RENDERER).add(MekanismItems.MEKASUIT_HELMET);
         getBuilder(MekanismTags.Items.STONE_CRAFTING_MATERIALS).add(ItemTags.STONE_CRAFTING_MATERIALS, Tags.Items.COBBLESTONES_NORMAL);
@@ -115,9 +111,9 @@ public class MekanismTagProvider extends BaseTagProvider {
               Tags.Items.INGOTS_IRON,
               Tags.Items.INGOTS_GOLD,
               Tags.Items.INGOTS_COPPER,
-              MekanismTags.Items.PROCESSED_RESOURCES.get(ResourceType.INGOT, PrimaryResource.OSMIUM),
-              MekanismTags.Items.PROCESSED_RESOURCES.get(ResourceType.INGOT, PrimaryResource.TIN),
-              MekanismTags.Items.PROCESSED_RESOURCES.get(ResourceType.INGOT, PrimaryResource.LEAD),
+              MekanismTags.Items.getProcessedResource(ResourceType.INGOT, PrimaryResource.OSMIUM),
+              MekanismTags.Items.getProcessedResource(ResourceType.INGOT, PrimaryResource.TIN),
+              MekanismTags.Items.getProcessedResource(ResourceType.INGOT, PrimaryResource.LEAD),
               MekanismTags.Items.GEMS_FLUORITE
         );
         addEntities();
@@ -143,7 +139,7 @@ public class MekanismTagProvider extends BaseTagProvider {
 
         addToTags(Tags.Items.HIDDEN_FROM_RECIPE_VIEWERS, Tags.Blocks.HIDDEN_FROM_RECIPE_VIEWERS, MekanismBlocks.BOUNDING_BLOCK);
 
-        getBuilder(BlockTags.SNOW_LAYER_CANNOT_SURVIVE_ON).add(
+        getBuilder(BlockTags.CANNOT_SUPPORT_SNOW_LAYER).add(
               MekanismBlocks.STRUCTURAL_GLASS,
 
               MekanismBlocks.BOILER_CASING,
@@ -221,7 +217,7 @@ public class MekanismTagProvider extends BaseTagProvider {
 
     private void addProcessedResources() {
         for (Cell<ResourceType, PrimaryResource, ? extends Holder<Item>> item : MekanismItems.PROCESSED_RESOURCES.cellSet()) {
-            TagKey<Item> tag = MekanismTags.Items.PROCESSED_RESOURCES.get(item.getRowKey(), item.getColumnKey());
+            TagKey<Item> tag = MekanismTags.Items.getProcessedResource(item.getRowKey(), item.getColumnKey());
             getBuilder(tag).add(item.getValue());
             getBuilder(switch (item.getRowKey()) {
                 case SHARD -> MekanismTags.Items.SHARDS;
@@ -251,10 +247,10 @@ public class MekanismTagProvider extends BaseTagProvider {
         );
         //Beacon payment items
         getBuilder(ItemTags.BEACON_PAYMENT_ITEMS).add(
-              MekanismItems.PROCESSED_RESOURCES.get(ResourceType.INGOT, PrimaryResource.OSMIUM),
-              MekanismItems.PROCESSED_RESOURCES.get(ResourceType.INGOT, PrimaryResource.TIN),
-              MekanismItems.PROCESSED_RESOURCES.get(ResourceType.INGOT, PrimaryResource.LEAD),
-              MekanismItems.PROCESSED_RESOURCES.get(ResourceType.INGOT, PrimaryResource.URANIUM),
+              MekanismItems.getProcessedResource(ResourceType.INGOT, PrimaryResource.OSMIUM),
+              MekanismItems.getProcessedResource(ResourceType.INGOT, PrimaryResource.TIN),
+              MekanismItems.getProcessedResource(ResourceType.INGOT, PrimaryResource.LEAD),
+              MekanismItems.getProcessedResource(ResourceType.INGOT, PrimaryResource.URANIUM),
               MekanismItems.BRONZE_INGOT,
               MekanismItems.REFINED_OBSIDIAN_INGOT,
               MekanismItems.REFINED_GLOWSTONE_INGOT,
@@ -555,10 +551,9 @@ public class MekanismTagProvider extends BaseTagProvider {
               Items.MAGENTA_CONCRETE_POWDER, Items.LIGHT_BLUE_CONCRETE_POWDER, Items.YELLOW_CONCRETE_POWDER, Items.LIME_CONCRETE_POWDER, Items.PINK_CONCRETE_POWDER,
               Items.GRAY_CONCRETE_POWDER, Items.LIGHT_GRAY_CONCRETE_POWDER, Items.CYAN_CONCRETE_POWDER, Items.PURPLE_CONCRETE_POWDER, Items.BLUE_CONCRETE_POWDER,
               Items.BROWN_CONCRETE_POWDER, Items.GREEN_CONCRETE_POWDER, Items.RED_CONCRETE_POWDER, Items.BLACK_CONCRETE_POWDER);
-        MekanismTagBuilder<Item> colorableBanners = getBuilder(MekanismTags.Items.COLORABLE_BANNERS);
-        for (DyeColor color : DyeColor.values()) {
-            colorableBanners.addIntrinsic(BuiltInRegistries.ITEM, BannerBlock.byColor(color).asItem());
-        }
+        getBuilder(MekanismTags.Items.COLORABLE_BANNERS).addIntrinsic(BuiltInRegistries.ITEM, Items.WHITE_BANNER, Items.ORANGE_BANNER, Items.MAGENTA_BANNER,
+              Items.LIGHT_BLUE_BANNER, Items.YELLOW_BANNER, Items.LIME_BANNER, Items.PINK_BANNER, Items.GRAY_BANNER, Items.LIGHT_GRAY_BANNER, Items.CYAN_BANNER,
+              Items.PURPLE_BANNER, Items.BLUE_BANNER, Items.BROWN_BANNER, Items.GREEN_BANNER, Items.RED_BANNER, Items.BLACK_BANNER);
     }
 
     private void addBiomes() {

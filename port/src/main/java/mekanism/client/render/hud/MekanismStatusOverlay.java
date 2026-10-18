@@ -1,6 +1,5 @@
 package mekanism.client.render.hud;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import mekanism.client.gui.GuiUtils;
 import mekanism.common.item.interfaces.IModeItem;
 import mekanism.common.lib.Color;
@@ -8,15 +7,14 @@ import net.minecraft.SharedConstants;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.LayeredDraw;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.GameType;
-import org.jetbrains.annotations.NotNull;
+import mekanism.neoshim.neoforge.client.gui.GuiLayer;
+import org.joml.Matrix3x2fStack;
 
-public class MekanismStatusOverlay implements LayeredDraw.Layer {
+public class MekanismStatusOverlay implements GuiLayer {
 
     public static final MekanismStatusOverlay INSTANCE = new MekanismStatusOverlay();
     private static final int BASE_TIMER = 5 * SharedConstants.TICKS_PER_SECOND;
@@ -32,9 +30,9 @@ public class MekanismStatusOverlay implements LayeredDraw.Layer {
     }
 
     @Override
-    public void render(@NotNull GuiGraphics graphics, @NotNull DeltaTracker delta) {
+    public void render(GuiGraphicsExtractor graphics, DeltaTracker delta) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (modeSwitchTimer > 1 && minecraft.player != null && minecraft.gameMode.getPlayerMode() != GameType.SPECTATOR && !minecraft.options.hideGui) {
+        if (modeSwitchTimer > 1 && minecraft.player != null && !minecraft.player.isSpectator() && !minecraft.options.hideGui) {
             ItemStack stack = minecraft.player.getMainHandItem();
             if (IModeItem.isModeItem(stack, EquipmentSlot.MAINHAND)) {
                 Component scrollTextComponent = ((IModeItem) stack.getItem()).getScrollTextComponent(stack);
@@ -53,12 +51,12 @@ public class MekanismStatusOverlay implements LayeredDraw.Layer {
                     }
                     //Shift the rendering to be above the previous line
                     targetShift += 13;
-                    PoseStack pose = graphics.pose();
-                    pose.pushPose();
-                    pose.translate((graphics.guiWidth() - componentWidth) / 2F, graphics.guiHeight() - targetShift, 0);
+                    Matrix3x2fStack pose = graphics.pose();
+                    pose.pushMatrix();
+                    pose.translate((graphics.guiWidth() - componentWidth) / 2F, graphics.guiHeight() - targetShift);
                     GuiUtils.drawBackdrop(graphics, minecraft, 0, 0, componentWidth, color.a());
-                    graphics.drawString(font, scrollTextComponent, 0, 0, color.argb());
-                    pose.popPose();
+                    graphics.text(font, scrollTextComponent, 0, 0, color.argb());
+                    pose.popMatrix();
                 }
             }
             //Only decrement the switch timer once a tick

@@ -1,9 +1,8 @@
 package mekanism.client;
 
-import com.mojang.blaze3d.shaders.FogShape;
-import com.mojang.blaze3d.systems.RenderSystem;
 import java.lang.ref.WeakReference;
-import mekanism.api.text.EnumColor;
+import java.util.Collections;
+import java.util.List;
 import mekanism.client.gui.machine.GuiAdvancedElectricMachine;
 import mekanism.client.gui.machine.GuiElectricMachine;
 import mekanism.client.render.MekanismRenderer;
@@ -11,73 +10,62 @@ import mekanism.client.render.RenderPropertiesProvider;
 import mekanism.common.block.BlockMekanism;
 import mekanism.common.block.interfaces.IColoredBlock;
 import mekanism.common.inventory.container.tile.MekanismTileContainer;
-import mekanism.common.item.interfaces.IColoredItem;
 import mekanism.common.registration.impl.BlockDeferredRegister;
 import mekanism.common.registration.impl.BlockRegistryObject;
 import mekanism.common.registration.impl.ContainerTypeRegistryObject;
 import mekanism.common.registration.impl.FluidDeferredRegister;
 import mekanism.common.registration.impl.FluidDeferredRegister.MekanismFluidType;
 import mekanism.common.registration.impl.TileEntityTypeRegistryObject;
-import mekanism.common.registries.MekanismDataComponents;
 import mekanism.common.tile.prefab.TileEntityAdvancedElectricMachine;
 import mekanism.common.tile.prefab.TileEntityElectricMachine;
 import net.minecraft.client.Camera;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.color.block.BlockColor;
-import net.minecraft.client.color.item.ItemColor;
+import net.minecraft.client.color.block.BlockTintSource;
 import net.minecraft.client.gui.screens.MenuScreens.ScreenConstructor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.MenuAccess;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.FogRenderer;
+import net.minecraft.client.renderer.block.FluidModel;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.item.ItemProperties;
-import net.minecraft.client.renderer.item.ItemPropertyFunction;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
+import net.minecraft.client.renderer.fog.FogData;
+import net.minecraft.client.renderer.fog.environment.FogEnvironment;
+import net.minecraft.client.resources.model.sprite.Material;
 import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.resources.PreparableReloadListener;
-import net.minecraft.util.FastColor;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
+import net.minecraft.world.attribute.EnvironmentAttributes;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import mekanism.neoshim.neoforge.client.event.EntityRenderersEvent;
-import mekanism.neoshim.neoforge.client.event.RegisterClientReloadListenersEvent;
 import mekanism.neoshim.neoforge.client.event.RegisterColorHandlersEvent;
+import mekanism.neoshim.neoforge.client.event.RegisterFluidModelsEvent;
 import mekanism.neoshim.neoforge.client.event.RegisterKeyMappingsEvent;
 import mekanism.neoshim.neoforge.client.event.RegisterMenuScreensEvent;
 import mekanism.neoshim.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import mekanism.neoshim.neoforge.client.extensions.common.IClientItemExtensions;
 import mekanism.neoshim.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
-import mekanism.neoshim.neoforge.client.model.DynamicFluidContainerModel;
+import mekanism.neoshim.neoforge.client.fluid.FluidTintSources;
 import mekanism.neoshim.neoforge.fluids.FluidType;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.joml.Vector3f;
+import org.joml.Vector4f;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 public class ClientRegistrationUtil {
 
-    private static final BlockColor COLORED_BLOCK_COLOR = (state, world, pos, tintIndex) -> {
+    private static final List<BlockTintSource> COLORED_BLOCK_COLOR = Collections.singletonList(state -> {
         Block block = state.getBlock();
         if (block instanceof IColoredBlock coloredBlock) {
             return coloredBlock.getColor().getPackedColor();
         }
         return -1;
-    };
-    private static final ItemColor COLORED_BLOCK_ITEM_COLOR = (stack, tintIndex) -> {
-        Item item = stack.getItem();
-        if (item instanceof BlockItem blockItem) {
-            Block block = blockItem.getBlock();
-            if (block instanceof IColoredBlock coloredBlock) {
-                return coloredBlock.getColor().getPackedColor();
-            }
-        }
-        return -1;
-    };
+    });
+    //TODO - 26.1 item models
+    /*
     private static final ItemColor COLORED_ITEM_COLOR = (stack, tintIndex) -> {
         Item item = stack.getItem();
         if (tintIndex == 1 && item instanceof IColoredItem) {
@@ -86,35 +74,34 @@ public class ClientRegistrationUtil {
                 return 0xFF555555;
             }
             int[] rgbCode = color.getRgbCode();
-            return FastColor.ARGB32.color(255, rgbCode[0], rgbCode[1], rgbCode[2]);
+            return ARGB.color(255, rgbCode[0], rgbCode[1], rgbCode[2]);
         }
         return -1;
-    };
-    private static final ItemColor BUCKET_ITEM_COLOR = new DynamicFluidContainerModel.Colors();
+    };*/
+    //private static final ItemColor BUCKET_ITEM_COLOR = new DynamicFluidContainerModel.Colors();
 
     private ClientRegistrationUtil() {
     }
 
     @SafeVarargs
-    public static <T extends BlockEntity> void bindTileEntityRenderer(EntityRenderersEvent.RegisterRenderers event, BlockEntityRendererProvider<T> rendererProvider,
-          TileEntityTypeRegistryObject<? extends T>... tileEntityTypeROs) {
+    public static <T extends BlockEntity, S extends BlockEntityRenderState> void bindTileEntityRenderer(EntityRenderersEvent.RegisterRenderers event,
+          BlockEntityRendererProvider<T, S> rendererProvider, TileEntityTypeRegistryObject<? extends T>... tileEntityTypeROs) {
         if (tileEntityTypeROs.length == 0) {
             throw new IllegalArgumentException("No renderers provided.");
         } else if (tileEntityTypeROs.length == 1) {
             event.registerBlockEntityRenderer(tileEntityTypeROs[0].get(), rendererProvider);
         } else {
-            BlockEntityRendererProvider<T> provider = new BlockEntityRendererProvider<>() {
+            BlockEntityRendererProvider<T, S> provider = new BlockEntityRendererProvider<>() {
                 @Nullable
                 private WeakReference<Context> cachedContext;
                 @Nullable
-                private WeakReference<BlockEntityRenderer<T>> cachedRenderer;
+                private WeakReference<BlockEntityRenderer<T, S>> cachedRenderer;
 
-                @NotNull
                 @Override
-                public BlockEntityRenderer<T> create(@NotNull Context context) {
+                public BlockEntityRenderer<T, S> create(Context context) {
                     //If there is a cached context and renderer make use of it, otherwise create one and cache it
                     // this allows us to reduce the number of renderer classes we create
-                    BlockEntityRenderer<T> renderer = cachedRenderer == null ? null : cachedRenderer.get();
+                    BlockEntityRenderer<T, S> renderer = cachedRenderer == null ? null : cachedRenderer.get();
                     if (cachedContext == null || cachedContext.get() != context || renderer == null) {
                         renderer = rendererProvider.create(context);
                         cachedContext = new WeakReference<>(context);
@@ -126,12 +113,6 @@ public class ClientRegistrationUtil {
             for (TileEntityTypeRegistryObject<? extends T> tileTypeRO : tileEntityTypeROs) {
                 event.registerBlockEntityRenderer(tileTypeRO.get(), provider);
             }
-        }
-    }
-
-    public static void registerClientReloadListeners(RegisterClientReloadListenersEvent event, PreparableReloadListener... listeners) {
-        for (PreparableReloadListener listener : listeners) {
-            event.registerReloadListener(listener);
         }
     }
 
@@ -160,39 +141,27 @@ public class ClientRegistrationUtil {
         }
     }
 
-    public static void setPropertyOverride(Holder<Item> item, ResourceLocation override, ItemPropertyFunction propertyGetter) {
-        ItemProperties.register(item.value(), override, propertyGetter);
-    }
 
-    public static void registerItemColorHandler(RegisterColorHandlersEvent.Item event, ItemColor itemColor, ItemLike... items) {
-        for (ItemLike itemProvider : items) {
-            event.register(itemColor, itemProvider);
+    @SafeVarargs
+    public static void registerBlockColorHandler(RegisterColorHandlersEvent.BlockTintSources event, List<BlockTintSource> tintSources, Holder<Block>... blocks) {
+        for (Holder<Block> blockProvider : blocks) {
+            event.register(tintSources, blockProvider.value());
         }
     }
 
     @SafeVarargs
-    public static void registerBlockColorHandler(RegisterColorHandlersEvent.Block event, BlockColor blockColor, Holder<Block>... blocks) {
-        for (Holder<Block> blockProvider : blocks) {
-            event.register(blockColor, blockProvider.value());
-        }
-    }
-
-    public static void registerBucketColorHandler(RegisterColorHandlersEvent.Item event, FluidDeferredRegister register) {
-        for (Holder<Item> bucket : register.getBucketEntries()) {
-            event.register(BUCKET_ITEM_COLOR, bucket.value());
-        }
+    public static void registerBlockColorHandler(RegisterColorHandlersEvent.BlockTintSources event, BlockTintSource tintSource, Holder<Block>... blocks) {
+        registerBlockColorHandler(event, Collections.singletonList(tintSource), blocks);
     }
 
     public static void registerIColoredBlockHandler(RegisterColorHandlersEvent event, BlockRegistryObject<?, ?>... blocks) {
-        if (event instanceof RegisterColorHandlersEvent.Block blockEvent) {
+        //TODO - 26.1: do this with the models themselves?
+        if (event instanceof RegisterColorHandlersEvent.BlockTintSources blockEvent) {
             registerBlockColorHandler(blockEvent, COLORED_BLOCK_COLOR, blocks);
-        } else if (event instanceof RegisterColorHandlersEvent.Item itemEvent) {
+        }//TODO - 26.1 item colours
+        /* else if (event instanceof RegisterColorHandlersEvent.ItemTintSources itemEvent) {
             registerItemColorHandler(itemEvent, COLORED_BLOCK_ITEM_COLOR, blocks);
-        }
-    }
-
-    public static void registerIColoredItemHandler(RegisterColorHandlersEvent.Item event, ItemLike... items) {
-        registerItemColorHandler(event, COLORED_ITEM_COLOR, items);
+        }*/
     }
 
     public static void registerItemExtensions(RegisterClientExtensionsEvent event, IClientItemExtensions extension, ItemLike... items) {
@@ -209,61 +178,49 @@ public class ClientRegistrationUtil {
         }
     }
 
+    @NullMarked
     public static void registerFluidExtensions(RegisterClientExtensionsEvent event, FluidDeferredRegister allFluids) {
         for (Holder<FluidType> fluidTypeEntry : allFluids.getFluidTypeEntries()) {
             if (fluidTypeEntry.value() instanceof MekanismFluidType fluidType) {
+                int fluidTint = fluidType.color;
                 event.registerFluidType(new IClientFluidTypeExtensions() {
-                    @NotNull
-                    @Override
-                    public ResourceLocation getStillTexture() {
-                        return fluidType.stillTexture;
-                    }
-
-                    @NotNull
-                    @Override
-                    public ResourceLocation getFlowingTexture() {
-                        return fluidType.flowingTexture;
-                    }
 
                     @Override
-                    public ResourceLocation getOverlayTexture() {
-                        return fluidType.overlayTexture;
-                    }
-
-                    @Nullable
-                    @Override
-                    public ResourceLocation getRenderOverlayTexture(Minecraft mc) {
+                    public Identifier getRenderOverlayTexture(Minecraft mc) {
                         return fluidType.renderOverlayTexture;
                     }
 
-                    @NotNull
                     @Override
-                    public Vector3f modifyFogColor(@NotNull Camera camera, float partialTick, @NotNull ClientLevel level, int renderDistance, float darkenWorldAmount,
-                          @NotNull Vector3f fluidFogColor) {
-                        return new Vector3f(MekanismRenderer.getRed(getTintColor()), MekanismRenderer.getGreen(getTintColor()), MekanismRenderer.getBlue(getTintColor()));
+                    public void modifyFogColor(Camera camera, float partialTick, ClientLevel level, int renderDistance, float darkenWorldAmount, Vector4f fluidFogColor) {
+                        //TODO - 26.1: is alpha needed?
+                        fluidFogColor.set(ARGB.redFloat(fluidTint), ARGB.greenFloat(fluidTint), ARGB.blueFloat(fluidTint));
                     }
 
                     @Override
-                    public void modifyFogRender(@NotNull Camera camera, @NotNull FogRenderer.FogMode mode, float renderDistance, float partialTick, float nearDistance,
-                          float farDistance, @NotNull FogShape shape) {
+                    public void modifyFogRender(Camera camera, @Nullable FogEnvironment environment, float renderDistance, float partialTick, FogData fog) {
                         //Copy of logic for water except always treating it as if it was a player who has no water vision
                         // and does not take the biome's closer water fog into account
-                        farDistance = 24F;
-                        if (farDistance > renderDistance) {
-                            farDistance = renderDistance;
-                            shape = FogShape.CYLINDER;
-                        }
-                        RenderSystem.setShaderFogStart(-8);
-                        RenderSystem.setShaderFogEnd(farDistance);
-                        RenderSystem.setShaderFogShape(shape);
-                    }
+                        float partialTicks = MekanismRenderer.getPartialTick();
+                        fog.environmentalStart = camera.attributeProbe().getValue(EnvironmentAttributes.WATER_FOG_START_DISTANCE, partialTicks);
+                        fog.environmentalEnd = camera.attributeProbe().getValue(EnvironmentAttributes.WATER_FOG_END_DISTANCE, partialTicks);
 
-                    @Override
-                    public int getTintColor() {
-                        return fluidType.color;
+                        fog.skyEnd = fog.environmentalEnd;
+                        fog.cloudEnd = fog.environmentalEnd;
                     }
                 }, fluidType);
             }
+        }
+    }
+
+    public static void registerFluidModels(RegisterFluidModelsEvent event, FluidDeferredRegister fluidDeferredRegister) {
+        for (var registryObject : fluidDeferredRegister.getEntries()) {
+            MekanismFluidType fluidType = registryObject.getFluidType();
+            event.register(new FluidModel.Unbaked(
+                  new Material(fluidType.stillTexture),
+                  new Material(fluidType.flowingTexture),
+                  new Material(fluidType.overlayTexture),
+                  FluidTintSources.constant(fluidType.color)
+            ), registryObject, registryObject.getFlowingFluid());
         }
     }
 }

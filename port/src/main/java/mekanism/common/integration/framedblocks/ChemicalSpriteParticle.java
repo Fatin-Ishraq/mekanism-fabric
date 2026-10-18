@@ -1,28 +1,29 @@
 package mekanism.common.integration.framedblocks;
 
-import mekanism.api.chemical.Chemical;
+import mekanism.api.chemical.ChemicalResource;
 import mekanism.client.render.MekanismRenderer;
 import mekanism.common.util.WorldUtils;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleProvider;
-import net.minecraft.client.particle.ParticleRenderType;
-import net.minecraft.client.particle.TextureSheetParticle;
+import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.util.ARGB;
+import net.minecraft.util.LightCoordsUtil;
+import net.minecraft.util.RandomSource;
+import org.jspecify.annotations.Nullable;
 
-final class ChemicalSpriteParticle extends TextureSheetParticle {
+final class ChemicalSpriteParticle extends SingleQuadParticle {
 
+    private final SingleQuadParticle.Layer layer;
     private final BlockPos pos;
     private final float uo;
     private final float vo;
     private final int brightness;
 
-    ChemicalSpriteParticle(ClientLevel level, double x, double y, double z, double sx, double sy, double sz, Holder<Chemical> chemical) {
-        super(level, x, y, z, sx, sy, sz);
+    ChemicalSpriteParticle(ClientLevel level, double x, double y, double z, double sx, double sy, double sz, ChemicalResource chemical) {
+        super(level, x, y, z, sx, sy, sz, MekanismRenderer.getChemicalTexture(chemical));
         this.pos = BlockPos.containing(x, y, z);
         this.gravity = 1F;
         this.quadSize /= 2F;
@@ -30,18 +31,16 @@ final class ChemicalSpriteParticle extends TextureSheetParticle {
         this.vo = random.nextFloat() * 3F;
         this.brightness = 0;
 
-        int tint = MekanismRenderer.getTint(chemical);
-        this.rCol = 0.6F * MekanismRenderer.getRed(tint);
-        this.gCol = 0.6F * MekanismRenderer.getGreen(tint);
-        this.bCol = 0.6F * MekanismRenderer.getBlue(tint);
-
-        setSprite(MekanismRenderer.getChemicalTexture(chemical));
+        int tint = chemical.getChemicalTint();
+        this.rCol = 0.6F * ARGB.redFloat(tint);
+        this.gCol = 0.6F * ARGB.greenFloat(tint);
+        this.bCol = 0.6F * ARGB.blueFloat(tint);
+        this.layer = Layer.bySprite(sprite);
     }
 
-    @NotNull
     @Override
-    public ParticleRenderType getRenderType() {
-        return ParticleRenderType.TERRAIN_SHEET;
+    protected SingleQuadParticle.Layer getLayer() {
+        return layer;
     }
 
     @Override
@@ -65,17 +64,21 @@ final class ChemicalSpriteParticle extends TextureSheetParticle {
     }
 
     @Override
-    public int getLightColor(float partialTick) {
-        int light = WorldUtils.isChunkLoaded(level, pos) ? LevelRenderer.getLightColor(level, pos) : 0;
-        int block = Math.max(brightness, LightTexture.block(light));
-        return LightTexture.pack(block, LightTexture.sky(light));
+    public int getLightCoords(float partialTick) {
+        int light = WorldUtils.isChunkLoaded(level, pos) ? LevelRenderer.getLightCoords(level, pos) : 0;
+        int block = Math.max(brightness, LightCoordsUtil.block(light));
+        return LightCoordsUtil.pack(block, LightCoordsUtil.sky(light));
     }
 
     static final class Provider implements ParticleProvider<ChemicalParticleOptions> {
 
+        @Nullable
         @Override
-        public Particle createParticle(ChemicalParticleOptions type, ClientLevel level, double x, double y, double z, double sx, double sy, double sz) {
-            return new ChemicalSpriteParticle(level, x, y, z, sx, sy, sz, type.chemical());
+        public Particle createParticle(ChemicalParticleOptions type, ClientLevel level, double x, double y, double z, double sx, double sy, double sz, RandomSource random) {
+            if (!type.chemical().isEmpty()) {
+                return new ChemicalSpriteParticle(level, x, y, z, sx, sy, sz, type.chemical());
+            }
+            return null;
         }
     }
 }

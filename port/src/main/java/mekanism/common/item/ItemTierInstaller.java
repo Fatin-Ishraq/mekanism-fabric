@@ -11,6 +11,7 @@ import mekanism.common.block.BlockBounding;
 import mekanism.common.block.attribute.Attribute;
 import mekanism.common.block.attribute.AttributeHasBounding;
 import mekanism.common.block.attribute.AttributeUpgradeable;
+import mekanism.common.lib.transaction.TransactionHelper;
 import mekanism.common.registries.MekanismBlocks;
 import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.tile.interfaces.ITierUpgradable;
@@ -30,17 +31,16 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import org.jspecify.annotations.Nullable;
 
 public class ItemTierInstaller extends Item {
 
     @Nullable
     private final BaseTier fromTier;
-    @NotNull
     private final BaseTier toTier;
 
-    public ItemTierInstaller(@Nullable BaseTier fromTier, @NotNull BaseTier toTier, Properties properties) {
+    public ItemTierInstaller(@Nullable BaseTier fromTier, BaseTier toTier, Properties properties) {
         super(properties);
         this.fromTier = fromTier;
         this.toTier = toTier;
@@ -51,18 +51,15 @@ public class ItemTierInstaller extends Item {
         return fromTier;
     }
 
-    @NotNull
     public BaseTier getToTier() {
         return toTier;
     }
 
-    @NotNull
     @Override
-    public Component getName(@NotNull ItemStack stack) {
+    public Component getName(ItemStack stack) {
         return TextComponentUtil.build(toTier.getColor(), super.getName(stack));
     }
 
-    @NotNull
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Player player = context.getPlayer();
@@ -85,7 +82,7 @@ public class ItemTierInstaller extends Item {
         } else if (world.isClientSide()) {
             return InteractionResult.PASS;
         }
-        Holder<Block> block = state.getBlockHolder();
+        Holder<Block> block = state.typeHolder();
         AttributeUpgradeable upgradeableBlock = Attribute.get(block, AttributeUpgradeable.class);
         if (upgradeableBlock != null) {
             BaseTier baseTier = Attribute.getBaseTier(block);
@@ -102,13 +99,13 @@ public class ItemTierInstaller extends Item {
                     IUpgradeData upgradeData = tierUpgradable.getUpgradeData(world.registryAccess());
                     if (upgradeData == null) {
                         if (tierUpgradable.canBeUpgraded()) {
-                            Mekanism.logger.warn("Got no upgrade data for block {} at position: {} in {} but it said it would be able to provide some.", block, pos, world.dimension().location());
+                            Mekanism.logger.warn("Got no upgrade data for block {} at position: {} in {} but it said it would be able to provide some.", block, pos, world.dimension().identifier());
                             return InteractionResult.FAIL;
                         }
                     } else {
                         AttributeHasBounding upgradeBounding = Attribute.get(upgradeState, AttributeHasBounding.class);
                         //If the resulting block has bounding blocks, validate that all of them will be able to be placed
-                        if (upgradeBounding != null && !upgradeBounding.handle(world, pos, upgradeState, pos, (level, boundingPos, mainPos) -> {
+                        if (upgradeBounding != null && !upgradeBounding.handle(world, pos, upgradeState, pos, (Level level, BlockPos boundingPos, BlockPos mainPos) -> {
                             Optional<BlockState> blockState = WorldUtils.getBlockState(level, boundingPos);
                             if (blockState.isPresent()) {
                                 BlockState boundingCurrentState = blockState.get();
@@ -128,7 +125,7 @@ public class ItemTierInstaller extends Item {
                         //Update the block
                         if (!world.setBlockAndUpdate(pos, upgradeState)) {
                             //Something went wrong, bail rather than trying to
-                            Mekanism.logger.warn("Error upgrading block at position: {} in {}.", pos, world.dimension().location());
+                            Mekanism.logger.warn("Error upgrading block at position: {} in {}.", pos, world.dimension().identifier());
                             return InteractionResult.FAIL;
                         }
                         //Place any bounding blocks the new state may have
@@ -137,14 +134,17 @@ public class ItemTierInstaller extends Item {
                         }
                         TileEntityMekanism upgradedTile = WorldUtils.getTileEntity(TileEntityMekanism.class, world, pos);
                         if (upgradedTile == null) {
-                            Mekanism.logger.warn("Error upgrading block at position: {} in {}. Expected a mekanism block as the result.", pos, world.dimension().location());
+                            Mekanism.logger.warn("Error upgrading block at position: {} in {}. Expected a mekanism block as the result.", pos, world.dimension().identifier());
                             return InteractionResult.FAIL;
                         }
                         //TODO: Make it so it doesn't have to be a TileEntityMekanism in order to do these things?
                         if (tile instanceof ITileDirectional directional && directional.isDirectional()) {
                             upgradedTile.setFacing(directional.getDirection(), false);
                         }
-                        upgradedTile.parseUpgradeData(world.registryAccess(), upgradeData);
+                        try (Transaction transaction = TransactionHelper.openTransactionSafe()) {
+                            upgradedTile.parseUpgradeData(upgradeData, world.registryAccess(), transaction);
+                            transaction.commit();
+                        }
                         upgradedTile.resyncMasterToBounding();
                         upgradedTile.sendUpdatePacket();
                         upgradedTile.setChanged();
@@ -152,9 +152,7 @@ public class ItemTierInstaller extends Item {
                         // In general replacing the tile likely will have caused this to be invalidated
                         // but mark it just to be safe, and in case there are any bounding blocks so that they notify the level their caps might have changed
                         upgradedTile.invalidateCapabilitiesFull();
-                        if (!player.isCreative()) {
-                            context.getItemInHand().shrink(1);
-                        }
+                        context.getItemInHand().consume(1, player);
                         if (player instanceof ServerPlayer serverPlayer) {
                             MekanismCriteriaTriggers.USE_TIER_INSTALLER.value().trigger(serverPlayer, toTier);
                         }

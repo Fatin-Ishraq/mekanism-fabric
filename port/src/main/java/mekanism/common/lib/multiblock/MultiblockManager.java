@@ -2,73 +2,55 @@ package mekanism.common.lib.multiblock;
 
 import java.util.ArrayDeque;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Supplier;
 import mekanism.api.SerializationConstants;
 import mekanism.common.Mekanism;
-import mekanism.common.lib.MekanismSavedData;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.core.UUIDUtil;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueInput.ValueInputList;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.ValueOutput.ValueOutputList;
 import mekanism.neoshim.bus.api.EventPriority;
 import mekanism.neoshim.bus.api.SubscribeEvent;
 import mekanism.neoshim.fml.common.EventBusSubscriber;
+import mekanism.neoshim.neoforge.common.util.ValueIOSerializable;
 import mekanism.neoshim.neoforge.event.tick.ServerTickEvent;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import org.jspecify.annotations.Nullable;
 
+//TODO - 26.1: rewrite multiblocks to have the MultiblockData ticked here, without a Cache middleman
+// MultiblockData should possibly be renamed MultiblockEntity as it's like a BE, but multi
 @EventBusSubscriber(modid = Mekanism.MODID)
-public class MultiblockManager<T extends MultiblockData> {
+public class MultiblockManager<T extends MultiblockData> implements ValueIOSerializable {
 
-    private static final Set<MultiblockManager<?>> managers = new HashSet<>();
+    //private static final Set<MultiblockManager<?>> managers = new HashSet<>();
 
-    private final String name;
-    private final String nameLower;
+    private final MultiblockType<T> multiblockType;
 
-    private final Supplier<MultiblockCache<T>> cacheSupplier;
-    private final Supplier<IStructureValidator<T>> validatorSupplier;
-
-    /**
-     * A map containing references to all multiblock inventory caches.
-     */
+    /// A map containing references to all multiblock inventory caches.
     private final Map<UUID, MultiblockCache<T>> caches = new HashMap<>();
 
     private final Queue<T> multiblocksTicked = new ArrayDeque<>();
 
-    /**
-     * Note: This can and will be null on the client side
-     */
-    @Nullable
-    private MultiblockCacheDataHandler dataHandler;
-
-    public MultiblockManager(String name, Supplier<MultiblockCache<T>> cacheSupplier, Supplier<IStructureValidator<T>> validatorSupplier) {
-        this.name = name;
-        this.nameLower = name.toLowerCase(Locale.ROOT);
-        this.cacheSupplier = cacheSupplier;
-        this.validatorSupplier = validatorSupplier;
-        managers.add(this);
+    public MultiblockManager(MultiblockType<T> multiblockType) {
+        this.multiblockType = multiblockType;
+        //managers.add(this);
     }
 
-    /**
-     * Note: It is important that callers also call {@link #trackCache(UUID, MultiblockCache)} after initializing any data the cache might require.
-     */
-    public MultiblockCache<T> createCache() {
-        return cacheSupplier.get();
+    public MultiblockType<T> getMultiblockType() {
+        return multiblockType;
     }
 
-    /**
-     * Adds a cache as tracked and marks the manager as dirty.
-     */
+    /// Adds a cache as tracked and marks the manager as dirty.
     public void trackCache(UUID id, MultiblockCache<T> cache) {
         caches.put(id, cache);
-        markDirty();
+        //markDirty();
     }
 
     @Nullable
@@ -76,40 +58,19 @@ public class MultiblockManager<T extends MultiblockData> {
         return caches.get(multiblockID);
     }
 
-    public IStructureValidator<T> createValidator() {
-        return validatorSupplier.get();
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getNameLower() {
-        return nameLower;
-    }
-
     @Override
     public String toString() {
-        return name;
+        return multiblockType.id().toString();
     }
 
-    public boolean isCompatible(BlockEntity tile) {
+    public boolean isCompatible(@Nullable BlockEntity tile) {
         if (tile instanceof IMultiblock<?> multiblock) {
-            return multiblock.getManager() == this;
+            return multiblock.getMultiblockType() == this.multiblockType;
         }
         return false;
     }
 
-    public static void reset() {
-        for (MultiblockManager<?> manager : managers) {
-            manager.caches.clear();
-            manager.dataHandler = null;
-        }
-    }
-
-    /**
-     * Replaces and invalidates all the caches with the given ids with a new cache with the given id.
-     */
+    /// Replaces and invalidates all the caches with the given ids with a new cache with the given id.
     public void replaceCaches(Set<UUID> staleIds, UUID id, MultiblockCache<T> cache) {
         for (UUID staleId : staleIds) {
             caches.remove(staleId);
@@ -125,9 +86,12 @@ public class MultiblockManager<T extends MultiblockData> {
             // in theory this method should only be called if the multiblock is valid and formed
             // but in case something goes wrong, don't let it
             if (cache != null) {
-                cache.sync(multiblock);
+                try (Transaction transaction = Transaction.openRoot()) {
+                    cache.sync(multiblock, transaction);
+                    transaction.commit();
+                }
                 //If the multiblock is dirty mark the manager's data handler as dirty to ensure that we save
-                markDirty();
+                //markDirty();
                 // next we can reset the dirty state of the multiblock
                 multiblock.resetDirty();
             }
@@ -138,55 +102,37 @@ public class MultiblockManager<T extends MultiblockData> {
         multiblocksTicked.add(multiblock);
     }
 
-    /**
-     * Grabs a unique inventory ID for a multiblock.
-     *
-     * @return unique inventory ID
-     */
+    /// Grabs a unique inventory ID for a multiblock.
+    ///
+    /// @return unique inventory ID
     public UUID getUniqueInventoryID() {
         return UUID.randomUUID();
     }
 
-    private void markDirty() {
-        if (dataHandler != null) {
-            dataHandler.setDirty();
-        }
+    //no longer relevant, attachement data is always saved
+    //private void markDirty() {
+    //}
+
+    public static <T extends MultiblockData> MultiblockManager<T> get(Level level, MultiblockType<T> type) {
+        return level.getData(type.attachment());
     }
 
-    /**
-     * Note: This should only be called from the server side
-     */
-    public static void createOrLoadAll() {
-        for (MultiblockManager<?> manager : managers) {
-            manager.createOrLoad();
-        }
-    }
-
-    /**
-     * Note: This should only be called from the server side
-     */
-    private void createOrLoad() {
-        if (dataHandler == null) {
-            //Always associate the world with the overworld as we base it on a manager wide state
-            dataHandler = MekanismSavedData.createSavedData(MultiblockCacheDataHandler::new, getNameLower());
-        }
-    }
-
-    /**
-     * Bit of a hack, really the multiblock system needs to not have a 'cache' middle-man.
-     * <p></p>
-     * Causes any multiblocks that became dirty after the master ticked to have their contents synced and thus saved (if one occurs after this tick)
-     */
+    /// Bit of a hack, really the multiblock system needs to not have a 'cache' middle-man.
+    ///
+    /// Causes any multiblocks that became dirty after the master ticked to have their contents synced and thus saved (if one occurs after this tick)
     @SubscribeEvent(priority = EventPriority.LOWEST)
     static void endOfTickEvent(ServerTickEvent.Post event) {
-        for (MultiblockManager<?> manager : managers) {
-            manager.endOfTick();
-        }
+        event.getServer().getAllLevels().forEach(level -> {
+            for (MultiblockType<?> multiblockType : MekanismMultiblockRegistry.ALL_TYPES) {
+                MultiblockManager<?> manager = level.getExistingDataOrNull(multiblockType.attachment());
+                if (manager != null) {
+                    manager.endOfTick();
+                }
+            }
+        });
     }
 
-    /**
-     * syncs any multiblocks if they're dirty
-     */
+    /// syncs any multiblocks if they're dirty
     private void endOfTick() {
         T item;
         while ((item = multiblocksTicked.poll()) != null) {
@@ -194,38 +140,29 @@ public class MultiblockManager<T extends MultiblockData> {
         }
     }
 
-    private class MultiblockCacheDataHandler extends MekanismSavedData {
 
-        @Override
-        public void load(@NotNull CompoundTag nbt, @NotNull HolderLookup.Provider provider) {
-            if (nbt.contains(SerializationConstants.CACHE, Tag.TAG_LIST)) {
-                ListTag cachesNbt = nbt.getList(SerializationConstants.CACHE, Tag.TAG_COMPOUND);
-                for (int i = 0; i < cachesNbt.size(); i++) {
-                    CompoundTag cacheTags = cachesNbt.getCompound(i);
-                    if (cacheTags.hasUUID(SerializationConstants.INVENTORY_ID)) {
-                        UUID id = cacheTags.getUUID(SerializationConstants.INVENTORY_ID);
-                        MultiblockCache<T> cachedData = cacheSupplier.get();
-                        cachedData.load(provider, cacheTags);
-                        caches.put(id, cachedData);
-                    }
-                }
+    @Override
+    public void deserialize(ValueInput input) {
+        ValueInputList list = input.childrenListOrEmpty(SerializationConstants.CACHE);
+        for (ValueInput child : list) {
+            Optional<UUID> id = child.read(SerializationConstants.INVENTORY_ID, UUIDUtil.LENIENT_CODEC);
+            if (id.isPresent()) {
+                MultiblockCache<T> cachedData = multiblockType.createCache();
+                cachedData.load(child);
+                caches.put(id.get(), cachedData);
             }
         }
+    }
 
-        @NotNull
-        @Override
-        public CompoundTag save(@NotNull CompoundTag nbt, @NotNull HolderLookup.Provider provider) {
-            ListTag cachesNbt = new ListTag(caches.size());
-            for (Map.Entry<UUID, MultiblockCache<T>> entry : caches.entrySet()) {
-                CompoundTag cacheTags = new CompoundTag();
-                //Note: We can just store the inventory id in the same compound tag as the rest of the cache data
-                // as none of the caches save anything to this tag
-                cacheTags.putUUID(SerializationConstants.INVENTORY_ID, entry.getKey());
-                entry.getValue().save(provider, cacheTags);
-                cachesNbt.add(cacheTags);
-            }
-            nbt.put(SerializationConstants.CACHE, cachesNbt);
-            return nbt;
+    @Override
+    public void serialize(ValueOutput output) {
+        ValueOutputList outList = output.childrenList(SerializationConstants.CACHE);
+        for (Map.Entry<UUID, MultiblockCache<T>> entry : caches.entrySet()) {
+            ValueOutput cacheOutput = outList.addChild();
+            //Note: We can just store the inventory id in the same compound tag as the rest of the cache data
+            // as none of the caches save anything to this tag
+            cacheOutput.store(SerializationConstants.INVENTORY_ID, UUIDUtil.LENIENT_CODEC, entry.getKey());
+            entry.getValue().save(cacheOutput);
         }
     }
 }
