@@ -84,6 +84,9 @@ public final class ClientBridge {
             mod.getEventBus().post(new FMLClientSetupEvent(mod));
         }
 
+        if (Boolean.getBoolean("mekanism_fabric.screenshots")) {
+            mekanism.fabric.client.ScreenshotDriver.init();
+        }
         if (Boolean.getBoolean("mekanism_fabric.smokeWorld")) {
             mekanism.fabric.client.SmokeWorldDriver.init();
         }

@@ -181,6 +181,14 @@ loom {
             runDir = 'run/smokeworld'
             vmArg('-Dmekanism_fabric.smokeWorld=true')
         }
+        // Automated screenshots for the project pages (ScreenshotDriver): saved to run/screenshots/screenshots/
+        screenshots {
+            client()
+            name = 'Screenshots'
+            runDir = 'run/screenshots'
+            vmArg('-Dmekanism_fabric.screenshots=true')
+            programArgs('--width', '1600', '--height', '900')
+        }
         // Automated client boot check: exits by itself after resource loading reaches the title screen
         smokeClient {
             client()
