@@ -45,9 +45,6 @@ repositories {
 
 // Packages from upstream that are not (yet) compiled in the Fabric port. Each entry is tracked in NOTES.md "Stubbed / disabled".
 def excludedFromCompile = [
-        // ComputerCraft peripheral glue (NeoForge capability based) - phase 9
-        'mekanism/common/integration/computer/computercraft/CC*.java',
-        'mekanism/common/integration/computer/computercraft/MekanismPeripheral.java',
         // Curios client renderer (Curios is NeoForge-only; Fabric equivalent TBD) - phase 9
         'mekanism/client/render/MekanismCurioRenderer.java',
         // Third-party integrations compiled against NeoForge builds of other mods - phase 9
@@ -214,6 +211,10 @@ dependencies {
     } else if (project.findProperty('looking_at') == 'wthit') {
         modLocalRuntime("mcp.mobius.waila:wthit:fabric-${wthit_version}")
         modLocalRuntime("lol.bai:badpackets:fabric-${badpackets_version}")
+    }
+    // ComputerCraft at dev runtime: -Pcomputers=cc (verification runs only; never bundled)
+    if (project.findProperty('computers') == 'cc') {
+        modLocalRuntime("cc.tweaked:cc-tweaked-${minecraft_version}-fabric:${cc_tweaked_version}")
     }
     // Recipe viewers at dev runtime: -Precipe_viewer=jei|emi (verification runs only; never bundled)
     if (project.findProperty('recipe_viewer') == 'jei') {

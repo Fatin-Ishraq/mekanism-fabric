@@ -104,7 +104,9 @@ public final class MekanismHooks {
     public void hookCommonSetup() {
         if (computerCompatEnabled()) {
             FactoryRegistry.load();
-            //FABRIC: ComputerCraft API registration (CCCapabilityHelper) is TODO
+            if (computerCraft.isLoaded()) {
+                mekanism.common.integration.computer.computercraft.CCCapabilityHelper.registerApis();
+            }
         }
 
         //TODO - 1.20: Move this out of here and back to always being registered whenever it gets fixed in Neo.

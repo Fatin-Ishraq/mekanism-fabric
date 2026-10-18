@@ -384,4 +384,21 @@ public class MekanismPortGameTests implements FabricGameTest {
         helper.assertTrue(container != null && container.getEnergy() > 0, "Energy tablet has no energy after the exchange");
         helper.succeed();
     }
+
+    /** ComputerCraft (only when CC: Tweaked is installed, -Pcomputers=cc): machines are peripherals through CC:T's Fabric lookup. */
+    @GameTest(template = EMPTY_STRUCTURE)
+    public void machinesArePeripheralsWithComputerCraft(GameTestHelper helper) {
+        if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("computercraft")) {
+            helper.succeed();
+            return;
+        }
+        placeLikeItem(helper, MekanismBlocks.ENRICHMENT_CHAMBER.value());
+        BlockPos absolute = helper.absolutePos(POS);
+        var lookup = net.fabricmc.fabric.api.lookup.v1.block.BlockApiLookup.get(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("computercraft", "peripheral"),
+              dan200.computercraft.api.peripheral.IPeripheral.class, Direction.class);
+        var peripheral = lookup.find(helper.getLevel(), absolute, Direction.UP);
+        helper.assertTrue(peripheral != null, "Enrichment chamber is not a ComputerCraft peripheral");
+        mekanism.common.Mekanism.logger.info("[Fabric port] GameTest: enrichment chamber peripheral type {}", peripheral.getType());
+        helper.succeed();
+    }
 }
