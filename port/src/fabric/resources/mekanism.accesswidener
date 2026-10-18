@@ -159,3 +159,4 @@ extendable method net/minecraft/world/entity/monster/Creeper spawnLingeringCloud
 extendable method net/minecraft/world/entity/item/PrimedTnt explode ()V
 accessible method net/minecraft/world/level/block/FireBlock getIgniteOdds (Lnet/minecraft/world/level/block/state/BlockState;)I
 accessible method net/minecraft/world/level/storage/LevelResource <init> (Ljava/lang/String;)V
+accessible class net/minecraft/client/renderer/FogRenderer$FogData

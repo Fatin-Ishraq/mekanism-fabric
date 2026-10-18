@@ -40,6 +40,8 @@ public final class SmokeWorldDriver {
 
     private static int stage = 0;
     private static int waitTicks = 0;
+    private static int renderFogEvents = 0;
+    private static int fogColorEvents = 0;
     private static int ticks = 0;
     private static BlockPos base;
     private static final List<String> failures = new ArrayList<>();
@@ -49,6 +51,8 @@ public final class SmokeWorldDriver {
 
     public static void init() {
         ClientTickEvents.END_CLIENT_TICK.register(SmokeWorldDriver::tick);
+        mekanism.neoshim.neoforge.common.NeoForge.EVENT_BUS.addListener((mekanism.neoshim.neoforge.client.event.ViewportEvent.RenderFog event) -> renderFogEvents++);
+        mekanism.neoshim.neoforge.common.NeoForge.EVENT_BUS.addListener((mekanism.neoshim.neoforge.client.event.ViewportEvent.ComputeFogColor event) -> fogColorEvents++);
     }
 
     private static void log(String message, Object... args) {
@@ -134,6 +138,11 @@ public final class SmokeWorldDriver {
             case 6 -> {
                 if (++ticks > 20) {
                     stage = 7;
+                    if (renderFogEvents == 0 || fogColorEvents == 0) {
+                        fail("fog events not fired (RenderFog " + renderFogEvents + ", ComputeFogColor " + fogColorEvents + ")");
+                    } else {
+                        log("fog events fired: RenderFog {}, ComputeFogColor {}", renderFogEvents, fogColorEvents);
+                    }
                     log("finished with {} failure(s){}", failures.size(), failures.isEmpty() ? "" : ": " + failures);
                     client.stop();
                 }
