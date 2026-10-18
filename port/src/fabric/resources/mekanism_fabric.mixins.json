@@ -17,6 +17,7 @@
     "LightEngineAccessor",
     "LightningBoltMixin",
     "LivingEntityHooksMixin",
+    "MappedRegistryAliasMixin",
     "MobFinalizeSpawnMixin",
     "PlayerHooksMixin",
     "PlayerTickMixin",

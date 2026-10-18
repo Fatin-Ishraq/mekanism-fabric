@@ -82,9 +82,10 @@ public class DeferredRegister<T> {
 
     private final Map<ResourceLocation, ResourceLocation> aliases = new LinkedHashMap<>();
 
-    /** Registry aliases (old id -> new id). TODO(phase 5): apply via a registry lookup mixin so old saves remap. */
+    /** Registry aliases (old id -> new id), resolved by MappedRegistryAliasMixin when a lookup misses. */
     public void addAlias(ResourceLocation from, ResourceLocation to) {
         aliases.put(from, to);
+        RegistryAliases.add(registryKey, from, to);
     }
 
     public Map<ResourceLocation, ResourceLocation> getAliases() {

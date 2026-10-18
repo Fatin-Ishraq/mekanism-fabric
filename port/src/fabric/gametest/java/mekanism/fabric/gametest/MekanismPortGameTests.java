@@ -329,4 +329,12 @@ public class MekanismPortGameTests implements FabricGameTest {
         helper.assertTrue(found, "Plains biome does not spawn Mekanism Additions baby skeletons");
         helper.succeed();
     }
+
+    /** NeoForge registry aliases: the pre-chemical-merge item id resolves to its replacement. */
+    @GameTest(template = EMPTY_STRUCTURE)
+    public void registryAliasesResolve(GameTestHelper helper) {
+        var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(mekanism.common.Mekanism.rl("upgrade_gas"));
+        helper.assertTrue(item == mekanism.common.registries.MekanismItems.CHEMICAL_UPGRADE.get(), "mekanism:upgrade_gas resolved to " + item);
+        helper.succeed();
+    }
 }
