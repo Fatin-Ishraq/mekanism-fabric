@@ -52,11 +52,14 @@ public class CreativeTabDeferredRegister extends MekanismDeferredRegister<Creati
      */
     public MekanismDeferredHolder<CreativeModeTab, CreativeModeTab> register(String name, ILangEntry title, Holder<Item> icon, UnaryOperator<CreativeModeTab.Builder> operator) {
         return register(name, () -> {
-            //FABRIC: FabricItemGroup.builder() instead of NeoForge's no-arg builder; withTabFactory (custom label color) is NeoForge-only
+            //FABRIC: FabricItemGroup.builder() instead of NeoForge's no-arg builder; withTabFactory (subclass for the label color) is NeoForge-only, so the
+            // MekanismCreativeTab label color is registered on the built tab instead
             CreativeModeTab.Builder builder = net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup.builder()
                   .title(title.translate())
                   .icon(() -> new ItemStack(icon));
-            return operator.apply(builder).build();
+            CreativeModeTab tab = operator.apply(builder).build();
+            mekanism.neoshim.neoforge.common.extensions.ICreativeModeTabExtension.setLabelColor(tab, () -> SpecialColors.TEXT_TITLE.argb());
+            return tab;
         });
     }
 

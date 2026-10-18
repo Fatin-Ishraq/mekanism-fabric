@@ -66,6 +66,7 @@
     "client.ClientPacketListenerMixin",
     "client.ClientRecipesMixin",
     "client.ClientRespawnMixin",
+    "client.CreativeModeInventoryScreenMixin",
     "client.EntityRenderDispatcherMixin",
     "client.FogRendererMixin",
     "client.GuiCrosshairMixin",
