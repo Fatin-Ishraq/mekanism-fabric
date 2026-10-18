@@ -32,6 +32,14 @@ repositories {
         forRepository { maven { name = 'BlameJared'; url = 'https://maven.blamejared.com' } }
         filter { includeGroup('org.openzen.zencode') }
     }
+    exclusiveContent {
+        forRepository { maven { name = 'bai (WTHIT)'; url = 'https://maven2.bai.lol' } }
+        filter { includeGroup('mcp.mobius.waila'); includeGroup('lol.bai') }
+    }
+    exclusiveContent {
+        forRepository { maven { name = 'Modrinth'; url = 'https://api.modrinth.com/maven' } }
+        filter { includeGroup('maven.modrinth') }
+    }
     mavenCentral()
 }
 
@@ -47,7 +55,8 @@ def excludedFromCompile = [
         'mekanism/common/integration/framedblocks/**',
         'mekanism/common/integration/gender/**',
         'mekanism/common/integration/jsonthings/**',
-        'mekanism/common/integration/lookingat/**',
+        // The One Probe has no Fabric build (Jade and WTHIT are supported)
+        'mekanism/common/integration/lookingat/theoneprobe/**',
         'mekanism/common/integration/projecte/**',
         'mekanism/common/integration/computer/opencomputers2/**',
         'mekanism/common/integration/energy/fluxnetworks/**',
@@ -73,7 +82,7 @@ sourceSets {
         resources {
             srcDirs = ['src/main/resources', 'src/datagen/generated/mekanism', 'src/fabric/resources']
             exclude('**/*.blend', '**/*.bbmodel', '.cache', '**/convert_uv.py',
-                    'META-INF/neoforge.mods.toml', 'META-INF/accesstransformer.cfg', 'wthit_plugins.json')
+                    'META-INF/neoforge.mods.toml', 'META-INF/accesstransformer.cfg')
         }
     }
 }
@@ -197,6 +206,15 @@ dependencies {
     compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     modCompileOnly("mezz.jei:jei-${minecraft_version}-fabric-api:${jei_version}")
     modCompileOnly("dev.emi:emi-fabric:${emi_version}:api")
+    modCompileOnly("mcp.mobius.waila:wthit-api:fabric-${wthit_version}") { transitive = false }
+    modCompileOnly("maven.modrinth:jade:${jade_version}") { transitive = false }
+    // "Looking at" overlays at dev runtime: -Plooking_at=jade|wthit (verification runs only; never bundled)
+    if (project.findProperty('looking_at') == 'jade') {
+        modLocalRuntime("maven.modrinth:jade:${jade_version}")
+    } else if (project.findProperty('looking_at') == 'wthit') {
+        modLocalRuntime("mcp.mobius.waila:wthit:fabric-${wthit_version}")
+        modLocalRuntime("lol.bai:badpackets:fabric-${badpackets_version}")
+    }
     // Recipe viewers at dev runtime: -Precipe_viewer=jei|emi (verification runs only; never bundled)
     if (project.findProperty('recipe_viewer') == 'jei') {
         modLocalRuntime("mezz.jei:jei-${minecraft_version}-fabric:${jei_version}")

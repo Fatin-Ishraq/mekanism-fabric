@@ -86,6 +86,9 @@ public final class SmokeWorldDriver {
                         ticks = 0;
                         log("in world, placing setup");
                         placeSetup(client.getSingleplayerServer());
+                        //Look at the enrichment chamber (placed next to the player) so "looking at" overlays (Jade/WTHIT, when installed) query Mekanism's providers
+                        client.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES,
+                              net.minecraft.world.phys.Vec3.atCenterOf(client.player.blockPosition().offset(3, 0, 0)));
                     }
                 }
             }
