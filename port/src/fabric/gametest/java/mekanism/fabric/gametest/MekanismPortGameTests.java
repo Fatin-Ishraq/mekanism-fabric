@@ -299,4 +299,23 @@ public class MekanismPortGameTests implements FabricGameTest {
         helper.assertFalse(saved.contains(controller.id().toString()), "Forced chunk not removed: " + saved);
         helper.succeed();
     }
+
+    /**
+     * Position-aware light emission of a lava filled fluid tank. Propagation through the light engine is checked client side by the world smoke test (the server
+     * light engine runs off thread, where vanilla returns no block entities; upstream Mekanism only rechecks tank lighting on the client too).
+     */
+    @GameTest(template = EMPTY_STRUCTURE)
+    public void fluidTankEmitsFluidLight(GameTestHelper helper) {
+        placeLikeItem(helper, MekanismBlocks.BASIC_FLUID_TANK.value());
+        BlockPos absolute = helper.absolutePos(POS);
+        Storage<FluidVariant> storage = FluidStorage.SIDED.find(helper.getLevel(), absolute, Direction.UP);
+        helper.assertTrue(storage != null, "No fluid storage exposed by the fluid tank");
+        try (Transaction transaction = Transaction.openOuter()) {
+            storage.insert(FluidVariant.of(Fluids.LAVA), FluidConstants.BUCKET, transaction);
+            transaction.commit();
+        }
+        int emission = helper.getLevel().getBlockState(absolute).getLightEmission(helper.getLevel(), absolute);
+        helper.assertTrue(emission == 15, "Positional emission of a lava tank is " + emission);
+        helper.succeed();
+    }
 }

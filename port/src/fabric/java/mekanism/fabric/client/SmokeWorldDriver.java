@@ -260,6 +260,9 @@ public final class SmokeWorldDriver {
                 cube.getEnergyContainer().setEnergy(Long.MAX_VALUE);
             }
             place(level, base.south(2), MekanismBlocks.BASIC_FLUID_TANK.value().defaultBlockState());
+            if (level.getBlockEntity(base.south(2)) instanceof mekanism.common.tile.TileEntityFluidTank tank) {
+                tank.fluidTank.setStack(new mekanism.neoshim.neoforge.fluids.FluidStack(net.minecraft.world.level.material.Fluids.LAVA, 4_000));
+            }
             place(level, base.south(2).east(), MekanismBlocks.BASIC_ENERGY_CUBE.value().defaultBlockState());
             place(level, base.north(2), MekanismBlocks.BASIC_LOGISTICAL_TRANSPORTER.value().defaultBlockState());
             place(level, base.north(2).east(), MekanismBlocks.BASIC_MECHANICAL_PIPE.value().defaultBlockState());
@@ -289,6 +292,12 @@ public final class SmokeWorldDriver {
             } else {
                 log("client BE at {}: {}", pos, be.getClass().getSimpleName());
             }
+        }
+        int tankLight = client.level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, base.south(2).above());
+        if (tankLight >= 14) {
+            log("block light above lava fluid tank {} (positional light emission)", tankLight);
+        } else {
+            fail("block light above lava fluid tank is " + tankLight + ", expected >= 14");
         }
         boolean foundBalloon = false;
         for (net.minecraft.world.entity.Entity entity : client.level.entitiesForRendering()) {
