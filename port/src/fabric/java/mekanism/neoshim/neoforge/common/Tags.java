@@ -20,6 +20,7 @@ public class Tags {
     public static class Items {
 
         public static final TagKey<Item> ORES = TagKey.create(Registries.ITEM, c("ores"));
+        public static final TagKey<Item> GEMS_LAPIS = TagKey.create(Registries.ITEM, c("gems/lapis"));
         public static final TagKey<Item> ORES_COPPER = TagKey.create(Registries.ITEM, c("ores/copper"));
         public static final TagKey<Item> ORES_GOLD = TagKey.create(Registries.ITEM, c("ores/gold"));
         public static final TagKey<Item> ORES_IRON = TagKey.create(Registries.ITEM, c("ores/iron"));

@@ -26,11 +26,11 @@ public class ToolsTags {
         public static final TagKey<Block> INCORRECT_FOR_STEEL_TOOL = tag("incorrect_for_steel_tool");
 
         private static TagKey<Block> commonTag(String name) {
-            return BlockTags.create(ResourceLocation.fromNamespaceAndPath("c", name));
+            return net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.BLOCK, /*FABRIC: BlockTags.create is NeoForge-only*/ ResourceLocation.fromNamespaceAndPath("c", name));
         }
 
         private static TagKey<Block> tag(String name) {
-            return BlockTags.create(MekanismTools.rl(name));
+            return net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.BLOCK, /*FABRIC: BlockTags.create is NeoForge-only*/ MekanismTools.rl(name));
         }
     }
 
@@ -42,7 +42,7 @@ public class ToolsTags {
         public static final TagKey<Item> TOOLS_PAXEL = commonTag("tools/paxel");
 
         private static TagKey<Item> commonTag(String name) {
-            return ItemTags.create(ResourceLocation.fromNamespaceAndPath("c", name));
+            return net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.ITEM, /*FABRIC: ItemTags.create is NeoForge-only*/ ResourceLocation.fromNamespaceAndPath("c", name));
         }
     }
 }

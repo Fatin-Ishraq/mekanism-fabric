@@ -69,7 +69,7 @@ public class GeneratorsClientRegistration {
         event.enqueueWork(() -> {
             //Set fluids to a translucent render layer
             for (Holder<Fluid> fluid : GeneratorsFluids.FLUIDS.getFluidEntries()) {
-                ItemBlockRenderTypes.setRenderLayer(fluid.value(), RenderType.translucent());
+                net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap.INSTANCE.putFluid(fluid.value(), RenderType.translucent());//FABRIC: setRenderLayer(Fluid) is NeoForge-only
             }
         });
 

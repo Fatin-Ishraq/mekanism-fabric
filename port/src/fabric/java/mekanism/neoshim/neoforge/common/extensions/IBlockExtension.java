@@ -102,6 +102,23 @@ public interface IBlockExtension {
         return state.getSoundType();
     }
 
+    default float getFriction(BlockState state, LevelReader level, BlockPos pos, @Nullable Entity entity) {
+        return self().getFriction();
+    }
+
+    default int getFlammability(BlockState state, BlockGetter level, BlockPos pos, Direction direction) {
+        return ((FireBlock) Blocks.FIRE).getBurnOdds(state);
+    }
+
+    default int getFireSpreadSpeed(BlockState state, BlockGetter level, BlockPos pos, Direction direction) {
+        return ((FireBlock) Blocks.FIRE).getIgniteOdds(state);
+    }
+
+    @Nullable
+    default Integer getBeaconColorMultiplier(BlockState state, LevelReader level, BlockPos pos, BlockPos beaconPos) {
+        return null;
+    }
+
     default boolean shouldCheckWeakPower(BlockState state, net.minecraft.world.level.SignalGetter level, BlockPos pos, Direction side) {
         return state.isRedstoneConductor(level, pos);
     }

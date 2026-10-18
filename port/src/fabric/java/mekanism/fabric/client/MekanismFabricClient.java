@@ -13,6 +13,7 @@ public class MekanismFabricClient implements ClientModInitializer {
     public void onInitializeClient() {
         new MekanismClient(MekanismFabric.container());
         EventBusSubscribers.registerClient(MekanismFabric.container().getEventBus());
+        mekanism.fabric.ModuleLoader.constructClientModules();
         ClientBridge.init(MekanismFabric.container());
     }
 }

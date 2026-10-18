@@ -48,6 +48,27 @@ public abstract class BlockEvent extends Event {
         }
     }
 
+    public static class NeighborNotifyEvent extends BlockEvent implements ICancellableEvent {
+
+        private final java.util.EnumSet<net.minecraft.core.Direction> notifiedSides;
+        private final boolean forceRedstoneUpdate;
+
+        public NeighborNotifyEvent(net.minecraft.world.level.Level level, BlockPos pos, BlockState state, java.util.EnumSet<net.minecraft.core.Direction> notifiedSides,
+              boolean forceRedstoneUpdate) {
+            super(level, pos, state);
+            this.notifiedSides = notifiedSides;
+            this.forceRedstoneUpdate = forceRedstoneUpdate;
+        }
+
+        public java.util.EnumSet<net.minecraft.core.Direction> getNotifiedSides() {
+            return notifiedSides;
+        }
+
+        public boolean getForceRedstoneUpdate() {
+            return forceRedstoneUpdate;
+        }
+    }
+
     public static class EntityPlaceEvent extends BlockEvent implements ICancellableEvent {
 
         private final Entity entity;

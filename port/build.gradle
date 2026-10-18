@@ -91,6 +91,37 @@ sourceSets {
     }
 }
 
+// Generators / Additions / Tools: each its own Fabric mod (src/<module> upstream code + src/fabric/<module> bootstrap)
+def mekModules = ['generators', 'additions', 'tools']
+def moduleExcludes = [
+        // Wildfire's Gender Mod integration (NeoForge capability based) - phase 9
+        'mekanism/tools/common/integration/gender/**',
+        // Module JEI/EMI plugins (depend on the core plugins) - phase 9
+        'mekanism/*/client/recipe_viewer/jei/**',
+        'mekanism/*/client/recipe_viewer/emi/**',
+]
+sourceSets {
+    mekModules.each { moduleName ->
+        create(moduleName) {
+            java {
+                srcDirs = ["src/${moduleName}/java", "src/fabric/${moduleName}/java"]
+                exclude(moduleExcludes)
+            }
+            resources {
+                srcDirs = ["src/${moduleName}/resources", "src/datagen/generated/mekanism${moduleName}", "src/fabric/${moduleName}/resources"]
+                exclude('**/*.blend', '**/*.bbmodel', '.cache', 'META-INF/neoforge.mods.toml', 'META-INF/accesstransformer.cfg')
+            }
+            compileClasspath += main.compileClasspath + main.output
+            runtimeClasspath += main.output + configurations.runtimeClasspath
+        }
+        main.runtimeClasspath += sourceSets.getByName(moduleName).output
+    }
+}
+mekModules.each { moduleName ->
+    configurations.named("${moduleName}AnnotationProcessor") { extendsFrom(configurations.annotationProcessor) }
+    configurations.named("${moduleName}CompileOnly") { extendsFrom(configurations.compileOnly) }
+}
+
 // Headless functional tests (Fabric GameTest), not shipped in the mod jar
 sourceSets {
     gametest {
@@ -108,6 +139,15 @@ loom {
         }
         mekanism_fabric_gametest {
             sourceSet sourceSets.gametest
+        }
+        mekanismgenerators_fabric {
+            sourceSet sourceSets.generators
+        }
+        mekanismadditions_fabric {
+            sourceSet sourceSets.additions
+        }
+        mekanismtools_fabric {
+            sourceSet sourceSets.tools
         }
     }
     accessWidenerPath = file('src/fabric/resources/mekanism.accesswidener')
@@ -178,22 +218,28 @@ dependencies {
     annotationProcessor(project(':annotation-processor'))
 }
 
-tasks.withType(JavaCompile).configureEach {
+tasks.withType(JavaCompile).configureEach { JavaCompile task ->
     options.encoding = 'UTF-8'
     options.release = Integer.parseInt(java_version)
-    options.compilerArgs.addAll(['-AmekanismModule=mekanism', '-parameters', '-Xmaxerrs', '100000'])
+    // Upstream's annotation processor needs the NeoForge module id of the source set being compiled
+    def module = mekModules.find { task.name == "compile${it.capitalize()}Java" }
+    options.compilerArgs.addAll(["-AmekanismModule=mekanism${module ?: ''}", '-parameters', '-Xmaxerrs', '100000'])
 }
 
-processResources {
-    def props = ['version': project.version, 'minecraft_version': minecraft_version, 'loader_version': loader_version,
-                 'fabric_version': fabric_version, 'fcap_version': fcap_version]
-    inputs.properties(props)
-    // Literal token replacement (not Groovy templating: injected interface keys contain '$')
-    filesMatching('fabric.mod.json') {
-        filter { String line -> props.inject(line) { String l, k, v -> l.replace('${' + k + '}', v.toString()) } }
+def fabricModJsonProps = ['version': project.version, 'minecraft_version': minecraft_version, 'loader_version': loader_version,
+                          'fabric_version': fabric_version, 'fcap_version': fcap_version]
+(['processResources'] + mekModules.collect { "process${it.capitalize()}Resources".toString() }).each { taskName ->
+    tasks.named(taskName, ProcessResources) {
+        inputs.properties(fabricModJsonProps)
+        // Literal token replacement (not Groovy templating: injected interface keys contain '$')
+        filesMatching('fabric.mod.json') {
+            filter { String line -> fabricModJsonProps.inject(line) { String l, k, v -> l.replace('${' + k + '}', v.toString()) } }
+        }
+        from(rootProject.file('LICENSE')) { rename { 'LICENSE_mekanism' } }
     }
+}
+processResources {
     from(rootProject.file('logo.png')) { into('assets/mekanism_fabric') }
-    from(rootProject.file('LICENSE')) { rename { 'LICENSE_mekanism' } }
 }
 
 // ---- NeoForge -> Fabric data JSON transform (NOTES.md D11) ----
@@ -238,6 +284,9 @@ transformJson = { Object node ->
         node.each { k, v ->
             if (k == 'neoforge:conditions') {
                 out['fabric:load_conditions'] = v.collect { convertCondition(it as Map) }
+            } else if (v instanceof String && v.startsWith('#neoforge:')) {
+                //NeoForge-namespaced tag references -> Fabric convention ("c") tags
+                out[k] = '#c:' + v.substring('#neoforge:'.length())
             } else if (k == 'type' && neoIngredientTypes.contains(v)) {
                 out['fabric:type'] = v
             } else {
@@ -246,12 +295,13 @@ transformJson = { Object node ->
         }
         return out
     } else if (node instanceof List) {
-        return node.collect { transformJson(it) }
+        //NeoForge-namespaced tag references -> optional Fabric convention ("c") tag entries (not every NeoForge tag has a Fabric equivalent)
+        return node.collect { it instanceof String && it.startsWith('#neoforge:') ? [id: '#c:' + it.substring('#neoforge:'.length()), required: false] : transformJson(it) }
     }
     return node
 }
 
-processResources {
+(['processResources'] + mekModules.collect { "process${it.capitalize()}Resources".toString() }).each { taskName -> tasks.named(taskName, ProcessResources) {
     doLast {
         def dataDir = new File(destinationDir, 'data')
         if (dataDir.exists()) {
@@ -265,4 +315,5 @@ processResources {
             }
         }
     }
+}
 }

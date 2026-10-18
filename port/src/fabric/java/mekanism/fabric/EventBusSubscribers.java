@@ -37,7 +37,7 @@ public final class EventBusSubscribers {
         register(modBus, CLIENT);
     }
 
-    private static void register(IEventBus modBus, String[] classNames) {
+    public static void register(IEventBus modBus, String[] classNames) {
         for (String className : classNames) {
             Class<?> clazz;
             try {

@@ -150,6 +150,9 @@
       "net/minecraft/class_1761": [
         "mekanism/neoshim/neoforge/common/extensions/ICreativeModeTabExtension"
       ],
+      "net/minecraft/class_1299$class_1300": [
+        "mekanism/neoshim/neoforge/common/extensions/IEntityTypeBuilderExtension<TT;>"
+      ],
       "net/minecraft/class_1761$class_7913": [
         "mekanism/neoshim/neoforge/common/extensions/ICreativeModeTabBuilderExtension"
       ],

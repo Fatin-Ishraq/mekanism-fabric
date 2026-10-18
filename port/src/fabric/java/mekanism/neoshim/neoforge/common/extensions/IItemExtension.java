@@ -38,6 +38,10 @@ public interface IItemExtension {
         return InteractionResult.PASS;
     }
 
+    default boolean isDamageable(ItemStack stack) {
+        return stack.has(DataComponents.MAX_DAMAGE);
+    }
+
     default boolean isRepairable(ItemStack stack) {
         return true;
     }

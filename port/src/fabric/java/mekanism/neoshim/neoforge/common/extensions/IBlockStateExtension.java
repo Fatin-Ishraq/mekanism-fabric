@@ -83,6 +83,14 @@ public interface IBlockStateExtension {
         return self().getBlock().getSoundType(self(), level, pos, entity);
     }
 
+    default float getFriction(LevelReader level, BlockPos pos, @Nullable net.minecraft.world.entity.Entity entity) {
+        return self().getBlock().getFriction(self(), level, pos, entity);
+    }
+
+    default int getFlammability(BlockGetter level, BlockPos pos, Direction face) {
+        return self().getBlock().getFlammability(self(), level, pos, face);
+    }
+
     default boolean getWeakChanges(LevelReader level, BlockPos pos) {
         return self().getBlock().getWeakChanges(self(), level, pos);
     }

@@ -37,6 +37,8 @@ public class MekanismFabric implements ModInitializer {
 
         new Mekanism(container, modBus);
         EventBusSubscribers.registerCommon(modBus);
+        //Generators / Additions / Tools (and any other NeoModule entrypoints)
+        ModuleLoader.constructModules();
 
         ModBusLifecycle.runCommonLifecycle();
         mekanism.fabric.compat.BiomeModifierBridge.apply(FABRIC_MOD_ID);
@@ -44,18 +46,18 @@ public class MekanismFabric implements ModInitializer {
     }
 
     private static void logRegistrationSummary() {
-        Mekanism.logger.info("[Fabric port] Registered {} blocks, {} items, {} block entity types, {} fluids, {} entity types, {} menus, {} chemicals",
+        Mekanism.logger.info("[Fabric port] (all modules) Registered {} blocks, {} items, {} block entity types, {} fluids, {} entity types, {} menus, {} chemicals",
               count(net.minecraft.core.registries.BuiltInRegistries.BLOCK), count(net.minecraft.core.registries.BuiltInRegistries.ITEM),
               count(net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE), count(net.minecraft.core.registries.BuiltInRegistries.FLUID),
               count(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE), count(net.minecraft.core.registries.BuiltInRegistries.MENU),
               count(mekanism.api.MekanismAPI.CHEMICAL_REGISTRY));
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STARTED.register(server -> {
-            long recipes = server.getRecipeManager().getRecipes().stream().filter(r -> r.id().getNamespace().equals(Mekanism.MODID)).count();
-            Mekanism.logger.info("[Fabric port] Loaded {} mekanism recipes", recipes);
+            long recipes = server.getRecipeManager().getRecipes().stream().filter(r -> r.id().getNamespace().startsWith(Mekanism.MODID)).count();
+            Mekanism.logger.info("[Fabric port] Loaded {} recipes in mekanism* namespaces", recipes);
         });
     }
 
     private static long count(net.minecraft.core.Registry<?> registry) {
-        return registry.keySet().stream().filter(id -> id.getNamespace().equals(Mekanism.MODID)).count();
+        return registry.keySet().stream().filter(id -> id.getNamespace().startsWith(Mekanism.MODID)).count();
     }
 }

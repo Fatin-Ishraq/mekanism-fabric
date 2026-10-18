@@ -55,11 +55,11 @@ public class AdditionsTags {
         public static final TagKey<Item> PLASTIC_BLOCKS_TRANSPARENT = tag("plastic_blocks/transparent");
 
         private static TagKey<Item> commonTag(String name) {
-            return ItemTags.create(ResourceLocation.fromNamespaceAndPath("c", name));
+            return net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.ITEM, /*FABRIC: ItemTags.create is NeoForge-only*/ ResourceLocation.fromNamespaceAndPath("c", name));
         }
 
         private static TagKey<Item> tag(String name) {
-            return ItemTags.create(MekanismAdditions.rl(name));
+            return net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.ITEM, /*FABRIC: ItemTags.create is NeoForge-only*/ MekanismAdditions.rl(name));
         }
     }
 
@@ -88,11 +88,11 @@ public class AdditionsTags {
         public static final TagKey<Block> PLASTIC_BLOCKS_TRANSPARENT = tag("plastic_blocks/transparent");
 
         private static TagKey<Block> commonTag(String name) {
-            return BlockTags.create(ResourceLocation.fromNamespaceAndPath("c", name));
+            return net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.BLOCK, /*FABRIC: BlockTags.create is NeoForge-only*/ ResourceLocation.fromNamespaceAndPath("c", name));
         }
 
         private static TagKey<Block> tag(String name) {
-            return BlockTags.create(MekanismAdditions.rl(name));
+            return net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.BLOCK, /*FABRIC: BlockTags.create is NeoForge-only*/ MekanismAdditions.rl(name));
         }
     }
 

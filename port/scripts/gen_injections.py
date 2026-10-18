@@ -53,6 +53,7 @@ SPEC = [
     ("net/minecraft/world/entity/LightningBolt", False, "", [EXT + "ILightningBoltExtension"], False, True),
     ("net/minecraft/network/protocol/configuration/ServerConfigurationPacketListener", True, "", [EXT + "IServerConfigurationPacketListenerExtension"], False, False),
     ("net/minecraft/world/item/CreativeModeTab", False, "", [EXT + "ICreativeModeTabExtension"], False, False),
+    ("net/minecraft/world/entity/EntityType$Builder", False, "T", [EXT + "IEntityTypeBuilderExtension<T>"], False, False),
     ("net/minecraft/world/item/CreativeModeTab$Builder", False, "", [EXT + "ICreativeModeTabBuilderExtension"], False, False),
     ("net/minecraft/world/item/DispensibleContainerItem", True, "", [EXT + "IDispensibleContainerItemExtension"], False, False),
     ("net/minecraft/resources/ResourceLocation", False, "", [EXT + "IResourceLocationExtension"], False, False),
@@ -81,6 +82,7 @@ SPEC = [
 # Bounds for type parameters of generic targets (for the generated mixin declarations)
 BOUNDS = {
     "net/minecraft/world/entity/EntityType": "T extends net.minecraft.world.entity.Entity",
+    "net/minecraft/world/entity/EntityType$Builder": "T extends net.minecraft.world.entity.Entity",
     "net/minecraft/client/gui/screens/inventory/AbstractContainerScreen": "T extends net.minecraft.world.inventory.AbstractContainerMenu",
     "net/minecraft/client/renderer/blockentity/BlockEntityRenderer": "T extends net.minecraft.world.level.block.entity.BlockEntity",
     "net/minecraft/client/renderer/entity/layers/ElytraLayer":

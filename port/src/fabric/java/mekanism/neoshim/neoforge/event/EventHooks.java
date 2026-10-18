@@ -16,6 +16,12 @@ import org.jetbrains.annotations.Nullable;
 /** NeoForge event hooks Mekanism calls directly. Fabric has no direct equivalents for these, so they report "not cancelled". */
 public class EventHooks {
 
+    /** Fabric has no neighbour-notify event; never cancelled. */
+    public static mekanism.neoshim.neoforge.event.level.BlockEvent.NeighborNotifyEvent onNeighborNotify(Level level, net.minecraft.core.BlockPos pos,
+          net.minecraft.world.level.block.state.BlockState state, java.util.EnumSet<Direction> notifiedSides, boolean forceRedstoneUpdate) {
+        return new mekanism.neoshim.neoforge.event.level.BlockEvent.NeighborNotifyEvent(level, pos, state, notifiedSides, forceRedstoneUpdate);
+    }
+
     public static boolean onBlockPlace(@Nullable Entity entity, BlockSnapshot blockSnapshot, Direction direction) {
         return false;
     }

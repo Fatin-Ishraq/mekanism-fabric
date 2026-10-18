@@ -11,6 +11,6 @@ import mekanism.neoshim.neoforge.client.gui.IConfigScreenFactory;
 public class GeneratorsClient {
 
     public GeneratorsClient(ModContainer container) {
-        container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
+        container.registerExtensionPoint(IConfigScreenFactory.class, () -> (c, parent) -> new ConfigurationScreen(c.getModId(), parent));//FABRIC: FCAP screen ctor takes a mod id
     }
 }

@@ -22,8 +22,7 @@ public class BlockPlasticFenceGate extends FenceGateBlock implements IColoredBlo
     private final EnumColor color;
 
     public BlockPlasticFenceGate(EnumColor color) {
-        super(BlockStateHelper.applyLightLevelAdjustments(BlockBehaviour.Properties.of().mapColor(color.getMapColor()).strength(5, 6)),
-              SoundEvents.FENCE_GATE_CLOSE, SoundEvents.FENCE_GATE_OPEN);
+        super(net.minecraft.world.level.block.state.properties.WoodType.OAK, BlockStateHelper.applyLightLevelAdjustments(BlockBehaviour.Properties.of().mapColor(color.getMapColor()).strength(5, 6)));//FABRIC: NeoForge (Properties, SoundEvent, SoundEvent) ctor; oak wood type has the same fence gate sounds
         this.color = color;
         //Uses getDefaultState as starting state to take into account the stuff from super
         registerDefaultState(BlockStateHelper.getDefaultState(defaultBlockState()));

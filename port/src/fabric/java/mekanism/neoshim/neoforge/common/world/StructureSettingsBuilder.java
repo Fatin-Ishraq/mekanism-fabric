@@ -14,6 +14,11 @@ public class StructureSettingsBuilder {
         return spawnOverrides.computeIfAbsent(category, c -> new StructureSpawnOverrideBuilder());
     }
 
+    @org.jetbrains.annotations.Nullable
+    public StructureSpawnOverrideBuilder getSpawnOverrides(MobCategory category) {
+        return spawnOverrides.get(category);
+    }
+
     public void removeSpawnOverrides(MobCategory category) {
         spawnOverrides.remove(category);
     }

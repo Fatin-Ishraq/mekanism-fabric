@@ -50,23 +50,39 @@ public final class ClientBridge {
         IEventBus modBus = container.getEventBus();
         IEventBus bus = NeoForge.EVENT_BUS;
 
-        // Mod-bus registration events (NeoForge fires these during client mod loading)
-        modBus.post(new RegisterKeyMappingsEvent());
-        modBus.post(new RegisterMenuScreensEvent());
-        modBus.post(new EntityRenderersEvent.RegisterLayerDefinitions());
-        modBus.post(new EntityRenderersEvent.RegisterRenderers());
-        modBus.post(new RegisterParticleProvidersEvent());
-        modBus.post(new RegisterClientExtensionsEvent());
-        modBus.post(new RegisterItemDecorationsEvent());
-        modBus.post(new ModelEvent.RegisterGeometryLoaders());
+        // Mod-bus registration events (NeoForge fires these during client mod loading), for every NeoForge-style mod in the port
+        List<RegisterGuiLayersEvent.Entry> allLayers = new java.util.ArrayList<>();
+        for (ModContainer mod : mekanism.fabric.bridge.ModBusLifecycle.mods()) {
+            IEventBus bus0 = mod.getEventBus();
+            bus0.post(new RegisterKeyMappingsEvent());
+            bus0.post(new RegisterMenuScreensEvent());
+            bus0.post(new EntityRenderersEvent.RegisterLayerDefinitions());
+            bus0.post(new EntityRenderersEvent.RegisterRenderers());
+            bus0.post(new RegisterParticleProvidersEvent());
+            bus0.post(new RegisterClientExtensionsEvent());
+            bus0.post(new RegisterItemDecorationsEvent());
+            bus0.post(new ModelEvent.RegisterGeometryLoaders());
+            RegisterGuiLayersEvent layers = new RegisterGuiLayersEvent();
+            bus0.post(layers);
+            allLayers.addAll(layers.getLayers());
+            mod.getCustomExtension(IConfigScreenFactory.class).ifPresent(factory ->
+                  ConfigScreenFactoryRegistry.INSTANCE.register(mod.getModId(), (modId, parent) -> factory.createScreen(mod, parent)));
+        }
+        guiLayers = List.copyOf(allLayers);
         mekanism.fabric.client.model.NeoModelLoadingPlugin.register();
-        RegisterGuiLayersEvent layers = new RegisterGuiLayersEvent();
-        modBus.post(layers);
-        guiLayers = List.copyOf(layers.getLayers());
-
-        container.getCustomExtension(IConfigScreenFactory.class).ifPresent(factory ->
-              ConfigScreenFactoryRegistry.INSTANCE.register(container.getModId(), (modId, parent) -> factory.createScreen(container, parent)));
-        modBus.post(new FMLClientSetupEvent(container));
+        net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback.EVENT.register(shaderContext -> {
+            for (ModContainer mod : mekanism.fabric.bridge.ModBusLifecycle.mods()) {
+                try {
+                    mod.getEventBus().post(new mekanism.neoshim.neoforge.client.event.RegisterShadersEvent(shaderContext));
+                } catch (RuntimeException e) {
+                    mekanism.common.Mekanism.logger.error("[Fabric port] Failed to register shaders for {}", mod.getModId(), e);
+                }
+            }
+        });
+        registerFluidRenderHandlers();
+        for (ModContainer mod : mekanism.fabric.bridge.ModBusLifecycle.mods()) {
+            mod.getEventBus().post(new FMLClientSetupEvent(mod));
+        }
 
         if (Boolean.getBoolean("mekanism_fabric.smokeWorld")) {
             mekanism.fabric.client.SmokeWorldDriver.init();
@@ -89,14 +105,6 @@ public final class ClientBridge {
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(mekanism.fabric.datamaps.DataMapLoader.SyncPayload.TYPE,
               (payload, context) -> mekanism.fabric.datamaps.DataMapLoader.applySync(payload.data(), context.client().getConnection().registryAccess()));
 
-        net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback.EVENT.register(shaderContext -> {
-            try {
-                modBus.post(new mekanism.neoshim.neoforge.client.event.RegisterShadersEvent(shaderContext));
-            } catch (RuntimeException e) {
-                mekanism.common.Mekanism.logger.error("[Fabric port] Failed to register shaders", e);
-            }
-        });
-        registerFluidRenderHandlers();
 
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(mekanism.fabric.menu.ExtendedMenus.MenuDataPayload.TYPE,
               (payload, context) -> mekanism.fabric.menu.ExtendedMenus.setPendingClientData(payload.data()));

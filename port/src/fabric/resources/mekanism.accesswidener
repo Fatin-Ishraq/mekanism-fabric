@@ -147,3 +147,14 @@ accessible field net/minecraft/client/renderer/block/model/BlockModel parentLoca
 accessible field net/minecraft/client/renderer/block/model/BlockModel textureMap Ljava/util/Map;
 accessible field net/minecraft/world/inventory/MenuType constructor Lnet/minecraft/world/inventory/MenuType$MenuSupplier;
 accessible method net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen selectTab (Lnet/minecraft/world/item/CreativeModeTab;)V
+# ---- From src/additions/resources/META-INF/accesstransformer.cfg (Additions module; access wideners are global) ----
+accessible field net/minecraft/world/entity/item/PrimedTnt owner Lnet/minecraft/world/entity/LivingEntity;
+accessible field net/minecraft/world/entity/item/PrimedTnt USED_PORTAL_DAMAGE_CALCULATOR Lnet/minecraft/world/level/ExplosionDamageCalculator;
+accessible field net/minecraft/world/entity/item/PrimedTnt usedPortal Z
+accessible field net/minecraft/world/entity/EntityType immuneTo Lcom/google/common/collect/ImmutableSet;
+accessible field net/minecraft/world/entity/EntityAttachments attachments Ljava/util/Map;
+accessible field net/minecraft/world/entity/monster/Creeper explosionRadius I
+extendable method net/minecraft/world/entity/monster/Creeper explodeCreeper ()V
+extendable method net/minecraft/world/entity/monster/Creeper spawnLingeringCloud ()V
+extendable method net/minecraft/world/entity/item/PrimedTnt explode ()V
+accessible method net/minecraft/world/level/block/FireBlock getIgniteOdds (Lnet/minecraft/world/level/block/state/BlockState;)I

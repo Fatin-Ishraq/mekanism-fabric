@@ -96,7 +96,7 @@ public final class SmokeWorldDriver {
                 if (++ticks > 40) {
                     stage = 4;
                     ticks = 0;
-                    if (client.screen == null || !client.screen.getClass().getName().startsWith("mekanism.client.gui")) {
+                    if (client.screen == null || !isMekanismScreen(client.screen)) {
                         fail("expected a Mekanism GUI, got " + (client.screen == null ? "no screen" : client.screen.getClass().getName()));
                     } else {
                         log("GUI open: {}", client.screen.getClass().getSimpleName());
@@ -110,12 +110,19 @@ public final class SmokeWorldDriver {
             }
             case 4 -> cycleGuiBlocks(client);
             case 5 -> {
-                if (++ticks == 1) {
-                    log("rendering the Mekanism creative tab");
+                if (ticks == 0) {
+                    tabs = net.minecraft.core.registries.BuiltInRegistries.CREATIVE_MODE_TAB.entrySet().stream()
+                          .filter(e -> e.getKey().location().getNamespace().startsWith("mekanism")).map(java.util.Map.Entry::getValue).toList();
+                    log("rendering {} Mekanism creative tabs", tabs.size());
                     var screen = new net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen(client.player, client.player.connection.enabledFeatures(), true);
                     client.setScreen(screen);
-                    screen.selectTab(mekanism.common.registries.MekanismCreativeTabs.MEKANISM.value());
-                } else if (ticks > 40) {
+                }
+                int tab = ticks / 10;
+                if (tab < tabs.size() && ticks % 10 == 0 && client.screen instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen screen) {
+                    screen.selectTab(tabs.get(tab));
+                }
+                ticks++;
+                if (tab >= tabs.size()) {
                     client.setScreen(null);
                     stage = 6;
                     ticks = 0;
@@ -133,10 +140,12 @@ public final class SmokeWorldDriver {
         }
     }
 
+    private static List<net.minecraft.world.item.CreativeModeTab> tabs = List.of();
     private static List<Block> guiBlocks = List.of();
     private static int guiIndex = 0;
     private static final List<String> noGui = new ArrayList<>();
     private static int guiOk = 0;
+    private static volatile String lastUseResult = "";
 
     private static List<Block> collectGuiBlocks() {
         List<Block> blocks = new ArrayList<>();
@@ -169,19 +178,27 @@ public final class SmokeWorldDriver {
             });
         } else if (ticks == 4) {
             //Open in a later tick so the client already has the block entity (like a real player interaction)
+            BlockPos checkPos = base.above(3);
+            if (client.level.getBlockEntity(checkPos) == null) {
+                String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).toString();
+                noGui.add(id + "(no client BE: " + client.level.getBlockState(checkPos) + ")");
+                ticks = 17;
+                return;
+            }
             MinecraftServer server = client.getSingleplayerServer();
             server.execute(() -> {
                 ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
                 ServerLevel level = player.serverLevel();
                 BlockPos pos = base.above(3);
-                level.getBlockState(pos).useWithoutItem(level, player, new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false));
+                InteractionResult result = level.getBlockState(pos).useWithoutItem(level, player, new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false));
+                lastUseResult = result + " state=" + level.getBlockState(pos) + " be=" + level.getBlockEntity(pos);
             });
         } else if (ticks == 16) {
             String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).getPath();
-            if (client.screen != null && client.screen.getClass().getName().startsWith("mekanism.client.gui")) {
+            if (client.screen != null && isMekanismScreen(client.screen)) {
                 guiOk++;
             } else {
-                noGui.add(id);
+                noGui.add(id + "[" + lastUseResult + "]");
             }
             if (client.player != null) {
                 client.player.closeContainer();
@@ -190,6 +207,11 @@ public final class SmokeWorldDriver {
             guiIndex++;
             ticks = 0;
         }
+    }
+
+    private static boolean isMekanismScreen(net.minecraft.client.gui.screens.Screen screen) {
+        String name = screen.getClass().getName();
+        return name.startsWith("mekanism.") && name.contains(".client.gui.");
     }
 
     private static BlockState facing(Block block, Direction direction) {

@@ -13,7 +13,7 @@ import org.jetbrains.annotations.NotNull;
 public class ItemMekanismSword extends SwordItem {
 
     public ItemMekanismSword(MaterialCreator material, Item.Properties properties) {
-        super(material, properties.attributes(createAttributes(material, material.getSwordDamage(), material.getSwordAtkSpeed())));
+        super(material, properties.attributes(createAttributes(material, Math.round(material.getSwordDamage()), material.getSwordAtkSpeed())/*FABRIC: vanilla takes an int damage*/));
     }
 
     @Override
