@@ -59,6 +59,7 @@ public final class ClientBridge {
         modBus.post(new RegisterClientExtensionsEvent());
         modBus.post(new RegisterItemDecorationsEvent());
         modBus.post(new ModelEvent.RegisterGeometryLoaders());
+        mekanism.fabric.client.model.NeoModelLoadingPlugin.register();
         RegisterGuiLayersEvent layers = new RegisterGuiLayersEvent();
         modBus.post(layers);
         guiLayers = List.copyOf(layers.getLayers());
@@ -73,6 +74,7 @@ public final class ClientBridge {
                 if (client.getOverlay() == null && client.screen != null) {
                     mekanism.common.Mekanism.logger.info("[Fabric port] Smoke test: resource loading finished, showing {}; stopping client",
                           client.screen.getClass().getSimpleName());
+                    logMissingModels(client);
                     client.stop();
                 }
             });
@@ -117,6 +119,41 @@ public final class ClientBridge {
             modBus.post(reloadListeners);
             reloadListeners.getListeners().forEach(resourceManager::registerReloadListener);
         }
+    }
+
+    /** Smoke-test diagnostic: counts Mekanism block states / items whose model baked to the missing model. */
+    private static void logMissingModels(Minecraft client) {
+        var missing = client.getModelManager().getMissingModel();
+        java.util.List<String> missingBlocks = new java.util.ArrayList<>();
+        int blockStates = 0;
+        for (var block : net.minecraft.core.registries.BuiltInRegistries.BLOCK) {
+            var id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block);
+            if (!id.getNamespace().startsWith("mekanism")) {
+                continue;
+            }
+            for (var state : block.getStateDefinition().getPossibleStates()) {
+                blockStates++;
+                if (client.getBlockRenderer().getBlockModel(state) == missing && state.getRenderShape() == net.minecraft.world.level.block.RenderShape.MODEL) {
+                    missingBlocks.add(state.toString());
+                }
+            }
+        }
+        java.util.List<String> missingItems = new java.util.ArrayList<>();
+        int items = 0;
+        for (var item : net.minecraft.core.registries.BuiltInRegistries.ITEM) {
+            var id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item);
+            if (!id.getNamespace().startsWith("mekanism")) {
+                continue;
+            }
+            items++;
+            if (client.getItemRenderer().getModel(new net.minecraft.world.item.ItemStack(item), null, null, 0) == missing) {
+                missingItems.add(id.toString());
+            }
+        }
+        mekanism.common.Mekanism.logger.info("[Fabric port] Smoke test models: {}/{} block states missing, {}/{} items missing", missingBlocks.size(), blockStates,
+              missingItems.size(), items);
+        missingBlocks.stream().limit(40).forEach(s -> mekanism.common.Mekanism.logger.warn("[Fabric port] Missing block model: {}", s));
+        missingItems.stream().limit(80).forEach(s -> mekanism.common.Mekanism.logger.warn("[Fabric port] Missing item model: {}", s));
     }
 
     private static void postStage(RenderLevelStageEvent.Stage stage, WorldRenderContext context) {

@@ -109,4 +109,21 @@ public abstract class BakedModelWrapper<T extends BakedModel> implements BakedMo
     public List<BakedModel> getRenderPasses(ItemStack itemStack, boolean fabulous) {
         return originalModel.getRenderPasses(itemStack, fabulous);
     }
+
+    //Fabric Renderer API: render with model data and per-render-type blend modes (NOTES.md "Hook status")
+    @Override
+    public boolean isVanillaAdapter() {
+        return false;
+    }
+
+    @Override
+    public void emitBlockQuads(BlockAndTintGetter blockView, BlockState state, BlockPos pos, java.util.function.Supplier<RandomSource> randomSupplier,
+          net.fabricmc.fabric.api.renderer.v1.render.RenderContext context) {
+        mekanism.fabric.client.model.NeoModelRendering.emitBlockQuads(this, blockView, state, pos, randomSupplier, context);
+    }
+
+    @Override
+    public void emitItemQuads(ItemStack stack, java.util.function.Supplier<RandomSource> randomSupplier, net.fabricmc.fabric.api.renderer.v1.render.RenderContext context) {
+        mekanism.fabric.client.model.NeoModelRendering.emitItemQuads(this, stack, randomSupplier, context);
+    }
 }

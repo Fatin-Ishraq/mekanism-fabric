@@ -4,6 +4,7 @@
   "package": "mekanism.fabric.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "BlockEntityRenderDataMixin",
     "EntityThunderHitMixin",
     "ItemPropertiesMixin",
     "LevelChunkMixin",
@@ -48,6 +49,7 @@
     "client.ClientPacketListenerMixin",
     "client.KeyMappingMixin",
     "client.MinecraftInitMixin",
+    "client.ModelManagerApplyMixin",
     "client.ModelManagerMixin",
     "inject.AbstractContainerScreenInjectMixin",
     "inject.BakedModelInjectMixin",
