@@ -2,6 +2,8 @@ package mekanism.common.tile.machine;
 
 import java.util.List;
 import mekanism.api.IContentsListener;
+import mekanism.api.energy.IEnergyContainer;
+import mekanism.api.inventory.IInventorySlot;
 import mekanism.api.recipes.CombinerRecipe;
 import mekanism.api.recipes.cache.CachedRecipe;
 import mekanism.api.recipes.cache.CachedRecipe.OperationTracker.RecipeError;
@@ -13,10 +15,10 @@ import mekanism.api.recipes.outputs.OutputHelper;
 import mekanism.client.recipe_viewer.type.IRecipeViewerRecipeType;
 import mekanism.client.recipe_viewer.type.RecipeViewerRecipeType;
 import mekanism.common.capabilities.energy.MachineEnergyContainer;
-import mekanism.common.capabilities.holder.energy.EnergyContainerHelper;
-import mekanism.common.capabilities.holder.energy.IEnergyContainerHolder;
-import mekanism.common.capabilities.holder.slot.IInventorySlotHolder;
-import mekanism.common.capabilities.holder.slot.InventorySlotHelper;
+import mekanism.common.capabilities.holder.container.IContainerHolder;
+import mekanism.common.capabilities.holder.container.MekContainerHelper;
+import mekanism.common.capabilities.holder.single.ISingleContainerHolder;
+import mekanism.common.capabilities.holder.single.SingleConfigHolder;
 import mekanism.common.integration.computer.SpecialComputerMethodWrapper.ComputerIInventorySlotWrapper;
 import mekanism.common.integration.computer.annotation.ComputerMethod;
 import mekanism.common.integration.computer.annotation.WrappingComputerMethod;
@@ -32,19 +34,21 @@ import mekanism.common.recipe.MekanismRecipeType;
 import mekanism.common.recipe.lookup.IDoubleRecipeLookupHandler.DoubleItemRecipeLookupHandler;
 import mekanism.common.recipe.lookup.cache.InputRecipeCache.DoubleItem;
 import mekanism.common.registries.MekanismBlocks;
-import mekanism.common.tile.component.TileComponentEjector;
 import mekanism.common.tile.prefab.TileEntityProgressMachine;
 import mekanism.common.upgrade.CombinerUpgradeData;
 import mekanism.common.util.MekanismUtils;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.crafting.RecipeInput;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.UnknownNullability;
+import org.jspecify.annotations.Nullable;
 
 public class TileEntityCombiner extends TileEntityProgressMachine<CombinerRecipe> implements DoubleItemRecipeLookupHandler<CombinerRecipe> {
 
@@ -57,17 +61,22 @@ public class TileEntityCombiner extends TileEntityProgressMachine<CombinerRecipe
     );
     public static final int BASE_TICKS_REQUIRED = 10 * SharedConstants.TICKS_PER_SECOND;
 
-    private final IOutputHandler<@NotNull ItemStack> outputHandler;
-    private final IInputHandler<@NotNull ItemStack> inputHandler;
-    private final IInputHandler<@NotNull ItemStack> extraInputHandler;
+    private final IOutputHandler<ItemStackTemplate> outputHandler;
+    private final IInputHandler<Item, ItemStack> inputHandler;
+    private final IInputHandler<Item, ItemStack> extraInputHandler;
 
+    @UnknownNullability//Initialized via getInitialEnergyContainer
     private MachineEnergyContainer<TileEntityCombiner> energyContainer;
+    @UnknownNullability//Initialized via getInitialInventory
     @WrappingComputerMethod(wrapper = ComputerIInventorySlotWrapper.class, methodNames = "getMainInput", docPlaceholder = "main input slot")
     InputInventorySlot mainInputSlot;
+    @UnknownNullability//Initialized via getInitialInventory
     @WrappingComputerMethod(wrapper = ComputerIInventorySlotWrapper.class, methodNames = "getSecondaryInput", docPlaceholder = "secondary input slot")
     InputInventorySlot extraInputSlot;
+    @UnknownNullability//Initialized via getInitialInventory
     @WrappingComputerMethod(wrapper = ComputerIInventorySlotWrapper.class, methodNames = "getOutput", docPlaceholder = "output slot")
     OutputInventorySlot outputSlot;
+    @UnknownNullability//Initialized via getInitialInventory
     @WrappingComputerMethod(wrapper = ComputerIInventorySlotWrapper.class, methodNames = "getEnergyItem", docPlaceholder = "energy slot")
     EnergyInventorySlot energySlot;
 
@@ -76,7 +85,6 @@ public class TileEntityCombiner extends TileEntityProgressMachine<CombinerRecipe
         configComponent.setupItemIOExtraConfig(mainInputSlot, outputSlot, extraInputSlot, energySlot);
         configComponent.setupInputConfig(TransmissionType.ENERGY, energyContainer);
 
-        ejectorComponent = new TileComponentEjector(this);
         ejectorComponent.setOutputData(configComponent, TransmissionType.ITEM);
 
         inputHandler = InputHelper.getInputHandler(mainInputSlot, RecipeError.NOT_ENOUGH_INPUT);
@@ -84,40 +92,36 @@ public class TileEntityCombiner extends TileEntityProgressMachine<CombinerRecipe
         outputHandler = OutputHelper.getOutputHandler(outputSlot, RecipeError.NOT_ENOUGH_OUTPUT_SPACE);
     }
 
-    @NotNull
     @Override
-    protected IEnergyContainerHolder getInitialEnergyContainers(IContentsListener listener, IContentsListener recipeCacheListener, IContentsListener recipeCacheUnpauseListener) {
-        EnergyContainerHelper builder = EnergyContainerHelper.forSideWithConfig(this);
-        builder.addContainer(energyContainer = MachineEnergyContainer.input(this, recipeCacheUnpauseListener));
-        return builder.build();
+    protected ISingleContainerHolder<IEnergyContainer> getInitialEnergyContainer(IContentsListener listener, IContentsListener recipeCacheListener, IContentsListener recipeCacheUnpauseListener) {
+        energyContainer = MachineEnergyContainer.input(this, recipeCacheUnpauseListener);
+        return SingleConfigHolder.energy(energyContainer, this);
     }
 
-    @NotNull
     @Override
-    protected IInventorySlotHolder getInitialInventory(IContentsListener listener, IContentsListener recipeCacheListener, IContentsListener recipeCacheUnpauseListener) {
-        InventorySlotHelper builder = InventorySlotHelper.forSideWithConfig(this);
-        builder.addSlot(mainInputSlot = InputInventorySlot.at(item -> containsRecipeAB(item, extraInputSlot.getStack()), this::containsRecipeA, recipeCacheListener,
+    protected IContainerHolder<IInventorySlot> getInitialInventory(IContentsListener listener, IContentsListener recipeCacheListener, IContentsListener recipeCacheUnpauseListener) {
+        MekContainerHelper<IInventorySlot> builder = MekContainerHelper.forSideWithItemConfig(this);
+        builder.addContainer(mainInputSlot = InputInventorySlot.at((itemType, _) -> containsRecipeAB(itemType, extraInputSlot.resource()), this::containsRecipeA, recipeCacheListener,
               64, 17)
         ).tracksWarnings(slot -> slot.warning(WarningType.NO_MATCHING_RECIPE, getWarningCheck(RecipeError.NOT_ENOUGH_INPUT)));
-        builder.addSlot(extraInputSlot = InputInventorySlot.at(item -> containsRecipeBA(mainInputSlot.getStack(), item), this::containsRecipeB, recipeCacheListener,
+        builder.addContainer(extraInputSlot = InputInventorySlot.at((itemType, _) -> containsRecipeBA(mainInputSlot.resource(), itemType), this::containsRecipeB, recipeCacheListener,
               64, 53)
         ).tracksWarnings(slot -> slot.warning(WarningType.NO_MATCHING_RECIPE, getWarningCheck(RecipeError.NOT_ENOUGH_SECONDARY_INPUT)));
-        builder.addSlot(outputSlot = OutputInventorySlot.at(recipeCacheUnpauseListener, 116, 35))
+        builder.addContainer(outputSlot = OutputInventorySlot.at(recipeCacheUnpauseListener, 116, 35))
               .tracksWarnings(slot -> slot.warning(WarningType.NO_SPACE_IN_OUTPUT, getWarningCheck(RecipeError.NOT_ENOUGH_OUTPUT_SPACE)));
-        builder.addSlot(energySlot = EnergyInventorySlot.fillOrConvert(energyContainer, this::getLevel, listener, 39, 35));
+        builder.addContainer(energySlot = EnergyInventorySlot.fillOrConvert(energyContainer, this::getLevel, listener, 39, 35));
         extraInputSlot.setSlotType(ContainerSlotType.EXTRA);
         return builder.build();
     }
 
     @Override
-    protected boolean onUpdateServer() {
-        boolean sendUpdatePacket = super.onUpdateServer();
-        energySlot.fillContainerOrConvert();
+    protected boolean onUpdateServer(ServerLevel level) {
+        boolean sendUpdatePacket = super.onUpdateServer(level);
+        energySlot.fillContainerOrConvert(null);
         recipeCacheLookupMonitor.updateAndProcess();
         return sendUpdatePacket;
     }
 
-    @NotNull
     @Override
     public IMekanismRecipeTypeProvider<RecipeInput, CombinerRecipe, DoubleItem<CombinerRecipe>> getRecipeType() {
         return MekanismRecipeType.COMBINING;
@@ -134,10 +138,9 @@ public class TileEntityCombiner extends TileEntityProgressMachine<CombinerRecipe
         return findFirstRecipe(inputHandler, extraInputHandler);
     }
 
-    @NotNull
     @Override
-    public CachedRecipe<CombinerRecipe> createNewCachedRecipe(@NotNull CombinerRecipe recipe, int cacheIndex) {
-        return TwoInputCachedRecipe.combiner(recipe, recheckAllRecipeErrors, inputHandler, extraInputHandler, outputHandler)
+    public CachedRecipe<CombinerRecipe> createNewCachedRecipe(CombinerRecipe recipe, int cacheIndex) {
+        return new TwoInputCachedRecipe<>(recipe, recheckAllRecipeErrors, inputHandler, extraInputHandler, outputHandler)
               .setErrorsChanged(this::onErrorsChanged)
               .setCanHolderFunction(this::canFunction)
               .setActive(this::setActive)
@@ -148,13 +151,12 @@ public class TileEntityCombiner extends TileEntityProgressMachine<CombinerRecipe
               .setBaselineMaxOperations(this::getOperationsPerTick);
     }
 
-    @NotNull
     @Override
     public CombinerUpgradeData getUpgradeData(HolderLookup.Provider provider) {
-        return new CombinerUpgradeData(provider, redstone, getControlType(), getEnergyContainer(), getOperatingTicks(), energySlot, extraInputSlot, mainInputSlot, outputSlot, getComponents());
+        return new CombinerUpgradeData(provider, redstone, getControlType(), energyContainer, getOperatingTicks(), energySlot, extraInputSlot, mainInputSlot, outputSlot, getComponents(), problemPath());
     }
 
-    public MachineEnergyContainer<TileEntityCombiner> getEnergyContainer() {
+    public MachineEnergyContainer<TileEntityCombiner> energyContainer() {
         return energyContainer;
     }
 

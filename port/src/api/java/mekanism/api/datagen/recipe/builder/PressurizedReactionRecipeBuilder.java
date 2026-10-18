@@ -1,28 +1,32 @@
 package mekanism.api.datagen.recipe.builder;
 
-import mekanism.api.annotations.NothingNullByDefault;
-import mekanism.api.chemical.ChemicalStack;
+import java.util.Objects;
+import mekanism.api.chemical.ChemicalStackTemplate;
 import mekanism.api.datagen.recipe.MekanismRecipeBuilder;
 import mekanism.api.recipes.PressurizedReactionRecipe;
 import mekanism.api.recipes.basic.BasicPressurizedReactionRecipe;
 import mekanism.api.recipes.ingredients.ChemicalStackIngredient;
 import mekanism.api.recipes.ingredients.FluidStackIngredient;
 import mekanism.api.recipes.ingredients.ItemStackIngredient;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.Recipe;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public class PressurizedReactionRecipeBuilder extends MekanismRecipeBuilder<PressurizedReactionRecipeBuilder> {
 
     private final ItemStackIngredient inputSolid;
     private final FluidStackIngredient inputFluid;
     private final ChemicalStackIngredient inputChemical;
-    private long energyRequired = 0;
+    private int energyRequired = 0;
     private final int duration;
-    private final ItemStack outputItem;
-    private final ChemicalStack outputChemical;
+    @Nullable
+    private final ItemStackTemplate outputItem;
+    @Nullable
+    private final ChemicalStackTemplate outputChemical;
 
     protected PressurizedReactionRecipeBuilder(ItemStackIngredient inputSolid, FluidStackIngredient inputFluid, ChemicalStackIngredient inputChemical, int duration,
-          ItemStack outputItem, ChemicalStack outputChemical) {
+          @Nullable ItemStackTemplate outputItem, @Nullable ChemicalStackTemplate outputChemical) {
         this.inputSolid = inputSolid;
         this.inputFluid = inputFluid;
         this.inputChemical = inputChemical;
@@ -31,57 +35,51 @@ public class PressurizedReactionRecipeBuilder extends MekanismRecipeBuilder<Pres
         this.outputChemical = outputChemical;
     }
 
-    /**
-     * Creates a Pressurized Reaction recipe builder.
-     *
-     * @param inputSolid    Item Input.
-     * @param inputFluid    Fluid Input.
-     * @param inputChemical Chemical Input.
-     * @param duration      Base duration in ticks that this recipe takes to complete. Must be greater than zero.
-     * @param outputItem    Item Output.
-     */
-    public static PressurizedReactionRecipeBuilder reaction(ItemStackIngredient inputSolid, FluidStackIngredient inputFluid, ChemicalStackIngredient inputChemical,
-          int duration, ItemStack outputItem) {
-        if (outputItem.isEmpty()) {
-            throw new IllegalArgumentException("This reaction recipe requires a non empty output item.");
-        }
-        validateDuration(duration);
-        return new PressurizedReactionRecipeBuilder(inputSolid, inputFluid, inputChemical, duration, outputItem, ChemicalStack.EMPTY);
+    @Override
+    public ResourceKey<Recipe<?>> defaultId() {
+        return NO_DEFAULT_ID;
     }
 
-    /**
-     * Creates a Pressurized Reaction recipe builder.
-     *
-     * @param inputSolid     Item Input.
-     * @param inputFluid     Fluid Input.
-     * @param inputChemical  Chemical Input.
-     * @param duration       Base duration in ticks that this recipe takes to complete. Must be greater than zero.
-     * @param outputChemical Chemical Output.
-     */
+    /// Creates a Pressurized Reaction recipe builder.
+    ///
+    /// @param inputSolid    Item Input.
+    /// @param inputFluid    Fluid Input.
+    /// @param inputChemical Chemical Input.
+    /// @param duration      Base duration in ticks that this recipe takes to complete. Must be greater than zero.
+    /// @param outputItem    Item Output.
     public static PressurizedReactionRecipeBuilder reaction(ItemStackIngredient inputSolid, FluidStackIngredient inputFluid, ChemicalStackIngredient inputChemical,
-          int duration, ChemicalStack outputChemical) {
-        if (outputChemical.isEmpty()) {
-            throw new IllegalArgumentException("This reaction recipe requires a non empty output chemical.");
-        }
+          int duration, ItemStackTemplate outputItem) {
+        Objects.requireNonNull(outputItem, "This reaction recipe requires a non empty output item.");
         validateDuration(duration);
-        return new PressurizedReactionRecipeBuilder(inputSolid, inputFluid, inputChemical, duration, ItemStack.EMPTY, outputChemical);
+        return new PressurizedReactionRecipeBuilder(inputSolid, inputFluid, inputChemical, duration, outputItem, null);
     }
 
-    /**
-     * Creates a Pressurized Reaction recipe builder.
-     *
-     * @param inputSolid     Item Input.
-     * @param inputFluid     Fluid Input.
-     * @param inputChemical  Chemical Input.
-     * @param duration       Base duration in ticks that this recipe takes to complete. Must be greater than zero.
-     * @param outputItem     Item Output.
-     * @param outputChemical Chemical Output.
-     */
+    /// Creates a Pressurized Reaction recipe builder.
+    ///
+    /// @param inputSolid     Item Input.
+    /// @param inputFluid     Fluid Input.
+    /// @param inputChemical  Chemical Input.
+    /// @param duration       Base duration in ticks that this recipe takes to complete. Must be greater than zero.
+    /// @param outputChemical Chemical Output.
     public static PressurizedReactionRecipeBuilder reaction(ItemStackIngredient inputSolid, FluidStackIngredient inputFluid, ChemicalStackIngredient inputChemical,
-          int duration, ItemStack outputItem, ChemicalStack outputChemical) {
-        if (outputItem.isEmpty() || outputChemical.isEmpty()) {
-            throw new IllegalArgumentException("This reaction recipe requires non empty item and chemical outputs.");
-        }
+          int duration, ChemicalStackTemplate outputChemical) {
+        Objects.requireNonNull(outputChemical, "This reaction recipe requires a non empty output chemical.");
+        validateDuration(duration);
+        return new PressurizedReactionRecipeBuilder(inputSolid, inputFluid, inputChemical, duration, null, outputChemical);
+    }
+
+    /// Creates a Pressurized Reaction recipe builder.
+    ///
+    /// @param inputSolid     Item Input.
+    /// @param inputFluid     Fluid Input.
+    /// @param inputChemical  Chemical Input.
+    /// @param duration       Base duration in ticks that this recipe takes to complete. Must be greater than zero.
+    /// @param outputItem     Item Output.
+    /// @param outputChemical Chemical Output.
+    public static PressurizedReactionRecipeBuilder reaction(ItemStackIngredient inputSolid, FluidStackIngredient inputFluid, ChemicalStackIngredient inputChemical,
+          int duration, ItemStackTemplate outputItem, ChemicalStackTemplate outputChemical) {
+        Objects.requireNonNull(outputItem, "This reaction recipe requires non empty item and chemical outputs.");
+        Objects.requireNonNull(outputChemical, "This reaction recipe requires non empty item and chemical outputs.");
         validateDuration(duration);
         return new PressurizedReactionRecipeBuilder(inputSolid, inputFluid, inputChemical, duration, outputItem, outputChemical);
     }
@@ -92,12 +90,10 @@ public class PressurizedReactionRecipeBuilder extends MekanismRecipeBuilder<Pres
         }
     }
 
-    /**
-     * Sets the "extra" energy required for this recipe.
-     *
-     * @param energyRequired How much "extra" energy this recipe requires, compared to the base energy requirements of the machine performing the recipe.
-     */
-    public PressurizedReactionRecipeBuilder energyRequired(long energyRequired) {
+    /// Sets the "extra" energy required for this recipe.
+    ///
+    /// @param energyRequired How much "extra" energy this recipe requires, compared to the base energy requirements of the machine performing the recipe.
+    public PressurizedReactionRecipeBuilder energyRequired(int energyRequired) {
         if (energyRequired < 0) {
             throw new IllegalArgumentException("This reaction recipe must have a positive or zero energy requirement.");
         }

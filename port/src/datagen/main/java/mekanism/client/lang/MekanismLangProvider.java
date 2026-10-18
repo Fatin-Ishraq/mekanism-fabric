@@ -76,7 +76,7 @@ import mekanism.common.util.EnumUtils;
 import mekanism.common.util.text.TextUtils;
 import net.minecraft.data.PackOutput;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 
@@ -405,7 +405,7 @@ public class MekanismLangProvider extends BaseLanguageProvider {
 
         for (Cell<ResourceType, PrimaryResource, ItemRegistryObject<Item>> item : MekanismItems.PROCESSED_RESOURCES.cellSet()) {
             String resourceName = TextUtils.formatAndCapitalize(item.getColumnKey().getRegistrySuffix());
-            TagKey<Item> tag = MekanismTags.Items.PROCESSED_RESOURCES.get(item.getRowKey(), item.getColumnKey());
+            TagKey<Item> tag = MekanismTags.Items.getProcessedResource(item.getRowKey(), item.getColumnKey());
             switch (item.getRowKey()) {
                 case SHARD -> {
                     add(item.getValue(), resourceName + " Shard");
@@ -658,7 +658,7 @@ public class MekanismLangProvider extends BaseLanguageProvider {
         addRobitSkin(MekanismRobitSkins.ALLAY, "Allay Costume");
         for (Map.Entry<RobitPrideSkinData, ResourceKey<RobitSkin>> entry : MekanismRobitSkins.PRIDE_SKINS.entrySet()) {
             ResourceKey<RobitSkin> prideSkin = entry.getValue();
-            String name = TextUtils.formatAndCapitalize(prideSkin.location().getPath());
+            String name = TextUtils.formatAndCapitalize(prideSkin.identifier().getPath());
             if (entry.getKey() != RobitPrideSkinData.PRIDE) {
                 name += " Pride";
             }
@@ -857,7 +857,7 @@ public class MekanismLangProvider extends BaseLanguageProvider {
         addJadeConfigTooltip(LookingAtUtils.CHEMICAL, "Chemical");
     }
 
-    private void addJadeConfigTooltip(ResourceLocation location, String value) {
+    private void addJadeConfigTooltip(Identifier location, String value) {
         add("config.jade.plugin_" + location.toLanguageKey(), value);
     }
 
@@ -898,8 +898,9 @@ public class MekanismLangProvider extends BaseLanguageProvider {
         add(APILang.CHEMICAL_ATTRIBUTE_COOLANT_EFFICIENCY, " - Coolant Efficiency: %1$s");
         add(APILang.CHEMICAL_ATTRIBUTE_COOLANT_ENTHALPY, " - Thermal Enthalpy: %1$s");
         add(APILang.CHEMICAL_ATTRIBUTE_COOLANT_TEMPERATURE, " - Temperature: %1$s");
-        add(APILang.CHEMICAL_ATTRIBUTE_FUEL_BURN_TICKS, " - Burn Time: %1$s t");
+        add(APILang.CHEMICAL_ATTRIBUTE_FUEL_MAX_BURN, " - Maximum Burn: %1$s");
         add(APILang.CHEMICAL_ATTRIBUTE_FUEL_ENERGY_DENSITY, " - Energy Density: %1$s");
+        add(APILang.CHEMICAL_ATTRIBUTE_FUEL_ENERGY_MAX_TOTAL, " - Maximum Output: %1$s");
         //Colors
         for (EnumColor color : EnumUtils.COLORS) {
             add(color.getLangEntry(), color.getEnglishName());
@@ -1537,9 +1538,6 @@ public class MekanismLangProvider extends BaseLanguageProvider {
         add(MekanismLang.TEMPERATURE_AMBIENT, "Ambient");
         add(MekanismLang.TEMPERATURE_AMBIENT_SHORT, "STP");
         //Energy
-        add(MekanismLang.ENERGY_JOULES, "Joule");
-        add(MekanismLang.ENERGY_JOULES_PLURAL, "Joules");
-        add(MekanismLang.ENERGY_JOULES_SHORT, "J");
         add(MekanismLang.ENERGY_FORGE, "Forge Energy");
         add(MekanismLang.ENERGY_FORGE_SHORT, "FE");
         //Network Reader

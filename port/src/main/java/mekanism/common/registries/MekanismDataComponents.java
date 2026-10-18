@@ -1,31 +1,30 @@
 package mekanism.common.registries;
 
-import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 import mekanism.api.MekanismAPI;
-import mekanism.api.annotations.NothingNullByDefault;
+import mekanism.api.chemical.ChemicalResource;
+import mekanism.api.resource.LargeResourceStack;
 import mekanism.api.robit.RobitSkin;
 import mekanism.api.security.SecurityMode;
 import mekanism.api.text.EnumColor;
 import mekanism.common.Mekanism;
-import mekanism.common.attachments.BlockData;
-import mekanism.common.attachments.FilterAware;
-import mekanism.common.attachments.FormulaAttachment;
-import mekanism.common.attachments.FrequencyAware;
-import mekanism.common.attachments.LockData;
-import mekanism.common.attachments.OverflowAware;
-import mekanism.common.attachments.StabilizedChunks;
-import mekanism.common.attachments.component.AttachedEjector;
-import mekanism.common.attachments.component.AttachedSideConfig;
-import mekanism.common.attachments.component.UpgradeAware;
-import mekanism.common.attachments.containers.chemical.AttachedChemicals;
-import mekanism.common.attachments.containers.energy.AttachedEnergy;
-import mekanism.common.attachments.containers.fluid.AttachedFluids;
-import mekanism.common.attachments.containers.heat.AttachedHeat;
-import mekanism.common.attachments.containers.item.AttachedItems;
-import mekanism.common.attachments.qio.DriveContents;
-import mekanism.common.attachments.qio.DriveMetadata;
-import mekanism.common.attachments.qio.PortableDashboardContents;
+import mekanism.common.component.BlockData;
+import mekanism.common.component.FilterAware;
+import mekanism.common.component.FormulaComponent;
+import mekanism.common.component.FrequencyAware;
+import mekanism.common.component.LockData;
+import mekanism.common.component.OverflowAware;
+import mekanism.common.component.PasteBucketConsumption;
+import mekanism.common.component.StabilizedChunks;
+import mekanism.common.component.component.AttachedEjector;
+import mekanism.common.component.component.AttachedSideConfig;
+import mekanism.common.component.component.UpgradeAware;
+import mekanism.common.component.containers.heat.HeatCapacitorData;
+import mekanism.common.component.containers.resource.AttachedResources;
+import mekanism.common.component.qio.DriveContents;
+import mekanism.common.component.qio.DriveMetadata;
+import mekanism.common.component.qio.PortableDashboardContents;
 import mekanism.common.content.entangloporter.InventoryFrequency;
 import mekanism.common.content.gear.ModuleContainer;
 import mekanism.common.content.qio.QIOFrequency;
@@ -37,7 +36,7 @@ import mekanism.common.item.interfaces.IFreeRunnerItem.FreeRunnerMode;
 import mekanism.common.item.interfaces.IJetpackItem.JetpackMode;
 import mekanism.common.lib.frequency.Frequency;
 import mekanism.common.lib.frequency.FrequencyType;
-import mekanism.common.lib.inventory.HashedItem;
+import mekanism.common.lib.frequency.FrequencyTypes;
 import mekanism.common.registration.MekanismDeferredHolder;
 import mekanism.common.registration.impl.DataComponentDeferredRegister;
 import mekanism.common.tile.TileEntityChemicalTank.GasMode;
@@ -51,11 +50,11 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.util.ExtraCodecs;
 import net.minecraft.world.item.Item;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.fluid.FluidResource;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public class MekanismDataComponents {
 
     private MekanismDataComponents() {
@@ -69,39 +68,22 @@ public class MekanismDataComponents {
                 .cacheEncoding()
     );
 
-    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<AttachedEnergy>> ATTACHED_ENERGY = DATA_COMPONENTS.simple("energy",
-          builder -> builder.persistent(AttachedEnergy.CODEC)
-                .networkSynchronized(AttachedEnergy.STREAM_CODEC)
-                .cacheEncoding()
-    );
-    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<AttachedItems>> ATTACHED_ITEMS = DATA_COMPONENTS.simple("items",
-          builder -> builder.persistent(AttachedItems.CODEC)
-                .networkSynchronized(AttachedItems.STREAM_CODEC)
-                .cacheEncoding()
-    );
-    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<AttachedFluids>> ATTACHED_FLUIDS = DATA_COMPONENTS.simple("fluids",
-          builder -> builder.persistent(AttachedFluids.CODEC)
-                .networkSynchronized(AttachedFluids.STREAM_CODEC)
+    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<Long>> ATTACHED_ENERGY = DATA_COMPONENTS.registerNonNegativeLong("energy");
+    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<AttachedResources<ItemResource>>> ATTACHED_ITEMS = DATA_COMPONENTS
+          .registerAttachedContents("items", LargeResourceStack.ITEM_HELPER);
+    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<AttachedResources<FluidResource>>> ATTACHED_FLUIDS = DATA_COMPONENTS
+          .registerAttachedContents("fluids", LargeResourceStack.FLUID_HELPER);
+    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<AttachedResources<ChemicalResource>>> ATTACHED_CHEMICALS = DATA_COMPONENTS
+          .registerAttachedContents("chemicals", LargeResourceStack.CHEMICAL_HELPER);
+
+    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<HeatCapacitorData>> ATTACHED_HEAT = DATA_COMPONENTS.simple("heat",
+          builder -> builder.persistent(HeatCapacitorData.CODEC)
+                .networkSynchronized(HeatCapacitorData.STREAM_CODEC)
                 .cacheEncoding()
     );
 
-    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<AttachedChemicals>> ATTACHED_CHEMICALS = DATA_COMPONENTS.simple("chemicals",
-          builder -> builder.persistent(AttachedChemicals.CODEC)
-                .networkSynchronized(AttachedChemicals.STREAM_CODEC)
-                .cacheEncoding()
-    );
-
-    static {//TODO - 1.22: remove backcompat
-        DATA_COMPONENTS.addAlias(Mekanism.rl("gases"), Mekanism.rl(ATTACHED_CHEMICALS.getName()));
-        DATA_COMPONENTS.addAlias(Mekanism.rl("infuse_types"), Mekanism.rl(ATTACHED_CHEMICALS.getName()));
-        DATA_COMPONENTS.addAlias(Mekanism.rl("pigments"), Mekanism.rl(ATTACHED_CHEMICALS.getName()));
-        DATA_COMPONENTS.addAlias(Mekanism.rl("slurries"), Mekanism.rl(ATTACHED_CHEMICALS.getName()));
-    }
-
-    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<AttachedHeat>> ATTACHED_HEAT = DATA_COMPONENTS.simple("heat_data",
-          builder -> builder.persistent(AttachedHeat.CODEC)
-                .networkSynchronized(AttachedHeat.STREAM_CODEC)
-                .cacheEncoding()
+    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<PasteBucketConsumption>> NUTRITIONAL_PASTE_CONSUMPTION = DATA_COMPONENTS.simple("paste_consumption",
+          builder -> builder.networkSynchronized(PasteBucketConsumption.STREAM_CODEC)
     );
 
     public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<DisassemblerMode>> DISASSEMBLER_MODE = DATA_COMPONENTS.simple("disassembler_mode",
@@ -178,19 +160,17 @@ public class MekanismDataComponents {
     );
 
     public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<Integer>> DELAY = DATA_COMPONENTS.registerInt("delay");
-    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<Long>> MIN_THRESHOLD = DATA_COMPONENTS.registerNonNegativeLong("min_threshold");
-    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<Long>> MAX_THRESHOLD = DATA_COMPONENTS.registerNonNegativeLong("max_threshold");
+    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<Integer>> MIN_THRESHOLD = DATA_COMPONENTS.registerNonNegativeInt("min_threshold");
+    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<Integer>> MAX_THRESHOLD = DATA_COMPONENTS.registerNonNegativeInt("max_threshold");
 
-    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<Long>> ENERGY_USAGE = DATA_COMPONENTS.registerNonNegativeLong("energy_usage");
+    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<Integer>> ENERGY_USAGE = DATA_COMPONENTS.registerNonNegativeInt("energy_usage");
 
     public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<Long>> LONG_AMOUNT = DATA_COMPONENTS.registerNonNegativeLong("long_amount");
-    //Note: We can't directly use ItemStack as it needs to override equals and hashcode, but as our only use case converts it to a HashedItem, we just use that
-    // We don't add this by default to the redstone adapter, so that the default state is there is no target set
-    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<Optional<HashedItem>>> ITEM_TARGET = DATA_COMPONENTS.simple("item_target",
-          builder -> builder.persistent(ExtraCodecs.optionalEmptyMap(HashedItem.CODEC)
-                .promotePartial(error -> Mekanism.logger.error("Failed to load item target: {}", error))
-                .orElse(Optional.empty())
-          ).networkSynchronized(ByteBufCodecs.optional(HashedItem.STREAM_CODEC))
+    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<ItemResource>> ITEM_TARGET = DATA_COMPONENTS.simple("item_target",
+          builder -> builder.persistent(ItemResource.OPTIONAL_CODEC.orElse(
+                (Consumer<String>) error -> Mekanism.logger.error("Failed to load item target: {}", error),
+                ItemResource.EMPTY
+          )).networkSynchronized(ItemResource.STREAM_CODEC)
     );
     public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<DriveMetadata>> DRIVE_METADATA = DATA_COMPONENTS.simple("drive_metadata",
           builder -> builder.persistent(DriveMetadata.CODEC)
@@ -217,9 +197,9 @@ public class MekanismDataComponents {
                 .networkSynchronized(LockData.STREAM_CODEC)
     );
 
-    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<FormulaAttachment>> FORMULA_HOLDER = DATA_COMPONENTS.simple("formula",
-          builder -> builder.persistent(FormulaAttachment.CODEC)
-                .networkSynchronized(FormulaAttachment.STREAM_CODEC)
+    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<FormulaComponent>> FORMULA_HOLDER = DATA_COMPONENTS.simple("formula",
+          builder -> builder.persistent(FormulaComponent.CODEC)
+                .networkSynchronized(FormulaComponent.STREAM_CODEC)
     );
 
     public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<CompoundTag>> CONFIGURATION_DATA = DATA_COMPONENTS.simple("configuration_data",
@@ -263,18 +243,18 @@ public class MekanismDataComponents {
                 .cacheEncoding()
     );
 
-    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<FrequencyAware<TeleporterFrequency>>> TELEPORTER_FREQUENCY = DATA_COMPONENTS.registerFrequencyAware("teleporter_frequency", () -> FrequencyType.TELEPORTER);
-    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<FrequencyAware<InventoryFrequency>>> INVENTORY_FREQUENCY = DATA_COMPONENTS.registerFrequencyAware("inventory_frequency", () -> FrequencyType.INVENTORY);
-    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<FrequencyAware<QIOFrequency>>> QIO_FREQUENCY = DATA_COMPONENTS.registerFrequencyAware("qio_frequency", () -> FrequencyType.QIO);
+    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<FrequencyAware<TeleporterFrequency>>> TELEPORTER_FREQUENCY = DATA_COMPONENTS.registerFrequencyAware("teleporter_frequency", () -> FrequencyTypes.TELEPORTER);
+    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<FrequencyAware<InventoryFrequency>>> INVENTORY_FREQUENCY = DATA_COMPONENTS.registerFrequencyAware("inventory_frequency", () -> FrequencyTypes.INVENTORY);
+    public static final MekanismDeferredHolder<DataComponentType<?>, DataComponentType<FrequencyAware<QIOFrequency>>> QIO_FREQUENCY = DATA_COMPONENTS.registerFrequencyAware("qio_frequency", () -> FrequencyTypes.QIO);
 
     @Nullable
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static <FREQ extends Frequency> DataComponentType<FrequencyAware<FREQ>> getFrequencyComponent(FrequencyType<FREQ> freq) {
-        if (freq == FrequencyType.TELEPORTER) {
+        if (freq == FrequencyTypes.TELEPORTER) {
             return (DataComponentType) TELEPORTER_FREQUENCY.value();
-        } else if (freq == FrequencyType.INVENTORY) {
+        } else if (freq == FrequencyTypes.INVENTORY) {
             return (DataComponentType) INVENTORY_FREQUENCY.value();
-        } else if (freq == FrequencyType.QIO) {
+        } else if (freq == FrequencyTypes.QIO) {
             return (DataComponentType) QIO_FREQUENCY.value();
         }
         return null;

@@ -10,15 +10,10 @@ import net.minecraft.world.level.block.state.BlockState;
 
 public class TileEntityInductionProvider extends TileEntityInternalMultiblock {
 
-    public InductionProviderTier tier;
+    public final InductionProviderTier tier;
 
     public TileEntityInductionProvider(Holder<Block> blockProvider, BlockPos pos, BlockState state) {
+        tier = Attribute.getTierNN(blockProvider, InductionProviderTier.class);
         super(blockProvider, pos, state);
-    }
-
-    @Override
-    protected void presetVariables() {
-        super.presetVariables();
-        tier = Attribute.getTier(getBlockHolder(), InductionProviderTier.class);
     }
 }

@@ -3,14 +3,12 @@ package mekanism.common.integration.lookingat;
 import mekanism.client.gui.GuiUtils;
 import mekanism.client.gui.GuiUtils.TilingDirection;
 import mekanism.client.render.IFancyFontRenderer;
-import mekanism.client.render.MekanismRenderer;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.network.chat.Component;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-public abstract class LookingAtElement implements ILookingAtElement, IFancyFontRenderer {
+public abstract sealed class LookingAtElement implements ILookingAtElement, IFancyFontRenderer permits EnergyElement, ResourceElement {
 
     private final int borderColor;
     private final int textColor;
@@ -20,7 +18,7 @@ public abstract class LookingAtElement implements ILookingAtElement, IFancyFontR
         this.textColor = textColor;
     }
 
-    public void render(@NotNull GuiGraphics guiGraphics, int x, int y) {
+    public void render(GuiGraphicsExtractor guiGraphics, int x, int y) {
         int width = getWidth();
         int height = getHeight();
         guiGraphics.fill(x, y, x + width - 1, y + 1, borderColor);
@@ -31,12 +29,8 @@ public abstract class LookingAtElement implements ILookingAtElement, IFancyFontR
         if (icon != null) {
             int scale = getScaledLevel(width - 2);
             if (scale > 0) {
-                boolean colored = applyRenderColor(guiGraphics);
                 GuiUtils.drawTiledSprite(guiGraphics, x + 1, y + 1, height - 2, scale, height - 2, icon,
-                      16, 16, 0, TilingDirection.DOWN_RIGHT);
-                if (colored) {
-                    MekanismRenderer.resetColor(guiGraphics);
-                }
+                      16, 16, 0, TilingDirection.DOWN_RIGHT, getRenderColor());
             }
         }
         drawScrollingString(guiGraphics, getText(), x, y + 3, TextAlignment.LEFT, textColor, 4, false);
@@ -62,7 +56,7 @@ public abstract class LookingAtElement implements ILookingAtElement, IFancyFontR
 
     public abstract Component getText();
 
-    protected boolean applyRenderColor(GuiGraphics guiGraphics) {
-        return false;
+    protected int getRenderColor() {
+        return -1;
     }
 }

@@ -4,7 +4,6 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import io.netty.buffer.ByteBuf;
-import java.util.Objects;
 import java.util.function.Function;
 import mekanism.api.SerializationConstants;
 import mekanism.common.content.filter.FilterType;
@@ -12,6 +11,8 @@ import mekanism.common.content.filter.ITagFilter;
 import mekanism.common.lib.inventory.Finder;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public class QIOTagFilter extends QIOFilter<QIOTagFilter> implements ITagFilter<QIOTagFilter> {
 
@@ -30,6 +31,7 @@ public class QIOTagFilter extends QIOFilter<QIOTagFilter> implements ITagFilter<
     private String tagName;
 
     public QIOTagFilter() {
+        tagName = "";
     }
 
     protected QIOTagFilter(boolean enabled, String tagName) {
@@ -43,8 +45,8 @@ public class QIOTagFilter extends QIOFilter<QIOTagFilter> implements ITagFilter<
     }
 
     @Override
-    public Finder getFinder() {
-        return Finder.tag(tagName);
+    public boolean test(ItemResource toCheck) {
+        return Finder.tag(tagName, toCheck);
     }
 
     @Override
@@ -53,7 +55,7 @@ public class QIOTagFilter extends QIOFilter<QIOTagFilter> implements ITagFilter<
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) {
             return true;
         } else if (o == null || getClass() != o.getClass() || !super.equals(o)) {

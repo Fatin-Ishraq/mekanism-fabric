@@ -1,33 +1,33 @@
 package mekanism.api.datagen.recipe.builder;
 
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.datagen.recipe.MekanismRecipeBuilder;
 import mekanism.api.recipes.FluidToFluidRecipe;
 import mekanism.api.recipes.basic.BasicFluidToFluidRecipe;
 import mekanism.api.recipes.ingredients.FluidStackIngredient;
-import mekanism.neoshim.neoforge.fluids.FluidStack;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.item.crafting.Recipe;
+import mekanism.neoshim.neoforge.fluids.FluidStackTemplate;
 
-@NothingNullByDefault
 public class FluidToFluidRecipeBuilder extends MekanismRecipeBuilder<FluidToFluidRecipeBuilder> {
 
     private final FluidStackIngredient input;
-    private final FluidStack output;
+    private final FluidStackTemplate output;
 
-    protected FluidToFluidRecipeBuilder(FluidStackIngredient input, FluidStack output) {
+    protected FluidToFluidRecipeBuilder(FluidStackIngredient input, FluidStackTemplate output) {
         this.input = input;
         this.output = output;
     }
 
-    /**
-     * Creates an Evaporating recipe builder.
-     *
-     * @param input  Input.
-     * @param output Output.
-     */
-    public static FluidToFluidRecipeBuilder evaporating(FluidStackIngredient input, FluidStack output) {
-        if (output.isEmpty()) {
-            throw new IllegalArgumentException("This evaporating recipe requires a non empty fluid output.");
-        }
+    @Override
+    public ResourceKey<Recipe<?>> defaultId() {
+        return getDefaultRecipeId(output);
+    }
+
+    /// Creates an Evaporating recipe builder.
+    ///
+    /// @param input  Input.
+    /// @param output Output.
+    public static FluidToFluidRecipeBuilder evaporating(FluidStackIngredient input, FluidStackTemplate output) {
         return new FluidToFluidRecipeBuilder(input, output);
     }
 

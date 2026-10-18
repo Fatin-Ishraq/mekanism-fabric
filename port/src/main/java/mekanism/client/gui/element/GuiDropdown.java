@@ -9,13 +9,14 @@ import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.tooltip.TooltipUtils;
 import mekanism.common.inventory.GuiComponents.IDropdownEnum;
 import mekanism.common.registries.MekanismSounds;
-import net.minecraft.Util;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.util.Util;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
 public class GuiDropdown<TYPE extends Enum<TYPE> & IDropdownEnum<TYPE>> extends GuiTexturedElement {
 
@@ -47,18 +48,18 @@ public class GuiDropdown<TYPE extends Enum<TYPE> & IDropdownEnum<TYPE>> extends 
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY, int button) {
-        super.onClick(mouseX, mouseY, button);
+    public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
+        super.onClick(event, isDoubleClick);
         setDragging(true);
-        setOpen(!isOpen || mouseY > getY() + 11);
+        setOpen(!isOpen || event.y() > getY() + 11);
     }
 
     @Override
-    public void onRelease(double mouseX, double mouseY) {
+    public void onRelease(MouseButtonEvent event) {
         boolean wasDragging = isDragging();
-        super.onRelease(mouseX, mouseY);
-        if (wasDragging && isOpen && mouseY > getY() + 11) {
-            int hoveredIndex = getHoveredIndex(mouseX, mouseY);
+        super.onRelease(event);
+        if (wasDragging && isOpen && event.y() > getY() + 11) {
+            int hoveredIndex = getHoveredIndex(event.x(), event.y());
             if (hoveredIndex != -1) {
                 handler.accept(options[hoveredIndex]);
             }
@@ -67,7 +68,7 @@ public class GuiDropdown<TYPE extends Enum<TYPE> & IDropdownEnum<TYPE>> extends 
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         drawOptionName(guiGraphics, curType.get(), 2, true);
         if (isOpen) {
@@ -77,7 +78,7 @@ public class GuiDropdown<TYPE extends Enum<TYPE> & IDropdownEnum<TYPE>> extends 
         }
     }
 
-    private void drawOptionName(GuiGraphics guiGraphics, TYPE option, int y, boolean alwaysDisplayed) {
+    private void drawOptionName(GuiGraphicsExtractor guiGraphics, TYPE option, int y, boolean alwaysDisplayed) {
         //Note: We add one for if we are rendering with an icon so that we allow going closer to the icon
         int maxWidth = option.getIcon() == null ? getWidth() : getWidth() - ICON_OFFSET + 1;
         drawScaledScrollingString(guiGraphics, option.getShortName(), 0, y, TextAlignment.LEFT, screenTextColor(), maxWidth, 10, 3, false,
@@ -85,9 +86,9 @@ public class GuiDropdown<TYPE extends Enum<TYPE> & IDropdownEnum<TYPE>> extends 
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
-        renderBackgroundTexture(guiGraphics, getResource(), GuiInnerScreen.SCREEN_SIZE, GuiInnerScreen.SCREEN_SIZE);
+        guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, getResource(), getButtonX(), getButtonY(), getButtonWidth(), getButtonHeight());
 
         int index = getHoveredIndex(mouseX, mouseY);
         if (index != -1) {
@@ -96,20 +97,19 @@ public class GuiDropdown<TYPE extends Enum<TYPE> & IDropdownEnum<TYPE>> extends 
 
         TYPE current = curType.get();
         if (current.getIcon() != null) {
-            guiGraphics.blit(current.getIcon(), relativeX + width - ICON_OFFSET, relativeY + 3, 0, 0, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, current.getIcon(), relativeX + width - ICON_OFFSET, relativeY + 3, 0, 0, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
         }
 
         if (isOpen) {
             for (int i = 0; i < options.length; i++) {
-                ResourceLocation icon = options[i].getIcon();
+                Identifier icon = options[i].getIcon();
                 if (icon != null) {
-                    guiGraphics.blit(icon, relativeX + width - ICON_OFFSET, relativeY + ELEMENT_HEIGHT + 2 + 10 * i, 0, 0, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
+                    guiGraphics.blit(RenderPipelines.GUI_TEXTURED, icon, relativeX + width - ICON_OFFSET, relativeY + ELEMENT_HEIGHT + 2 + 10 * i, 0, 0, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
                 }
             }
         }
     }
 
-    @NotNull
     @Override
     protected ScreenRectangle getTooltipRectangle(int mouseX, int mouseY) {
         return cachedTooltipRect == null ? super.getTooltipRectangle(mouseX, mouseY) : cachedTooltipRect;
@@ -130,7 +130,7 @@ public class GuiDropdown<TYPE extends Enum<TYPE> & IDropdownEnum<TYPE>> extends 
 
     private int getHoveredIndex(double mouseX, double mouseY) {
         if (isOpen && mouseX >= getX() && mouseX < getRight() && mouseY >= getY() + 11 && mouseY < getBottom()) {
-            return Math.max(0, Math.min(options.length - 1, (int) ((mouseY - getY() - 11) / 10)));
+            return Math.clamp((int) ((mouseY - getY() - 11) / 10), 0, options.length - 1);
         }
         return -1;
     }

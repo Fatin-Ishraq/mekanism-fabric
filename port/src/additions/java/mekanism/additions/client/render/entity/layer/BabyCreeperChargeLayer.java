@@ -1,20 +1,18 @@
 package mekanism.additions.client.render.entity.layer;
 
 import mekanism.additions.client.model.ModelBabyCreeper;
-import mekanism.additions.common.entity.baby.EntityBabyCreeper;
-import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.layers.EnergySwirlLayer;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.client.renderer.entity.state.CreeperRenderState;
+import net.minecraft.resources.Identifier;
 
-public class BabyCreeperChargeLayer extends EnergySwirlLayer<EntityBabyCreeper, ModelBabyCreeper> {
+public class BabyCreeperChargeLayer extends EnergySwirlLayer<CreeperRenderState, ModelBabyCreeper> {
 
-    private static final ResourceLocation POWER_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/creeper/creeper_armor.png");
+    private static final Identifier POWER_LOCATION = Identifier.withDefaultNamespace("textures/entity/creeper/creeper_armor.png");
     private final ModelBabyCreeper creeperModel;
 
-    public BabyCreeperChargeLayer(RenderLayerParent<EntityBabyCreeper, ModelBabyCreeper> renderer, EntityModelSet entityModelSet) {
+    public BabyCreeperChargeLayer(RenderLayerParent<CreeperRenderState, ModelBabyCreeper> renderer, EntityModelSet entityModelSet) {
         super(renderer);
         creeperModel = new ModelBabyCreeper(entityModelSet.bakeLayer(ModelBabyCreeper.ARMOR_LAYER));
     }
@@ -24,15 +22,18 @@ public class BabyCreeperChargeLayer extends EnergySwirlLayer<EntityBabyCreeper, 
         return modifier * 0.01F;
     }
 
-    @NotNull
     @Override
-    protected ResourceLocation getTextureLocation() {
+    protected Identifier getTextureLocation() {
         return POWER_LOCATION;
     }
 
-    @NotNull
     @Override
-    protected EntityModel<EntityBabyCreeper> model() {
+    protected boolean isPowered(CreeperRenderState state) {
+        return state.isPowered;
+    }
+
+    @Override
+    protected ModelBabyCreeper model() {
         return this.creeperModel;
     }
 }

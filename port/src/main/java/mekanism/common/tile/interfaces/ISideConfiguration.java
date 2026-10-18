@@ -2,7 +2,7 @@ package mekanism.common.tile.interfaces;
 
 import java.util.List;
 import mekanism.api.chemical.IChemicalTank;
-import mekanism.api.fluid.IExtendedFluidTank;
+import mekanism.api.fluid.IFluidTank;
 import mekanism.api.inventory.IInventorySlot;
 import mekanism.common.lib.transmitter.TransmissionType;
 import mekanism.common.tile.component.TileComponentConfig;
@@ -10,35 +10,25 @@ import mekanism.common.tile.component.TileComponentEjector;
 import mekanism.common.tile.component.config.ConfigInfo;
 import mekanism.common.tile.component.config.DataType;
 import net.minecraft.core.Direction;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Implement this if your TileEntity is capable of being modified by a Configurator in it's 'modify' mode.
- *
- * @author AidanBrady
- */
+/// Implement this if your TileEntity is capable of being modified by a Configurator in it's 'modify' mode.
 //TODO: Make the main mekanism tile extend this directly?
 public interface ISideConfiguration {
 
-    /**
-     * Gets the tile's configuration component.
-     *
-     * @return the tile's configuration component
-     */
+    /// Gets the tile's configuration component.
+    ///
+    /// @return the tile's configuration component
     TileComponentConfig getConfig();
 
-    /**
-     * Gets this machine's current orientation.
-     *
-     * @return machine's current orientation
-     */
+    /// Gets this machine's current orientation.
+    ///
+    /// @return machine's current orientation
     Direction getDirection();
 
-    /**
-     * Gets this machine's ejector.
-     *
-     * @return this machine's ejector
-     */
+    /// Gets this machine's ejector.
+    ///
+    /// @return this machine's ejector
     TileComponentEjector getEjector();
 
     @Nullable
@@ -47,7 +37,7 @@ public interface ISideConfiguration {
         TileComponentConfig config = getConfig();
         if (container instanceof IChemicalTank && config.supports(TransmissionType.CHEMICAL)) {
             info = config.getConfig(TransmissionType.CHEMICAL);
-        } else if (container instanceof IExtendedFluidTank && config.supports(TransmissionType.FLUID)) {
+        } else if (container instanceof IFluidTank && config.supports(TransmissionType.FLUID)) {
             info = config.getConfig(TransmissionType.FLUID);
         } else if (container instanceof IInventorySlot && config.supports(TransmissionType.ITEM)) {
             info = config.getConfig(TransmissionType.ITEM);

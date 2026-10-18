@@ -7,13 +7,12 @@ import mekanism.api.recipes.MekanismRecipe;
 import mekanism.api.recipes.ingredients.InputIngredient;
 import mekanism.common.recipe.MekanismRecipeType;
 import mekanism.common.recipe.lookup.cache.type.IInputCache;
+import net.minecraft.core.TypedInstance;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Basic helper implementation for {@link IInputRecipeCache} that keeps track of the recipe type and if this cache has been initialized yet or not.
- */
+/// Basic helper implementation for [IInputRecipeCache] that keeps track of the recipe type and if this cache has been initialized yet or not.
 public abstract class AbstractInputRecipeCache<RECIPE extends MekanismRecipe<?>> implements IInputRecipeCache {
 
     protected final MekanismRecipeType<?, RECIPE, ?> recipeType;
@@ -29,9 +28,7 @@ public abstract class AbstractInputRecipeCache<RECIPE extends MekanismRecipe<?>>
         initialized = false;
     }
 
-    /**
-     * Initializes the cache if it hasn't already been initialized.
-     */
+    /// Initializes the cache if it hasn't already been initialized.
     protected void initCacheIfNeeded(@Nullable Level world) {
         if (!initialized) {
             initialized = true;
@@ -39,18 +36,14 @@ public abstract class AbstractInputRecipeCache<RECIPE extends MekanismRecipe<?>>
         }
     }
 
-    /**
-     * Initializes the recipe cache based on the given recipes.
-     *
-     * @param recipes Recipes to build the cache for.
-     */
+    /// Initializes the recipe cache based on the given recipes.
+    ///
+    /// @param recipes Recipes to build the cache for.
     protected abstract void initCache(List<RecipeHolder<RECIPE>> recipes);
 
-    /**
-     * Helper to check if a cache contains a given input, or if not, if the complex recipe fallback set contains a matching recipe.
-     */
-    protected <INPUT, INGREDIENT extends InputIngredient<INPUT>, CACHE extends IInputCache<INPUT, INGREDIENT, RECIPE>> boolean containsInput(
-          @Nullable Level world, INPUT input, Function<RECIPE, INGREDIENT> inputExtractor, CACHE cache, Set<RECIPE> complexRecipes) {
+    /// Helper to check if a cache contains a given input, or if not, if the complex recipe fallback set contains a matching recipe.
+    protected <TYPE, STACK extends TypedInstance<TYPE>, INGREDIENT extends InputIngredient<TYPE, STACK>, CACHE extends IInputCache<TYPE, STACK, INGREDIENT, RECIPE>> boolean containsInput(
+          @Nullable Level world, TypedInstance<TYPE> input, Function<RECIPE, INGREDIENT> inputExtractor, CACHE cache, Set<RECIPE> complexRecipes) {
         if (cache.isEmpty(input)) {
             //Don't allow empty inputs
             return false;
@@ -67,19 +60,16 @@ public abstract class AbstractInputRecipeCache<RECIPE extends MekanismRecipe<?>>
         return false;
     }
 
-    /**
-     * Helper to check if a cache contains a given input grouping, or if not, if the complex recipe fallback set contains a matching recipe. This method is mainly used
-     * for purposes of implementing insertion predicates, so it has the following behaviors. This allows it to short circuit in cases where we already know the input is
-     * valid (the last case in the below list).
-     * <ul>
-     * <li>If the first input is empty: This will check if there is a recipe that the second input is valid for.</li>
-     * <li>If the first input is not empty but the second input is empty: This will return true.</li>
-     * </ul>
-     */
-    protected <INPUT_1, INGREDIENT_1 extends InputIngredient<INPUT_1>, CACHE_1 extends IInputCache<INPUT_1, INGREDIENT_1, RECIPE>, INPUT_2,
-          INGREDIENT_2 extends InputIngredient<INPUT_2>, CACHE_2 extends IInputCache<INPUT_2, INGREDIENT_2, RECIPE>> boolean containsPairing(@Nullable Level world,
-          INPUT_1 input1, Function<RECIPE, INGREDIENT_1> input1Extractor, CACHE_1 cache1, Set<RECIPE> complexIngredients1, INPUT_2 input2,
-          Function<RECIPE, INGREDIENT_2> input2Extractor, CACHE_2 cache2, Set<RECIPE> complexIngredients2) {
+    /// Helper to check if a cache contains a given input grouping, or if not, if the complex recipe fallback set contains a matching recipe. This method is mainly used
+    /// for purposes of implementing insertion predicates, so it has the following behaviors. This allows it to short circuit in cases where we already know the input is
+    /// valid (the last case in the below list).
+    /// - If the first input is empty: This will check if there is a recipe that the second input is valid for.
+    /// - If the first input is not empty but the second input is empty: This will return true.
+    protected <HOLDER_1, INPUT_1 extends TypedInstance<HOLDER_1>, INGREDIENT_1 extends InputIngredient<HOLDER_1, INPUT_1>,
+          CACHE_1 extends IInputCache<HOLDER_1, INPUT_1, INGREDIENT_1, RECIPE>, HOLDER_2, INPUT_2 extends TypedInstance<HOLDER_2>,
+          INGREDIENT_2 extends InputIngredient<HOLDER_2, INPUT_2>, CACHE_2 extends IInputCache<HOLDER_2, INPUT_2, INGREDIENT_2, RECIPE>> boolean containsPairing(
+          @Nullable Level world, TypedInstance<HOLDER_1> input1, Function<RECIPE, INGREDIENT_1> input1Extractor, CACHE_1 cache1, Set<RECIPE> complexIngredients1,
+          TypedInstance<HOLDER_2> input2, Function<RECIPE, INGREDIENT_2> input2Extractor, CACHE_2 cache2, Set<RECIPE> complexIngredients2) {
         if (cache1.isEmpty(input1)) {
             //Note: We don't bother checking if 2 is empty here as it will be verified in containsInput
             return containsInput(world, input2, input2Extractor, cache2, complexIngredients2);

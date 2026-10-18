@@ -12,6 +12,8 @@ import mekanism.common.content.filter.IModIDFilter;
 import mekanism.common.lib.inventory.Finder;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public class QIOModIDFilter extends QIOFilter<QIOModIDFilter> implements IModIDFilter<QIOModIDFilter> {
 
@@ -30,6 +32,7 @@ public class QIOModIDFilter extends QIOFilter<QIOModIDFilter> implements IModIDF
     private String modID;
 
     public QIOModIDFilter() {
+        modID = "";
     }
 
     protected QIOModIDFilter(boolean enabled, String modID) {
@@ -43,8 +46,8 @@ public class QIOModIDFilter extends QIOFilter<QIOModIDFilter> implements IModIDF
     }
 
     @Override
-    public Finder getFinder() {
-        return Finder.modID(modID);
+    public boolean test(ItemResource toCheck) {
+        return Finder.modID(modID, Objects.requireNonNull(this.registryAccess.get(), "Registry access not set up"), toCheck);
     }
 
     @Override
@@ -53,7 +56,7 @@ public class QIOModIDFilter extends QIOFilter<QIOModIDFilter> implements IModIDF
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) {
             return true;
         } else if (o == null || getClass() != o.getClass() || !super.equals(o)) {

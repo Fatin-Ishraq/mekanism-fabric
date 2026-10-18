@@ -1,6 +1,7 @@
 package mekanism.client.model.data;
 
-import java.util.Collections;
+//TODO - 26.1 models
+/*import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -16,22 +17,21 @@ import net.minecraft.client.resources.model.ModelBaker;
 import net.minecraft.client.resources.model.ModelBakery;
 import net.minecraft.client.resources.model.ModelState;
 import net.minecraft.client.resources.model.UnbakedModel;
-import net.minecraft.resources.ResourceLocation;
-import mekanism.neoshim.neoforge.client.model.data.ModelProperty;
+import net.minecraft.resources.Identifier;
+import mekanism.neoshim.neoforge.model.data.ModelProperty;
 import mekanism.neoshim.neoforge.client.model.geometry.IGeometryBakingContext;
 import mekanism.neoshim.neoforge.client.model.geometry.IUnbakedGeometry;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public class DataBasedGeometry implements IUnbakedGeometry<DataBasedGeometry> {
 
     private final Map<ModelProperty<Void>, UnbakedModel> propertyBasedUnbakedModels = new HashMap<>();
-    private final Map<ModelProperty<Void>, ResourceLocation> propertyBasedModels;
-    private final ResourceLocation noData;
+    private final Map<ModelProperty<Void>, Identifier> propertyBasedModels;
+    private final Identifier noData;
     @Nullable
     private UnbakedModel unbakedModel;
 
-    DataBasedGeometry(ResourceLocation noData, Map<ModelProperty<Void>, ResourceLocation> propertyBasedModels) {
+    DataBasedGeometry(Identifier noData, Map<ModelProperty<Void>, Identifier> propertyBasedModels) {
         this.noData = noData;
         this.propertyBasedModels = propertyBasedModels;
     }
@@ -62,14 +62,14 @@ public class DataBasedGeometry implements IUnbakedGeometry<DataBasedGeometry> {
     }
 
     @Override
-    public void resolveParents(Function<ResourceLocation, UnbakedModel> modelGetter, IGeometryBakingContext context) {
+    public void resolveParents(Function<Identifier, UnbakedModel> modelGetter, IGeometryBakingContext context) {
         unbakedModel = resolve(modelGetter, context, noData);
-        for (Map.Entry<ModelProperty<Void>, ResourceLocation> entry : propertyBasedModels.entrySet()) {
+        for (Map.Entry<ModelProperty<Void>, Identifier> entry : propertyBasedModels.entrySet()) {
             propertyBasedUnbakedModels.put(entry.getKey(), resolve(modelGetter, context, entry.getValue()));
         }
     }
 
-    private UnbakedModel resolve(Function<ResourceLocation, UnbakedModel> modelGetter, IGeometryBakingContext context, ResourceLocation modelName) {
+    private UnbakedModel resolve(Function<Identifier, UnbakedModel> modelGetter, IGeometryBakingContext context, Identifier modelName) {
         UnbakedModel model = modelGetter.apply(modelName);
         if (model == null) {
             Mekanism.logger.warn("Could not find '{}' while loading model '{}'", modelName, context.getModelName());
@@ -79,4 +79,4 @@ public class DataBasedGeometry implements IUnbakedGeometry<DataBasedGeometry> {
         }
         return model;
     }
-}
+}*/

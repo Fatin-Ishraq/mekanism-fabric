@@ -9,28 +9,23 @@ import mekanism.common.tile.base.TileEntityUpdateable;
 import mekanism.common.tile.component.TileComponentUpgrade;
 import mekanism.common.tile.interfaces.IBoundingBlock;
 import mekanism.common.tile.interfaces.IUpgradeTile;
-import mekanism.common.util.NBTUtils;
 import mekanism.common.util.WorldUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.Nameable;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.redstone.Redstone;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import mekanism.neoshim.neoforge.capabilities.BlockCapability;
 import mekanism.neoshim.neoforge.capabilities.RegisterCapabilitiesEvent;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Multi-block used by wind turbines, solar panels, and other machines
- */
+/// Multi-block used by wind turbines, solar panels, and other machines
 public class TileEntityBoundingBlock extends TileEntityUpdateable implements IUpgradeTile, Nameable {
 
     @Nullable
@@ -41,9 +36,9 @@ public class TileEntityBoundingBlock extends TileEntityUpdateable implements IUp
         super(MekanismTileEntityTypes.BOUNDING_BLOCK, pos, state);
     }
 
-    public void setMainLocation(@Nullable BlockPos pos, boolean sync) {
+    public void setMainLocation(Level level, @Nullable BlockPos pos, boolean sync) {
         mainPos = pos;
-        if (sync && !isRemote()) {
+        if (sync && !level.isClientSide()) {
             sendUpdatePacket();
         }
     }
@@ -72,7 +67,7 @@ public class TileEntityBoundingBlock extends TileEntityUpdateable implements IUp
         if (tile != null && !(tile instanceof IBoundingBlock)) {
             // On the off chance that another block got placed there (which seems only likely with corruption, go ahead and log what we found.)
             Mekanism.logger.error("Found tile {} instead of an IBoundingBlock, at {} in {}. Multiblock cannot function", tile, getMainPos(),
-                  level == null ? "null" : level.dimension().location());
+                  level == null ? "null" : level.dimension().identifier());
             return null;
         }
         return (IBoundingBlock) tile;
@@ -85,8 +80,8 @@ public class TileEntityBoundingBlock extends TileEntityUpdateable implements IUp
         return main != null && main.triggerBoundingEvent(worldPosition.subtract(getMainPos()), id, param) || handled;
     }
 
-    public void onNeighborChange(Level level, Block block, BlockPos neighborPos) {
-        if (!isRemote()) {
+    public void onNeighborChange(LevelReader level) {
+        if (!level.isClientSide()) {
             int power = level.getBestNeighborSignal(getBlockPos());
             if (currentRedstoneLevel != power) {
                 IBoundingBlock main = getMain();
@@ -112,6 +107,7 @@ public class TileEntityBoundingBlock extends TileEntityUpdateable implements IUp
         return main != null && main.supportsUpgrades();
     }
 
+    @Nullable
     @Override
     public TileComponentUpgrade getComponent() {
         IBoundingBlock main = getMain();
@@ -130,37 +126,31 @@ public class TileEntityBoundingBlock extends TileEntityUpdateable implements IUp
     }
 
     @Override
-    public void loadAdditional(@NotNull CompoundTag nbt, @NotNull HolderLookup.Provider provider) {
-        super.loadAdditional(nbt, provider);
-        NBTUtils.setBlockPosIfPresent(nbt, SerializationConstants.MAIN, pos -> mainPos = pos);
-        currentRedstoneLevel = nbt.getInt(SerializationConstants.REDSTONE);
+    public void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
+        input.read(SerializationConstants.MAIN, BlockPos.CODEC).ifPresent(pos -> mainPos = pos);
+        currentRedstoneLevel = input.getIntOr(SerializationConstants.REDSTONE, currentRedstoneLevel);
     }
 
     @Override
-    public void saveAdditional(@NotNull CompoundTag nbtTags, @NotNull HolderLookup.Provider provider) {
-        super.saveAdditional(nbtTags, provider);
-        if (mainPos != null) {
-            nbtTags.put(SerializationConstants.MAIN, NbtUtils.writeBlockPos(mainPos));
-        }
-        nbtTags.putInt(SerializationConstants.REDSTONE, currentRedstoneLevel);
-    }
-
-    @NotNull
-    @Override
-    public CompoundTag getReducedUpdateTag(@NotNull HolderLookup.Provider provider) {
-        CompoundTag updateTag = super.getReducedUpdateTag(provider);
-        if (mainPos != null) {
-            updateTag.put(SerializationConstants.MAIN, NbtUtils.writeBlockPos(mainPos));
-        }
-        updateTag.putInt(SerializationConstants.REDSTONE, currentRedstoneLevel);
-        return updateTag;
+    public void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
+        output.storeNullable(SerializationConstants.MAIN, BlockPos.CODEC, mainPos);
+        output.putInt(SerializationConstants.REDSTONE, currentRedstoneLevel);
     }
 
     @Override
-    public void handleUpdateTag(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider provider) {
-        super.handleUpdateTag(tag, provider);
-        NBTUtils.setBlockPosIfPresent(tag, SerializationConstants.MAIN, pos -> mainPos = pos);
-        currentRedstoneLevel = tag.getInt(SerializationConstants.REDSTONE);
+    public void writeReducedUpdatedTag(ValueOutput output) {
+        super.writeReducedUpdatedTag(output);
+        output.storeNullable(SerializationConstants.MAIN, BlockPos.CODEC, mainPos);
+        output.putInt(SerializationConstants.REDSTONE, currentRedstoneLevel);
+    }
+
+    @Override
+    public void handleUpdateTag(ValueInput input) {
+        super.loadAdditional(input);//we do NOT call super directly, as it will call a load (like from disk) and BEs will never see their changes
+        input.read(SerializationConstants.MAIN, BlockPos.CODEC).ifPresent(pos -> mainPos = pos);
+        currentRedstoneLevel = input.getIntOr(SerializationConstants.REDSTONE, currentRedstoneLevel);
     }
 
     @Override
@@ -168,7 +158,6 @@ public class TileEntityBoundingBlock extends TileEntityUpdateable implements IUp
         return getMainTile(worldPosition) instanceof Nameable mainTile && mainTile.hasCustomName();
     }
 
-    @NotNull
     @Override
     @SuppressWarnings("ConstantConditions")
     public Component getName() {
@@ -178,7 +167,6 @@ public class TileEntityBoundingBlock extends TileEntityUpdateable implements IUp
         return MekanismBlocks.BOUNDING_BLOCK.getTextComponent();
     }
 
-    @NotNull
     @Override
     public Component getDisplayName() {
         return getMainTile(worldPosition) instanceof Nameable mainTile ? mainTile.getDisplayName() : MekanismBlocks.BOUNDING_BLOCK.getTextComponent();
@@ -191,7 +179,7 @@ public class TileEntityBoundingBlock extends TileEntityUpdateable implements IUp
     }
 
     public static <CAP> void proxyCapability(RegisterCapabilitiesEvent event, BlockCapability<CAP, @Nullable Direction> capability) {
-        event.registerBlock(capability, (level, pos, state, blockEntity, context) -> {
+        event.registerBlock(capability, (_, pos, _, blockEntity, context) -> {
             if (blockEntity instanceof TileEntityBoundingBlock bounding) {
                 IBoundingBlock main = bounding.getMain();
                 if (main != null) {
@@ -202,8 +190,8 @@ public class TileEntityBoundingBlock extends TileEntityUpdateable implements IUp
         }, MekanismBlocks.BOUNDING_BLOCK.value());
     }
 
-    public static <CAP, CONTEXT> void alwaysProxyCapability(RegisterCapabilitiesEvent event, BlockCapability<CAP, CONTEXT> capability) {
-        event.registerBlock(capability, (level, pos, state, boundingBlock, context) -> {
+    public static <CAP, CONTEXT extends @Nullable Object> void alwaysProxyCapability(RegisterCapabilitiesEvent event, BlockCapability<CAP, CONTEXT> capability) {
+        event.registerBlock(capability, (level, pos, _, boundingBlock, context) -> {
             if (boundingBlock instanceof TileEntityBoundingBlock bounding && bounding.canRedirectFrom(pos)) {
                 return WorldUtils.getCapability(level, capability, bounding.getMainPos(), context);
             }

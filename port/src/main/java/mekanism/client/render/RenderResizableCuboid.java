@@ -2,32 +2,29 @@ package mekanism.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import java.util.Arrays;
-import mekanism.client.render.MekanismRenderer.Model3D;
+import java.util.List;
+import mekanism.client.render.data.ValveRenderData;
 import mekanism.common.util.EnumUtils;
-import net.minecraft.client.Camera;
+import net.minecraft.client.renderer.OrderedSubmitNodeCollector;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
 import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.util.FastColor.ARGB32;
 import net.minecraft.util.Mth;
+import net.minecraft.util.Util;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.Nullable;
+import org.intellij.lang.annotations.MagicConstant;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Adapted from Mantle's FluidRenderer and Tinker's SmelteryTankRenderer
- */
+/// Adapted from Mantle's FluidRenderer and Tinker's SmelteryTankRenderer
 public class RenderResizableCuboid {
 
-    /**
-     * Used to not need to create multiple arrays when we just want to fill it differently at times, and given rendering TERs is not multithreaded it is perfectly safe to
-     * just use one backing "temporary" array.
-     */
-    private static final int[] combinedARGB = new int[EnumUtils.DIRECTIONS.length];
     private static final Vector3f NORMAL = new Vector3f(1, 1, 1).normalize();
     private static final int X_AXIS_MASK = 1 << Axis.X.ordinal();
     private static final int Y_AXIS_MASK = 1 << Axis.Y.ordinal();
@@ -36,17 +33,25 @@ public class RenderResizableCuboid {
     private RenderResizableCuboid() {
     }
 
-    public static void renderCube(Model3D cube, PoseStack matrix, VertexConsumer buffer, int argb, int light, int overlay, FaceDisplay faceDisplay, Camera camera,
-          @Nullable Vec3 renderPos) {
-        Arrays.fill(combinedARGB, argb);
-        renderCube(cube, matrix, buffer, combinedARGB, light, overlay, faceDisplay, camera, renderPos);
+    public static void renderCube(@SideRender.SideRenderFlags byte sidesToRender, float cubeMinX, float cubeMinY, float cubeMinZ, float cubeMaxX, float cubeMaxY, float cubeMaxZ, PoseStack matrix, RenderType renderType, OrderedSubmitNodeCollector nodeCollector, int argb, int light, int overlay, FaceDisplay faceDisplay, Vec3 camPos,
+          @Nullable Vec3 renderPos, TexturePicker spriteFromDirection) {
+        renderCube(sidesToRender, cubeMinX, cubeMinY, cubeMinZ, cubeMaxX, cubeMaxY, cubeMaxZ, matrix, renderType, nodeCollector, light, overlay, faceDisplay, camPos, renderPos, argb, argb, argb, argb, argb, argb, spriteFromDirection);
     }
 
-    /**
-     * @implNote Based off of Tinker's
-     */
-    public static void renderCube(Model3D cube, PoseStack matrix, VertexConsumer buffer, int[] colors, int light, int overlay, FaceDisplay faceDisplay, Camera camera,
-          @Nullable Vec3 renderPos) {
+    //TODO - 26.1: Try use some kind of ColorGetter instead of unrolling arrays?
+
+    /// Based off of Tinker's in the distant past and thoroughly disassembled and reassembled over the years.
+    ///
+    /// @implNote if ever different colours are used for axis side, this won't handle that like it does sprites. (e.g. currently EAST+WEST colours are the same)
+    ///
+    /// This has a buttload of params, but boxing them causes either a bunch of allocations, or caching to avoid said allocations as it is a fairly hot path,
+    /// historically.
+    ///
+    /// In many cases, the boxing is for static values, so there is really no point aside from 'code tidyness'.
+    ///
+    /// We can revisit this if value types become a thing.
+    public static void renderCube(@SideRender.SideRenderFlags byte sidesToRender, float cubeMinX, float cubeMinY, float cubeMinZ, float cubeMaxX, float cubeMaxY, float cubeMaxZ, PoseStack matrix, RenderType renderType, OrderedSubmitNodeCollector nodeCollector, int light, int overlay, FaceDisplay faceDisplay, Vec3 camPos,
+          @Nullable Vec3 renderPos, int westColor, int eastColor, int downColor, int upColor, int northColor, int southColor, TexturePicker spriteFromDirection) {
         TextureAtlasSprite[] sprites = new TextureAtlasSprite[6];
         int axisToRender = 0;
         //TODO: Eventually try not rendering faces that are covered by things? At the very least for things like multiblocks
@@ -54,11 +59,13 @@ public class RenderResizableCuboid {
         if (renderPos != null && faceDisplay != FaceDisplay.BOTH) {
             //If we know the position this model is based around in the world, and we aren't displaying both faces
             // then calculate to see if we can skip rendering any faces due to the camera not facing them
-            Vec3 camPos = camera.getPosition();
-            Vec3 minPos = renderPos.add(cube.minX, cube.minY, cube.minZ);
-            Vec3 maxPos = renderPos.add(cube.maxX, cube.maxY, cube.maxZ);
+            Vec3 minPos = renderPos.add(cubeMinX, cubeMinY, cubeMinZ);
+            Vec3 maxPos = renderPos.add(cubeMaxX, cubeMaxY, cubeMaxZ);
             for (Direction direction : EnumUtils.DIRECTIONS) {
-                TextureAtlasSprite sprite = cube.getSpriteToRender(direction);
+                if (!shouldRenderSide(sidesToRender, direction)) {
+                    continue;
+                }
+                TextureAtlasSprite sprite = spriteFromDirection.apply(direction);
                 if (sprite != null) {
                     Axis axis = direction.getAxis();
                     AxisDirection axisDirection = direction.getAxisDirection();
@@ -82,7 +89,10 @@ public class RenderResizableCuboid {
             }
         } else {
             for (Direction direction : EnumUtils.DIRECTIONS) {
-                TextureAtlasSprite sprite = cube.getSpriteToRender(direction);
+                if (!shouldRenderSide(sidesToRender, direction)) {
+                    continue;
+                }
+                TextureAtlasSprite sprite = spriteFromDirection.apply(direction);
                 if (sprite != null) {
                     sprites[direction.ordinal()] = sprite;
                     axisToRender |= 1 << direction.getAxis().ordinal();
@@ -97,15 +107,15 @@ public class RenderResizableCuboid {
         // that may improve performance some, but definitely would reduce/remove the majority of remaining z-fighting that is going on
         //Shift it so that the min values are all greater than or equal to zero as the various drawing code
         // has some issues when it comes to handling negative numbers
-        int xShift = Mth.floor(cube.minX);
-        int yShift = Mth.floor(cube.minY);
-        int zShift = Mth.floor(cube.minZ);
-        float minX = cube.minX - xShift;
-        float minY = cube.minY - yShift;
-        float minZ = cube.minZ - zShift;
-        float maxX = cube.maxX - xShift;
-        float maxY = cube.maxY - yShift;
-        float maxZ = cube.maxZ - zShift;
+        int xShift = Mth.floor(cubeMinX);
+        int yShift = Mth.floor(cubeMinY);
+        int zShift = Mth.floor(cubeMinZ);
+        float minX = cubeMinX - xShift;
+        float minY = cubeMinY - yShift;
+        float minZ = cubeMinZ - zShift;
+        float maxX = cubeMaxX - xShift;
+        float maxY = cubeMaxY - yShift;
+        float maxZ = cubeMaxZ - zShift;
         int xDelta = calculateDelta(minX, maxX);
         int yDelta = calculateDelta(minY, maxY);
         int zDelta = calculateDelta(minZ, maxZ);
@@ -115,24 +125,29 @@ public class RenderResizableCuboid {
 
         matrix.pushPose();
         matrix.translate(xShift, yShift, zShift);
-        PoseStack.Pose lastMatrix = matrix.last();
-        Matrix4f matrix4f = lastMatrix.pose();
-        NormalData normal = new NormalData(lastMatrix.normal(), NORMAL, faceDisplay);
 
-        if ((axisToRender & X_AXIS_MASK) != 0) {
-            renderSideXAxis(buffer, colors, light, overlay, faceDisplay, xDelta, yDelta, zDelta, sprites, yBounds, zBounds, xBounds, matrix4f, normal);
-        }
-        if ((axisToRender & Y_AXIS_MASK) != 0) {
-            renderSideYAxis(buffer, colors, light, overlay, faceDisplay, xDelta, yDelta, zDelta, sprites, yBounds, zBounds, xBounds, matrix4f, normal);
-        }
-        if ((axisToRender & Z_AXIS_MASK) != 0) {
-            renderSideZAxis(buffer, colors, light, overlay, faceDisplay, xDelta, yDelta, zDelta, sprites, yBounds, zBounds, xBounds, matrix4f, normal);
-        }
+        int finalAxisToRender = axisToRender;
+        nodeCollector.submitCustomGeometry(matrix, renderType, (pose, buffer) -> {
+            NormalData normalData = new NormalData(pose.normal(), NORMAL, faceDisplay);
+            if ((finalAxisToRender & X_AXIS_MASK) != 0) {
+                renderSideXAxis(buffer, light, overlay, faceDisplay, xDelta, yDelta, zDelta, sprites, yBounds, zBounds, xBounds, pose.pose(), normalData, westColor, eastColor);
+            }
+            if ((finalAxisToRender & Y_AXIS_MASK) != 0) {
+                renderSideYAxis(buffer, light, overlay, faceDisplay, xDelta, yDelta, zDelta, sprites, yBounds, zBounds, xBounds, pose.pose(), normalData, downColor, upColor);
+            }
+            if ((finalAxisToRender & Z_AXIS_MASK) != 0) {
+                renderSideZAxis(buffer, light, overlay, faceDisplay, xDelta, yDelta, zDelta, sprites, yBounds, zBounds, xBounds, pose.pose(), normalData, northColor, southColor);
+            }
+        });
 
         matrix.popPose();
     }
 
-    private static void renderSideZAxis(VertexConsumer buffer, int[] colors, int light, int overlay, FaceDisplay faceDisplay, int xDelta, int yDelta, int zDelta, TextureAtlasSprite[] sprites, float[] yBounds, float[] zBounds, float[] xBounds, Matrix4f matrix4f, NormalData normal) {
+    private static boolean shouldRenderSide(@SideRender.SideRenderFlags byte sidesToRender, Direction direction) {
+        return (sidesToRender & SideRender.DIRECTION_TO_FACE[direction.ordinal()]) != 0;
+    }
+
+    private static void renderSideZAxis(VertexConsumer buffer, int light, int overlay, FaceDisplay faceDisplay, int xDelta, int yDelta, int zDelta, TextureAtlasSprite[] sprites, float[] yBounds, float[] zBounds, float[] xBounds, Matrix4f matrix4f, NormalData normal, int northColor, int southColor) {
 
         TextureAtlasSprite northSprite = sprites[Direction.NORTH.ordinal()];
         TextureAtlasSprite southSprite = sprites[Direction.SOUTH.ordinal()];
@@ -142,18 +157,6 @@ public class RenderResizableCuboid {
         if (!hasNorth && !hasSouth) {
             return; //sanity check failed
         }
-
-        int colorNorth = colors[Direction.NORTH.ordinal()];
-        int colorSouth = colors[Direction.SOUTH.ordinal()];
-
-        int redNorth = ARGB32.red(colorNorth);
-        int greenNorth = ARGB32.green(colorNorth);
-        int blueNorth = ARGB32.blue(colorNorth);
-        int alphaNorth = ARGB32.alpha(colorNorth);
-        int redSouth = ARGB32.red(colorSouth);
-        int greenSouth = ARGB32.green(colorSouth);
-        int blueSouth = ARGB32.blue(colorSouth);
-        int alphaSouth = ARGB32.alpha(colorSouth);
 
         // render each side
         for (int y = 0; y <= yDelta; y += 1) {
@@ -217,27 +220,28 @@ public class RenderResizableCuboid {
                     float z1 = zBounds[0];
                     // add quads
 
-                    drawFace(buffer, matrix4f, minUNorth, maxUNorth, minVNorth, maxVNorth, light, overlay, faceDisplay, normal,
+                    drawFace(buffer, matrix4f, minUNorth, maxUNorth, minVNorth, maxVNorth, light, overlay, faceDisplay, normal, northColor,
                           x1, y1, z1,
                           x1, y2, z1,
                           x2, y2, z1,
-                          x2, y1, z1, redNorth, greenNorth, blueNorth, alphaNorth);
+                          x2, y1, z1);
                 }
                 if (hasSouth) {
                     float z2 = zBounds[zDelta + 1];
                     // add quads
-                    drawFace(buffer, matrix4f, minUSouth, maxUSouth, minVSouth, maxVSouth, light, overlay, faceDisplay, normal,
+                    drawFace(buffer, matrix4f, minUSouth, maxUSouth, minVSouth, maxVSouth, light, overlay, faceDisplay, normal, southColor,
                           x2, y1, z2,
                           x2, y2, z2,
                           x1, y2, z2,
-                          x1, y1, z2, redSouth, greenSouth, blueSouth, alphaSouth);
+                          x1, y1, z2);
                 }
 
             }
         }
     }
 
-    private static void renderSideXAxis(VertexConsumer buffer, int[] colors, int light, int overlay, FaceDisplay faceDisplay, int xDelta, int yDelta, int zDelta, TextureAtlasSprite[] sprites, float[] yBounds, float[] zBounds, float[] xBounds, Matrix4f matrix4f, NormalData normal) {
+    private static void renderSideXAxis(VertexConsumer buffer, int light, int overlay, FaceDisplay faceDisplay, int xDelta, int yDelta, int zDelta,
+          TextureAtlasSprite[] sprites, float[] yBounds, float[] zBounds, float[] xBounds, Matrix4f matrix4f, NormalData normal, int westColor, int eastColor) {
         TextureAtlasSprite westSprite = sprites[Direction.WEST.ordinal()];
         TextureAtlasSprite eastSprite = sprites[Direction.EAST.ordinal()];
         boolean hasWest = westSprite != null;
@@ -246,17 +250,6 @@ public class RenderResizableCuboid {
         if (!hasWest && !hasEast) {
             return; //sanity check failed
         }
-
-        int westColor = colors[Direction.WEST.ordinal()];
-        int eastColor = colors[Direction.EAST.ordinal()];
-        int redWest = ARGB32.red(westColor);
-        int greenWest = ARGB32.green(westColor);
-        int blueWest = ARGB32.blue(westColor);
-        int alphaWest = ARGB32.alpha(westColor);
-        int redEast = ARGB32.red(eastColor);
-        int greenEast = ARGB32.green(eastColor);
-        int blueEast = ARGB32.blue(eastColor);
-        int alphaEast = ARGB32.alpha(eastColor);
 
         // render each side
         for (int y = 0; y <= yDelta; y += 1) {
@@ -315,27 +308,27 @@ public class RenderResizableCuboid {
                 if (hasWest) {
                     float x1 = xBounds[0];
                     // add quads
-                    drawFace(buffer, matrix4f, minUWest, maxUWest, minVWest, maxVWest, light, overlay, faceDisplay, normal,
+                    drawFace(buffer, matrix4f, minUWest, maxUWest, minVWest, maxVWest, light, overlay, faceDisplay, normal, westColor,
                           x1, y1, z2,
                           x1, y2, z2,
                           x1, y2, z1,
-                          x1, y1, z1, redWest, greenWest, blueWest, alphaWest);
+                          x1, y1, z1);
                 }
                 if (hasEast) {
                     float x2 = xBounds[xDelta + 1];
                     // add quads
-                    drawFace(buffer, matrix4f, minUEast, maxUEast, minVEast, maxVEast, light, overlay, faceDisplay, normal,
+                    drawFace(buffer, matrix4f, minUEast, maxUEast, minVEast, maxVEast, light, overlay, faceDisplay, normal, eastColor,
                           x2, y1, z1,
                           x2, y2, z1,
                           x2, y2, z2,
-                          x2, y1, z2, redEast, greenEast, blueEast, alphaEast);
+                          x2, y1, z2);
 
                 }
             }
         }
     }
 
-    private static void renderSideYAxis(VertexConsumer buffer, int[] colors, int light, int overlay, FaceDisplay faceDisplay, int xDelta, int yDelta, int zDelta, TextureAtlasSprite[] sprites, float[] yBounds, float[] zBounds, float[] xBounds, Matrix4f matrix4f, NormalData normal) {
+    private static void renderSideYAxis(VertexConsumer buffer, int light, int overlay, FaceDisplay faceDisplay, int xDelta, int yDelta, int zDelta, TextureAtlasSprite[] sprites, float[] yBounds, float[] zBounds, float[] xBounds, Matrix4f matrix4f, NormalData normal, int downColor, int upColor) {
         TextureAtlasSprite upSprite = sprites[Direction.UP.ordinal()];
         TextureAtlasSprite downSprite = sprites[Direction.DOWN.ordinal()];
         boolean hasUp = upSprite != null;
@@ -344,17 +337,6 @@ public class RenderResizableCuboid {
         if (!hasUp && !hasDown) {
             return; //sanity check failed
         }
-
-        int downColor = colors[Direction.DOWN.ordinal()];
-        int upColor = colors[Direction.UP.ordinal()];
-        int redUp = ARGB32.red(upColor);
-        int greenUp = ARGB32.green(upColor);
-        int blueUp = ARGB32.blue(upColor);
-        int alphaUp = ARGB32.alpha(upColor);
-        int redDown = ARGB32.red(downColor);
-        int greenDown = ARGB32.green(downColor);
-        int blueDown = ARGB32.blue(downColor);
-        int alphaDown = ARGB32.alpha(downColor);
 
         // render each side
         for (int z = 0; z <= zDelta; z += 1) {
@@ -413,28 +395,26 @@ public class RenderResizableCuboid {
                 if (hasUp) {
                     float y2 = yBounds[yDelta + 1];
                     // add quads
-                    drawFace(buffer, matrix4f, minUUp, maxUUp, minVUp, maxVUp, light, overlay, faceDisplay, normal,
+                    drawFace(buffer, matrix4f, minUUp, maxUUp, minVUp, maxVUp, light, overlay, faceDisplay, normal, upColor,
                           x1, y2, z1,
                           x1, y2, z2,
                           x2, y2, z2,
-                          x2, y2, z1, redUp, greenUp, blueUp, alphaUp);
+                          x2, y2, z1);
                 }
                 if (hasDown) {
                     float y1 = yBounds[0];
                     // add quads
-                    drawFace(buffer, matrix4f, minU, maxU, minV, maxV, light, overlay, faceDisplay, normal,
+                    drawFace(buffer, matrix4f, minU, maxU, minV, maxV, light, overlay, faceDisplay, normal, downColor,
                           x1, y1, z2,
                           x1, y1, z1,
                           x2, y1, z1,
-                          x2, y1, z2, redDown, greenDown, blueDown, alphaDown);
+                          x2, y1, z2);
                 }
             }
         }
     }
 
-    /**
-     * @implNote From Tinker's
-     */
+    /// @implNote From Tinker's
     private static float[] getBlockBounds(int delta, float start, float end) {
         float[] bounds = new float[2 + delta];
         bounds[0] = start;
@@ -446,9 +426,7 @@ public class RenderResizableCuboid {
         return bounds;
     }
 
-    /**
-     * @implNote From Tinker's
-     */
+    /// @implNote From Tinker's
     private static int calculateDelta(float min, float max) {
         //The texture can stretch over more blocks than the subtracted height is if min's decimal is bigger than max's decimal (causing UV over 1)
         // ignoring the decimals prevents this, as yd then equals exactly how many ints are between the two
@@ -463,32 +441,32 @@ public class RenderResizableCuboid {
     }
 
     private static void drawFace(VertexConsumer buffer, Matrix4f matrix, float minU, float maxU, float minV, float maxV, int light, int overlay,
-          FaceDisplay faceDisplay, NormalData normal,
+          FaceDisplay faceDisplay, NormalData normal, int color,
           float x1, float y1, float z1,
           float x2, float y2, float z2,
           float x3, float y3, float z3,
-          float x4, float y4, float z4, int red, int green, int blue, int alpha) {
+          float x4, float y4, float z4) {
         if (faceDisplay.front) {
             buffer.addVertex(matrix, x1, y1, z1)
-                  .setColor(red, green, blue, alpha)
+                  .setColor(color)
                   .setUv(minU, maxV)
                   .setOverlay(overlay)
                   .setLight(light)
                   .setNormal(normal.front.x(), normal.front.y(), normal.front.z());
             buffer.addVertex(matrix, x2, y2, z2)
-                  .setColor(red, green, blue, alpha)
+                  .setColor(color)
                   .setUv(minU, minV)
                   .setOverlay(overlay)
                   .setLight(light)
                   .setNormal(normal.front.x(), normal.front.y(), normal.front.z());
             buffer.addVertex(matrix, x3, y3, z3)
-                  .setColor(red, green, blue, alpha)
+                  .setColor(color)
                   .setUv(maxU, minV)
                   .setOverlay(overlay)
                   .setLight(light)
                   .setNormal(normal.front.x(), normal.front.y(), normal.front.z());
             buffer.addVertex(matrix, x4, y4, z4)
-                  .setColor(red, green, blue, alpha)
+                  .setColor(color)
                   .setUv(maxU, maxV)
                   .setOverlay(overlay)
                   .setLight(light)
@@ -496,25 +474,25 @@ public class RenderResizableCuboid {
         }
         if (faceDisplay.back) {
             buffer.addVertex(matrix, x4, y4, z4)
-                  .setColor(red, green, blue, alpha)
+                  .setColor(color)
                   .setUv(maxU, maxV)
                   .setOverlay(overlay)
                   .setLight(light)
                   .setNormal(normal.back.x(), normal.back.y(), normal.back.z());
             buffer.addVertex(matrix, x3, y3, z3)
-                  .setColor(red, green, blue, alpha)
+                  .setColor(color)
                   .setUv(maxU, minV)
                   .setOverlay(overlay)
                   .setLight(light)
                   .setNormal(normal.back.x(), normal.back.y(), normal.back.z());
             buffer.addVertex(matrix, x2, y2, z2)
-                  .setColor(red, green, blue, alpha)
+                  .setColor(color)
                   .setUv(minU, minV)
                   .setOverlay(overlay)
                   .setLight(light)
                   .setNormal(normal.back.x(), normal.back.y(), normal.back.z());
             buffer.addVertex(matrix, x1, y1, z1)
-                  .setColor(red, green, blue, alpha)
+                  .setColor(color)
                   .setUv(minU, maxV)
                   .setOverlay(overlay)
                   .setLight(light)
@@ -544,15 +522,129 @@ public class RenderResizableCuboid {
         return max == 0 ? 1 : max;
     }
 
-    /**
-     * Used to only have to calculate normals once rather than transforming based on the matrix for every vertex call. If a face shouldn't be displayed the normal vector
-     * will be zero.
-     */
+    public static boolean isInsideBounds(Vec3 camera, double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+        return minX <= camera.x && camera.x <= maxX &&
+               minY <= camera.y && camera.y <= maxY &&
+               minZ <= camera.z && camera.z <= maxZ;
+    }
+
+    protected static FaceDisplay getFaceDisplay(Vec3 camPos, BlockPos renderStart, int length, int width, float height) {
+        return isInsideBounds(camPos, renderStart.getX(), renderStart.getY(), renderStart.getZ(),
+              renderStart.getX() + length, renderStart.getY() + height, renderStart.getZ() + width)
+               ? FaceDisplay.BACK : FaceDisplay.FRONT;
+    }
+
+    public static void renderValves(Vec3 camPos, PoseStack matrix, RenderType renderType, SubmitNodeCollector nodeCollector, List<ValveRenderData> valves, int overlay, TexturePicker valveTexture, BlockPos terPos, BlockPos renderStartPos, int physicalLength, int physicalWidth, int physicalHeight, int fluidColor, int glowLight, float mainFluidHeight) {
+        if (!valves.isEmpty()) {
+            //Use the full multiblock's render data unlike getFaceDisplay which gets the current height for calculating if it is inside
+            //If we are in the multiblock, render both faces of the valves as we may be "inside" of them or inside and outside them
+            // if we aren't in the multiblock though we can just get away with only rendering the front faces
+            FaceDisplay faceDisplay = isInsideBounds(camPos, renderStartPos.getX(), renderStartPos.getY(), renderStartPos.getZ(), renderStartPos.getX() + physicalLength,
+                  renderStartPos.getY() + physicalHeight, renderStartPos.getZ() + physicalWidth) ? FaceDisplay.BOTH : FaceDisplay.FRONT;
+            for (ValveRenderData valveRenderData : valves) {
+                renderValve(camPos, matrix, renderType, nodeCollector, terPos, overlay, valveRenderData, glowLight, faceDisplay, valveTexture, fluidColor, mainFluidHeight, physicalHeight);
+            }
+        }
+    }
+
+    private static void renderValve(Vec3 camPos, PoseStack matrix, RenderType renderType, SubmitNodeCollector nodeCollector, BlockPos rendererPos, int overlay, ValveRenderData valveRenderData, int glow, FaceDisplay faceDisplay, TexturePicker valveTexture, int fluidColor, float mainFluidHeight, int physicalHeight) {
+        Direction side = valveRenderData.getSide();
+        if (ModelRenderer.shouldSkipValveRender(mainFluidHeight, side, physicalHeight, valveRenderData.getValveFluidHeight())) {
+            return;
+        }
+        matrix.pushPose();
+        matrix.translate(valveRenderData.getValveLocation().getX() - rendererPos.getX(), valveRenderData.getValveLocation().getY() - rendererPos.getY(), valveRenderData.getValveLocation().getZ() - rendererPos.getZ());
+        renderCube(valveRenderData.renderCheck, valveRenderData.minX, valveRenderData.minY, valveRenderData.minZ, valveRenderData.maxX, valveRenderData.maxY, valveRenderData.maxZ, matrix, renderType, nodeCollector, fluidColor, glow, overlay, faceDisplay, camPos, Vec3.atLowerCornerOf(valveRenderData.getValveLocation()), valveTexture);
+        matrix.popPose();
+
+    }
+
+    //TODO - 26.1: Should we no-op all the cases of scale == 0
+    public static void renderObject(Vec3 camPos, PoseStack matrix, RenderType renderType, SubmitNodeCollector nodeCollector, @SideRender.SideRenderFlags byte sideRenderCheck, float cubeMinX, float cubeMinY, float cubeMinZ, float cubeMaxX, float cubeMaxY, float cubeMaxZ, TexturePicker spriteFromDirection, int overlay, int glowLight, int scaledColor, BlockPos terPos, BlockPos renderStartPos, int physicalLength, int physicalWidth) {
+        matrix.pushPose();
+        matrix.translate(renderStartPos.getX() - terPos.getX(), renderStartPos.getY() - terPos.getY(), renderStartPos.getZ() - terPos.getZ());
+        FaceDisplay faceDisplay = getFaceDisplay(camPos, renderStartPos, physicalLength, physicalWidth, cubeMaxY);
+        renderCube(sideRenderCheck, cubeMinX, cubeMinY, cubeMinZ, cubeMaxX, cubeMaxY, cubeMaxZ, matrix, renderType, nodeCollector, scaledColor, glowLight, overlay, faceDisplay, camPos, Vec3.atLowerCornerOf(renderStartPos), spriteFromDirection);
+        matrix.popPose();
+    }
+
+    /// avoid allocating a new one just to be non-null
+    private static final Vector3f UNUSED = new Vector3f();
+
+    public static class SideRender {
+
+        @MagicConstant(flags = {FACE_DOWN, FACE_UP, FACE_NORTH, FACE_SOUTH, FACE_WEST, FACE_EAST})
+        public @interface SideRenderFlags {}
+
+        public static final byte FACE_DOWN = 1 << 0;
+        public static final byte FACE_UP = 1 << 1;
+        public static final byte FACE_NORTH = 1 << 2;
+        public static final byte FACE_SOUTH = 1 << 3;
+        public static final byte FACE_WEST = 1 << 4;
+        public static final byte FACE_EAST = 1 << 5;
+
+        @SideRenderFlags
+        public static final byte ALL_FACES = FACE_DOWN | FACE_UP | FACE_NORTH | FACE_SOUTH | FACE_WEST | FACE_EAST;
+        @SideRenderFlags
+        public static final byte NOT_DOWN = FACE_UP | FACE_NORTH | FACE_SOUTH | FACE_WEST | FACE_EAST;
+        @SideRenderFlags
+        public static final byte HORIZONTAL = FACE_NORTH | FACE_SOUTH | FACE_WEST | FACE_EAST;
+        @SideRenderFlags
+        public static final byte X_AXIS = FACE_WEST | FACE_EAST;
+        @SideRenderFlags
+        public static final byte Z_AXIS = FACE_NORTH | FACE_SOUTH;
+        @SideRenderFlags
+        public static final byte Y_AXIS = FACE_DOWN | FACE_UP;
+
+        @SideRenderFlags
+        public static final byte[] DIRECTION_TO_FACE = Util.make(new byte[6], mapping -> {
+            mapping[Direction.DOWN.ordinal()] = FACE_DOWN;
+            mapping[Direction.UP.ordinal()] = FACE_UP;
+            mapping[Direction.NORTH.ordinal()] = FACE_NORTH;
+            mapping[Direction.SOUTH.ordinal()] = FACE_SOUTH;
+            mapping[Direction.WEST.ordinal()] = FACE_WEST;
+            mapping[Direction.EAST.ordinal()] = FACE_EAST;
+        });
+
+        @SideRenderFlags
+        @SuppressWarnings({"MagicConstant", "RedundantSuppression"})//IJ is silly
+        public static byte of(Direction dir) {
+            return DIRECTION_TO_FACE[dir.ordinal()];
+        }
+
+        @SideRenderFlags
+        public static byte from(boolean down, boolean up, boolean north, boolean south, boolean west, boolean east) {
+            byte output = 0;
+            if (down) {
+                output |= FACE_DOWN;
+            }
+            if (up) {
+                output |= FACE_UP;
+            }
+            if (north) {
+                output |= FACE_NORTH;
+            }
+            if (south) {
+                output |= FACE_SOUTH;
+            }
+            if (west) {
+                output |= FACE_WEST;
+            }
+            if (east) {
+                output |= FACE_EAST;
+            }
+
+            return output;
+        }
+    }
+
+    /// Used to only have to calculate normals once rather than transforming based on the matrix for every vertex call. If a face shouldn't be displayed the normal vector
+    /// will be zero.
     private record NormalData(Vector3f front, Vector3f back) {
 
         private NormalData(Matrix3f normalMatrix, Vector3f normal, FaceDisplay faceDisplay) {
-            this(faceDisplay.front ? calculate(normalMatrix, normal.x(), normal.y(), normal.z()) : new Vector3f(),
-                  faceDisplay.back ? calculate(normalMatrix, -normal.x(), -normal.y(), -normal.z()) : new Vector3f());
+            this(faceDisplay.front ? calculate(normalMatrix, normal.x(), normal.y(), normal.z()) : UNUSED,
+                  faceDisplay.back ? calculate(normalMatrix, -normal.x(), -normal.y(), -normal.z()) : UNUSED);
         }
 
         private static Vector3f calculate(Matrix3f normalMatrix, float x, float y, float z) {
@@ -573,5 +665,10 @@ public class RenderResizableCuboid {
             this.front = front;
             this.back = back;
         }
+    }
+
+    public sealed interface TexturePicker permits MekanismRenderer.SingleTexturePicker, MekanismRenderer.ValveTextureGetter {
+
+        TextureAtlasSprite apply(Direction direction);
     }
 }

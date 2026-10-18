@@ -1,6 +1,6 @@
 package mekanism.generators.common.item;
 
-import java.util.List;
+import java.util.function.Consumer;
 import mekanism.api.text.EnumColor;
 import mekanism.common.block.prefab.BlockBasicMultiblock;
 import mekanism.common.item.block.ItemBlockTooltip;
@@ -13,7 +13,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.item.component.TooltipDisplay;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
 
 public class ItemBlockFusionLogicAdapter extends ItemBlockTooltip<BlockBasicMultiblock<TileEntityFusionReactorLogicAdapter>> {
 
@@ -22,10 +23,11 @@ public class ItemBlockFusionLogicAdapter extends ItemBlockTooltip<BlockBasicMult
     }
 
     @Override
-    protected void addDetails(@NotNull ItemStack stack, @NotNull Item.TooltipContext context, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        super.addDetails(stack, context, tooltip, flag);
+    protected void addDetails(ItemStack stack, ItemAccess itemAccess, Item.TooltipContext context, TooltipDisplay tooltipDisplay,
+          Consumer<Component> tooltipAdder, TooltipFlag flag) {
+        super.addDetails(stack, itemAccess, context, tooltipDisplay, tooltipAdder, flag);
         FusionReactorLogic logicType = stack.getOrDefault(GeneratorsDataComponents.FUSION_LOGIC_TYPE, FusionReactorLogic.DISABLED);
-        tooltip.add(GeneratorsLang.REACTOR_LOGIC_REDSTONE_MODE.translate(logicType.getColor(), logicType));
-        tooltip.add(GeneratorsLang.REACTOR_LOGIC_ACTIVE_COOLING.translate(EnumColor.RED, OnOff.of(stack.getOrDefault(GeneratorsDataComponents.ACTIVE_COOLED, false))));
+        tooltipAdder.accept(GeneratorsLang.REACTOR_LOGIC_REDSTONE_MODE.translate(logicType.getColor(), logicType));
+        tooltipAdder.accept(GeneratorsLang.REACTOR_LOGIC_ACTIVE_COOLING.translate(EnumColor.RED, OnOff.of(stack.getOrDefault(GeneratorsDataComponents.ACTIVE_COOLED, false))));
     }
 }

@@ -10,9 +10,10 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.storage.TagValueInput;
 import mekanism.neoshim.neoforge.network.handling.IPayloadContext;
-import org.jetbrains.annotations.NotNull;
 
 public record PacketUpdateTile(BlockPos pos, CompoundTag updateTag) implements IMekanismPacket {
 
@@ -23,11 +24,6 @@ public record PacketUpdateTile(BlockPos pos, CompoundTag updateTag) implements I
           PacketUpdateTile::new
     );
 
-    public PacketUpdateTile(TileEntityUpdateable tile) {
-        this(tile.getBlockPos(), tile.getReducedUpdateTag(tile.getLevel().registryAccess()));
-    }
-
-    @NotNull
     @Override
     public CustomPacketPayload.Type<PacketUpdateTile> type() {
         return TYPE;
@@ -41,9 +37,12 @@ public record PacketUpdateTile(BlockPos pos, CompoundTag updateTag) implements I
             TileEntityUpdateable tile = WorldUtils.getTileEntity(TileEntityUpdateable.class, world, pos, true);
             if (tile == null) {
                 Mekanism.logger.warn("Update tile packet received for position: {} in world: {}, but no valid tile was found.", pos,
-                      world.dimension().location());
+                      world.dimension().identifier());
             } else {
-                tile.handleUpdateTag(updateTag, world.registryAccess());
+                //TODO - 26.1: Is this fine for how to create the problem reporter?
+                try (ProblemReporter.ScopedCollector reporter = new ProblemReporter.ScopedCollector(tile.problemPath(), Mekanism.logger)) {
+                    tile.handleUpdateTag(TagValueInput.create(reporter, world.registryAccess(), updateTag));
+                }
             }
         }
     }

@@ -17,20 +17,20 @@ import mekanism.generators.common.network.to_server.PacketGeneratorsGuiInteract;
 import mekanism.generators.common.network.to_server.PacketGeneratorsGuiInteract.GeneratorsGuiInteraction;
 import mekanism.generators.common.tile.fusion.TileEntityFusionReactorLogicAdapter;
 import mekanism.generators.common.tile.fusion.TileEntityFusionReactorLogicAdapter.FusionReactorLogic;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
 public class GuiFusionReactorLogicAdapter extends GuiMekanismTile<TileEntityFusionReactorLogicAdapter, EmptyTileContainer<TileEntityFusionReactorLogicAdapter>> {
 
     private static final int DISPLAY_COUNT = 4;
 
+    @Nullable
     private GuiScrollBar scrollBar;
 
     public GuiFusionReactorLogicAdapter(EmptyTileContainer<TileEntityFusionReactorLogicAdapter> container, Inventory inv, Component title) {
-        super(container, inv, title);
-        imageWidth += 20;
+        super(container, inv, title, DEFAULT_IMAGE_WIDTH + 20, DEFAULT_IMAGE_HEIGHT);
     }
 
     @Override
@@ -38,7 +38,7 @@ public class GuiFusionReactorLogicAdapter extends GuiMekanismTile<TileEntityFusi
         super.addGuiElements();
         addRenderableWidget(new GuiElementHolder(this, 26, 31, 130, 90));
         addRenderableWidget(new ToggleButton(this, 26, 19, 11, tile::isActiveCooled,
-              (element, mouseX, mouseY) -> PacketUtils.sendToServer(new PacketGuiInteract(GuiInteraction.NEXT_MODE, ((GuiFusionReactorLogicAdapter) element.gui()).tile))))
+              (element, _, _) -> PacketUtils.sendToServer(new PacketGuiInteract(GuiInteraction.NEXT_MODE, ((GuiFusionReactorLogicAdapter) element.gui()).tile))))
               .setTooltip(GeneratorsLang.REACTOR_LOGIC_TOGGLE_COOLING);
         scrollBar = addRenderableWidget(new GuiScrollBar(this, 156, 31, 90, () -> tile.getModes().length, () -> DISPLAY_COUNT));
         for (int i = 0; i < DISPLAY_COUNT; i++) {
@@ -48,16 +48,14 @@ public class GuiFusionReactorLogicAdapter extends GuiMekanismTile<TileEntityFusi
     }
 
     private void changeLogic(FusionReactorLogic type) {
-        if (type != null) {
-            PacketUtils.sendToServer(new PacketGeneratorsGuiInteract(GeneratorsGuiInteraction.LOGIC_TYPE, tile, type.ordinal()));
-        }
+        PacketUtils.sendToServer(new PacketGeneratorsGuiInteract(GeneratorsGuiInteraction.LOGIC_TYPE, tile, type.ordinal()));
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         renderTitleText(guiGraphics);
         drawScrollingString(guiGraphics, GeneratorsLang.REACTOR_LOGIC_ACTIVE_COOLING.translate(EnumColor.RED, OnOff.of(tile.isActiveCooled())), 23, 20, TextAlignment.LEFT,
-              titleTextColor(), getXSize() - 23, 16, false);
+              titleTextColor(), this.getImageWidth() - 23, 16, false);
         drawScrollingString(guiGraphics, GeneratorsLang.REACTOR_LOGIC_REDSTONE_MODE.translate(EnumColor.RED, tile.logicType), 0, 123, TextAlignment.CENTER, titleTextColor(), 4, false);
         drawScrollingString(guiGraphics, MekanismLang.STATUS.translate(EnumColor.RED, tile.checkMode() ? GeneratorsLang.REACTOR_LOGIC_OUTPUTTING : MekanismLang.IDLE),
               0, 136, TextAlignment.CENTER, titleTextColor(), 4, false);
@@ -66,6 +64,6 @@ public class GuiFusionReactorLogicAdapter extends GuiMekanismTile<TileEntityFusi
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
-        return super.mouseScrolled(mouseX, mouseY, deltaX, deltaY) || scrollBar.adjustScroll(deltaY);
+        return super.mouseScrolled(mouseX, mouseY, deltaX, deltaY) || scrollBar != null && scrollBar.adjustScroll(deltaY);
     }
 }

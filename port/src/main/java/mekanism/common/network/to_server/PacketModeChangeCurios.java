@@ -12,7 +12,8 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import mekanism.neoshim.neoforge.network.handling.IPayloadContext;
-import org.jetbrains.annotations.NotNull;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
 
 public record PacketModeChangeCurios(String slotType, int slot, int shift, boolean displayChangeMessage) implements IMekanismPacket {
 
@@ -33,7 +34,6 @@ public record PacketModeChangeCurios(String slotType, int slot, int shift, boole
         this(slotType, slot, shift, false);
     }
 
-    @NotNull
     @Override
     public CustomPacketPayload.Type<PacketModeChangeCurios> type() {
         return TYPE;
@@ -45,7 +45,10 @@ public record PacketModeChangeCurios(String slotType, int slot, int shift, boole
             Player player = context.player();
             ItemStack stack = CuriosIntegration.getCurioStack(player, slotType, slot);
             if (!stack.isEmpty() && stack.getItem() instanceof IModeItem modeItem) {
-                modeItem.changeMode(player, stack, shift, displayChangeMessage ? DisplayChange.OTHER : DisplayChange.NONE);
+                try (Transaction transaction = Transaction.openRoot()) {
+                    modeItem.changeMode(player, ItemAccess.forStack(stack), shift, displayChangeMessage ? DisplayChange.OTHER : DisplayChange.NONE, transaction);
+                    transaction.commit();
+                }
             }
         }
     }

@@ -3,60 +3,51 @@ package mekanism.api.recipes.ingredients;
 import com.mojang.serialization.Codec;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import mekanism.api.MekanismAPI;
 import mekanism.api.SerializerHelper;
-import mekanism.api.annotations.NothingNullByDefault;
+import mekanism.api.recipes.ingredients.creator.IngredientCreatorAccess;
+import net.minecraft.core.TypedInstance;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.tags.TagKey;
+import net.minecraft.util.context.ContextMap;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.Ingredient.TagValue;
-import net.minecraft.world.item.crafting.Ingredient.Value;
+import net.minecraft.world.item.crafting.display.DisplayContentsFactory.ForStacks;
 import mekanism.neoshim.neoforge.common.crafting.SizedIngredient;
 import org.jetbrains.annotations.ApiStatus.Internal;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Base implementation for how Mekanism handle's ItemStack Ingredients.
- * <p>
- * Create instances of this using {@link mekanism.api.recipes.ingredients.creator.IngredientCreatorAccess#item()}.
- *
- * @implNote This is a wrapper around {@link SizedIngredient}
- */
-@NothingNullByDefault
-public final class ItemStackIngredient implements InputIngredient<@NotNull ItemStack> {
+/// Base implementation for how Mekanism handle's ItemStack Ingredients.
+///
+/// Create instances of this using [mekanism.api.recipes.ingredients.creator.IngredientCreatorAccess#item()].
+///
+/// @implNote This is a wrapper around [SizedIngredient]
+public final class ItemStackIngredient implements InputIngredient<Item, ItemStack> {
 
-    /**
-     * A codec which can (de)encode item stack ingredients.
-     *
-     * @since 10.6.0
-     */
-    public static final Codec<ItemStackIngredient> CODEC = SizedIngredient.FLAT_CODEC.xmap(ItemStackIngredient::new, ItemStackIngredient::ingredient);
-    /**
-     * A stream codec which can be used to encode and decode item stack ingredients over the network.
-     *
-     * @since 10.6.0
-     */
+    /// A codec which can (de)encode item stack ingredients.
+    ///
+    /// @since 10.6.0
+    public static final Codec<ItemStackIngredient> CODEC = SizedIngredient.NESTED_CODEC.xmap(ItemStackIngredient::new, ItemStackIngredient::ingredient);
+    /// A stream codec which can be used to encode and decode item stack ingredients over the network.
+    ///
+    /// @since 10.6.0
     public static final StreamCodec<RegistryFriendlyByteBuf, ItemStackIngredient> STREAM_CODEC = SizedIngredient.STREAM_CODEC
           .map(ItemStackIngredient::new, ItemStackIngredient::ingredient);
 
-    /**
-     * Creates an Item Stack Ingredient that matches a given ingredient and amount. Prefer calling via
-     * {@link mekanism.api.recipes.ingredients.creator.IngredientCreatorAccess#item()} and
-     * {@link mekanism.api.recipes.ingredients.creator.IItemStackIngredientCreator#from(SizedIngredient)}.
-     *
-     * @param ingredient Sized ingredient to match.
-     *
-     * @throws NullPointerException     if the given instance is null.
-     * @throws IllegalArgumentException if the given instance is empty.
-     * @since 10.6.0
-     */
+    /// Creates an Item Stack Ingredient that matches a given ingredient and amount. Prefer calling via
+    /// [mekanism.api.recipes.ingredients.creator.IngredientCreatorAccess#item()] and
+    /// [mekanism.api.recipes.ingredients.creator.IItemStackIngredientCreator#from(SizedIngredient)].
+    ///
+    /// @param ingredient Sized ingredient to match.
+    ///
+    /// @throws NullPointerException     if the given instance is null.
+    /// @throws IllegalArgumentException if the given instance is empty.
+    /// @since 10.6.0
     public static ItemStackIngredient of(SizedIngredient ingredient) {
         Objects.requireNonNull(ingredient, "ItemStackIngredients cannot be created from a null ingredient.");
-        if (ingredient.ingredient().isEmpty()) {
-            throw new IllegalArgumentException("ItemStackIngredients cannot be created using the empty ingredient.");
-        }
         return new ItemStackIngredient(ingredient);
     }
 
@@ -75,9 +66,15 @@ public final class ItemStackIngredient implements InputIngredient<@NotNull ItemS
     }
 
     @Override
-    public boolean testType(ItemStack stack) {
-        Objects.requireNonNull(stack);
-        return ingredient.ingredient().test(stack);
+    public boolean testType(TypedInstance<Item> instance) {
+        Objects.requireNonNull(instance);
+        Ingredient vanillaIngredient = ingredient.ingredient();
+        if (vanillaIngredient.isCustom()) {
+            //Component data might be necessary, make it into a stack and test it
+            return vanillaIngredient.test(IngredientCreatorAccess.item().createStack(instance));
+        }
+        //Vanilla ingredients don't need to check component data so we can just skip converting the resource to a stack
+        return vanillaIngredient.acceptsItem(instance.typeHolder());
     }
 
     @Override
@@ -86,59 +83,51 @@ public final class ItemStackIngredient implements InputIngredient<@NotNull ItemS
     }
 
     @Override
-    public long getNeededAmount(ItemStack stack) {
-        return testType(stack) ? ingredient.count() : 0;
+    public int getNeededAmount(TypedInstance<Item> instance) {
+        return testType(instance) ? ingredient.count() : 0;
     }
 
     @Override
     public boolean hasNoMatchingInstances() {
-        return ingredient.ingredient().hasNoItems();
+        return ingredient.ingredient().isEmpty();
     }
 
     @Override
     public void logMissingTags() {
+        //TODO - 26.1: Re-evaluate this implementation
         if (hasNoMatchingInstances()) {
             Ingredient unsized = ingredient.ingredient();
-            if (unsized.isSimple()) {
-                if (unsized.isEmpty()) {
-                    MekanismAPI.logger.error("Empty ingredient: {}", unsized);
-                } else {
-                    for (Value ingredientValue : unsized.getValues()) {
-                        if (ingredientValue instanceof TagValue tagValue) {
-                            MekanismAPI.logger.error("Empty tag: {}", tagValue);
-                        } else {
-                            MekanismAPI.logger.warn("Unknown value: {}", ingredientValue);
-                        }
-                    }
-                }
-            } else {
+            if (unsized.isCustom()) {
                 MekanismAPI.logger.error("Empty ItemStackIngredient: {}", SerializerHelper.stringify(Ingredient.CODEC, unsized));
+            } else {
+                Optional<TagKey<Item>> fluidTagKey = unsized.getValues().unwrapKey();
+                if (fluidTagKey.isPresent()) {
+                    MekanismAPI.logger.error("Empty tag: {}", fluidTagKey.get());
+                } else {
+                    MekanismAPI.logger.error("Empty ItemStackIngredient: {}", SerializerHelper.stringify(Ingredient.CODEC, unsized));
+                }
             }
         }
     }
 
     @Override
-    public List<@NotNull ItemStack> getRepresentations() {
+    public List<ItemStack> getRepresentations(ContextMap context) {
         if (this.representations == null) {
-            //TODO: See if quark or whatever mods used to occasionally have empty stacks in their ingredients still do
-            // if so we probably should filter them out of this
-            this.representations = List.of(ingredient.getItems());
+            this.representations = ingredient.ingredient().display().resolve(context, (ForStacks<ItemStack>) stack -> stack.copyWithCount(ingredient.count())).toList();
         }
         return representations;
     }
 
-    /**
-     * For use in recipe input caching. Gets the internal Neo Sized Ingredient.
-     *
-     * @since 10.6.0
-     */
+    /// For use in recipe input caching. Gets the internal Neo Sized Ingredient.
+    ///
+    /// @since 10.6.0
     @Internal
     public SizedIngredient ingredient() {
         return ingredient;
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) {
             return true;
         } else if (o == null || getClass() != o.getClass()) {

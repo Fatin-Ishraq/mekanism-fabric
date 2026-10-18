@@ -1,5 +1,6 @@
 package mekanism.client.recipe_viewer;
 
+import com.google.common.primitives.Ints;
 import it.unimi.dsi.fastutil.bytes.Byte2ObjectArrayMap;
 import it.unimi.dsi.fastutil.bytes.Byte2ObjectMap;
 import it.unimi.dsi.fastutil.bytes.Byte2ObjectMaps;
@@ -22,32 +23,29 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import mekanism.api.Action;
 import mekanism.api.inventory.IInventorySlot;
-import mekanism.api.math.MathUtils;
 import mekanism.common.Mekanism;
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.content.qio.QIOCraftingTransferHelper;
 import mekanism.common.content.qio.QIOCraftingTransferHelper.BaseSimulatedInventory;
-import mekanism.common.content.qio.QIOCraftingTransferHelper.HashedItemSource;
-import mekanism.common.content.qio.QIOCraftingTransferHelper.SingularHashedItemSource;
+import mekanism.common.content.qio.QIOCraftingTransferHelper.ItemTypeSource;
+import mekanism.common.content.qio.QIOCraftingTransferHelper.SingularItemTypeSource;
 import mekanism.common.content.qio.QIOCraftingWindow;
 import mekanism.common.content.qio.QIOFrequency;
 import mekanism.common.inventory.container.QIOItemViewerContainer;
-import mekanism.common.inventory.container.slot.HotBarSlot;
-import mekanism.common.inventory.container.slot.MainInventorySlot;
-import mekanism.common.lib.inventory.HashedItem;
+import mekanism.common.inventory.container.slot.TransactionalSlot;
 import mekanism.common.network.PacketUtils;
 import mekanism.common.network.to_server.qio.PacketQIOFillCraftingWindow;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CraftingRecipe;
+import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public class QIOCraftingTransferHandler {
 
@@ -68,7 +66,7 @@ public class QIOCraftingTransferHandler {
             return recipeHolder().value();
         }
 
-        default ResourceLocation id() {
+        default ResourceKey<Recipe<?>> id() {
             return recipeHolder().id();
         }
 
@@ -76,7 +74,7 @@ public class QIOCraftingTransferHandler {
 
         Player player();
 
-        ITEM_UUID itemUUID(HashedItem hashed);
+        ITEM_UUID itemUUID(ItemResource itemType);
 
         List<SLOT> inputs();
 
@@ -88,7 +86,7 @@ public class QIOCraftingTransferHandler {
     }
 
     @Nullable
-    public static <RESULT, SLOT extends RVRecipeSlot, ITEM_UUID> RESULT transferRecipe(RVRecipeInfo<RESULT, SLOT, ITEM_UUID> recipeHelper, Action action) {
+    public static <RESULT, SLOT extends RVRecipeSlot, ITEM_UUID> RESULT transferRecipe(RVRecipeInfo<RESULT, SLOT, ITEM_UUID> recipeHelper, boolean execute) {
         if (recipeHelper.transferAmount() < 1) {
             //Short circuit if for some reason our caller is trying to transfer an invalid amount of items
             return recipeHelper.createInternalError();
@@ -104,12 +102,12 @@ public class QIOCraftingTransferHandler {
         QIOCraftingWindow craftingWindow = container.getCraftingWindow(selectedCraftingGrid);
         //Note: This variable is only used for when doTransfer is false
         byte nonEmptyCraftingSlots = 0;
-        if (action.simulate()) {
-            List<ItemStack> dummy = new ArrayList<>(9);
-            for (int slot = 0; slot < 9; slot++) {
-                ItemStack inputStack = craftingWindow.getInputSlot(slot).getStack();
+        if (!execute) {
+            List<ItemStack> dummy = new ArrayList<>(QIOCraftingWindow.SLOTS_PER_WINDOW);
+            for (int slot = 0; slot < QIOCraftingWindow.SLOTS_PER_WINDOW; slot++) {
+                ItemResource inputStack = craftingWindow.getInputSlot(slot).resource();
                 //Copy it in case any recipe does weird things and tries to mutate the stack
-                dummy.add(inputStack.copyWithCount(1));
+                dummy.add(inputStack.toStack());
                 if (!inputStack.isEmpty()) {
                     //Count how many crafting slots are not empty
                     nonEmptyCraftingSlots++;
@@ -131,15 +129,15 @@ public class QIOCraftingTransferHandler {
         // logic, unless we can also somehow cache the recipe layout and how it interacts with the other information
         List<SLOT> slotViews = recipeHelper.inputs();
         int maxInputCount = slotViews.size();
-        if (maxInputCount > 9) {
+        if (maxInputCount > QIOCraftingWindow.SLOTS_PER_WINDOW) {
             //I don't believe this ever will happen with a normal crafting recipe but just in case it does, error
             // if we have more than nine inputs, as there should never be
             // a case where this actually happens except potentially with some really obscure modded recipe
-            Mekanism.logger.warn("Error evaluating recipe transfer handler for recipe: {}, had more than 9 inputs: {}", recipeHelper.id(), maxInputCount);
+            Mekanism.logger.warn("Error evaluating recipe transfer handler for recipe: {}, had more than {} inputs: {}", recipeHelper.id(), QIOCraftingWindow.SLOTS_PER_WINDOW, maxInputCount);
             return recipeHelper.createInternalError();
         }
         int inputCount = 0;
-        record TrackedIngredients<SLOT extends RVRecipeSlot>(SLOT view, Set<HashedItem> representations) {
+        record TrackedIngredients<SLOT extends RVRecipeSlot>(SLOT view, Set<ItemResource> representations) {
         }
         //We will have at most the same number of ingredients as we have input slot views
         Byte2ObjectMap<TrackedIngredients<SLOT>> hashedIngredients = new Byte2ObjectArrayMap<>(maxInputCount);
@@ -149,9 +147,9 @@ public class QIOCraftingTransferHandler {
             if (!validIngredients.isEmpty()) {
                 //If there are valid ingredients, increment the count
                 inputCount++;
-                // and convert them to HashedItems
+                // and convert them to ItemResources
                 // Note: we use a linked hash set to preserve the order of the ingredients as done in JEI
-                LinkedHashSet<HashedItem> representations = new LinkedHashSet<>(validIngredients.size());
+                LinkedHashSet<ItemResource> representations = new LinkedHashSet<>(validIngredients.size());
                 //Note: We shouldn't need to convert the item that is part of the recipe to a "reduced" stack form based
                 // on what the server would send, as the item should already be like that from when the server sent the
                 // client the recipe. If this turns out to be incorrect due to how some mod does recipes, then we may need
@@ -162,13 +160,13 @@ public class QIOCraftingTransferHandler {
                 // so we may as well remove some unneeded copies
                 if (!displayed.isEmpty()) {
                     //Start by adding the displayed ingredient if there is one to prioritize it
-                    representations.add(HashedItem.raw(displayed));
+                    representations.add(ItemResource.of(displayed));
                 }
                 //Then add all valid ingredients in the order they appear in JEI. Because we are using a set
                 // we will just end up merging with the displayed ingredient when we get to it as a valid ingredient
                 for (ItemStack validIngredient : validIngredients) {
                     if (!validIngredient.isEmpty()) {//Shouldn't be empty but validate it just in case
-                        representations.add(HashedItem.raw(validIngredient));
+                        representations.add(ItemResource.of(validIngredient));
                     }
                 }
                 hashedIngredients.put((byte) index, new TrackedIngredients<>(slotView, representations));
@@ -182,9 +180,9 @@ public class QIOCraftingTransferHandler {
             Mekanism.logger.warn("Error initializing QIO transfer handler for crafting window: {}", selectedCraftingGrid);
             return recipeHelper.createInternalError();
         }
-        //Note: We do this in a reversed manner (HashedItem -> slots, vs slot -> HashedItem) so that we can more easily
+        //Note: We do this in a reversed manner (ItemResource -> slots, vs slot -> ItemResource) so that we can more easily
         // calculate the split for how we handle maxTransfer by quickly being able to see how many of each type we have
-        Map<HashedItem, ByteList> matchedItems = new HashMap<>(inputCount);
+        Map<ItemResource, ByteList> matchedItems = new HashMap<>(inputCount);
         ByteSet missingSlots = new ByteArraySet(inputCount);
         for (ObjectIterator<Byte2ObjectMap.Entry<TrackedIngredients<SLOT>>> iterator = Byte2ObjectMaps.fastIterator(hashedIngredients); iterator.hasNext(); ) {
             Byte2ObjectMap.Entry<TrackedIngredients<SLOT>> entry = iterator.next();
@@ -197,14 +195,14 @@ public class QIOCraftingTransferHandler {
             // table don't currently handle this, though it is something that would be nice to handle and is something I believe vanilla's recipe
             // book transfer handler is able to do (RecipeItemHelper/ServerRecipePlayer)
             boolean matchFound = false;
-            for (HashedItem validInput : entry.getValue().representations()) {
-                HashedItemSource source = qioTransferHelper.getSource(validInput);
+            for (ItemResource validInput : entry.getValue().representations()) {
+                ItemTypeSource source = qioTransferHelper.getSource(validInput);
                 if (source != null && source.hasMoreRemaining()) {
                     //We found a match for this slot, reduce how much of the item we have as an input
                     source.matchFound();
                     // mark that we found a match
                     matchFound = true;
-                    // and which HashedItem the slot's index corresponds to
+                    // and which ItemResource the slot's index corresponds to
                     matchedItems.computeIfAbsent(validInput, item -> new ByteArrayList()).add(entry.getByteKey());
                     // and stop checking the other possible inputs
                     break;
@@ -219,24 +217,24 @@ public class QIOCraftingTransferHandler {
             //After doing the quicker exact match lookup checks, go through any potentially missing slots
             // and do the slower more "accurate" check of if the stacks match. This allows us to use JEI's
             // system for letting mods declare what things match when it comes down to NBT
-            Map<HashedItem, ITEM_UUID> cachedIngredientUUIDs = new HashMap<>();
-            for (Map.Entry<HashedItem, HashedItemSource> entry : qioTransferHelper.reverseLookup.entrySet()) {
-                HashedItemSource source = entry.getValue();
+            Map<ItemResource, ITEM_UUID> cachedIngredientUUIDs = new HashMap<>();
+            for (Map.Entry<ItemResource, ItemTypeSource> entry : qioTransferHelper.reverseLookup.entrySet()) {
+                ItemTypeSource source = entry.getValue();
                 if (source.hasMoreRemaining()) {
                     //Only look at the source if we still have more items available in it
-                    HashedItem storedHashedItem = entry.getKey();
-                    Item storedItemType = storedHashedItem.getItem();
+                    ItemResource storedITemType = entry.getKey();
+                    Item storedItemType = storedITemType.getItem();
                     ITEM_UUID storedItemUUID = null;
                     for (ByteIterator missingIterator = missingSlots.iterator(); missingIterator.hasNext(); ) {
                         byte index = missingIterator.nextByte();
-                        for (HashedItem validIngredient : hashedIngredients.get(index).representations()) {
+                        for (ItemResource validIngredient : hashedIngredients.get(index).representations()) {
                             //Compare the raw item types
                             if (storedItemType == validIngredient.getItem()) {
                                 //If they match, compute the identifiers for both stacks as needed
                                 if (storedItemUUID == null) {
                                     //If we haven't retrieved a UUID for the stored stack yet because none of our previous ingredients
                                     // matched the basic item type, retrieve it
-                                    storedItemUUID = recipeHelper.itemUUID(storedHashedItem);
+                                    storedItemUUID = recipeHelper.itemUUID(storedITemType);
                                 }
                                 //Next compute the UUID for the ingredient we are missing if we haven't already calculated it
                                 // either in a previous iteration or for a different slot
@@ -246,8 +244,8 @@ public class QIOCraftingTransferHandler {
                                     source.matchFound();
                                     // unmark that the slot is missing a match
                                     missingIterator.remove();
-                                    // and mark which HashedItem the slot's index corresponds to
-                                    matchedItems.computeIfAbsent(storedHashedItem, item -> new ByteArrayList()).add(index);
+                                    // and mark which ItemResource the slot's index corresponds to
+                                    matchedItems.computeIfAbsent(storedITemType, item -> new ByteArrayList()).add(index);
                                     // and stop checking the other possible inputs
                                     break;
                                 }
@@ -273,7 +271,7 @@ public class QIOCraftingTransferHandler {
                 return recipeHelper.createMissingSlotsError(missing);
             }
         }
-        if (action.execute() || (nonEmptyCraftingSlots > 0 && nonEmptyCraftingSlots >= qioTransferHelper.getEmptyInventorySlots())) {
+        if (execute || (nonEmptyCraftingSlots > 0 && nonEmptyCraftingSlots >= qioTransferHelper.getEmptyInventorySlots())) {
             //Note: If all our crafting inventory slots are not empty, and we don't "obviously" have enough room due to empty slots,
             // then we need to calculate how much we can actually transfer and where it is coming from so that we are able to calculate
             // if we actually have enough room to shuffle the items around, even though otherwise we would only need to do these
@@ -281,20 +279,20 @@ public class QIOCraftingTransferHandler {
             int toTransfer = recipeHelper.transferAmount();
             if (toTransfer > 1) {
                 //Calculate how much we can actually transfer if we want to transfer as many full sets as possible
-                for (Map.Entry<HashedItem, ByteList> entry : matchedItems.entrySet()) {
-                    HashedItem hashedItem = entry.getKey();
-                    HashedItemSource source = qioTransferHelper.getSource(hashedItem);
+                for (Map.Entry<ItemResource, ByteList> entry : matchedItems.entrySet()) {
+                    ItemResource itemType = entry.getKey();
+                    ItemTypeSource source = qioTransferHelper.getSource(itemType);
                     if (source == null) {
                         //If something went wrong, and we don't actually have the item we think we do, error
-                        return invalidSource(recipeHelper, hashedItem);
+                        return invalidSource(recipeHelper, itemType);
                     }
-                    int maxStack = hashedItem.getMaxStackSize();
+                    int maxStack = itemType.getMaxStackSize();
                     //If we have something that only stacks to one, such as a bucket. Don't limit the max stack size
                     // of other items to one
                     int max = maxStack == 1 ? toTransfer : Math.min(toTransfer, maxStack);
                     //Note: This will always be at least one as the int list should not be able to become
                     // larger than the number of items we have available
-                    toTransfer = Math.min(max, MathUtils.clampToInt(source.getAvailable() / entry.getValue().size()));
+                    toTransfer = Math.min(max, Ints.saturatedCast(source.getAvailable() / entry.getValue().size()));
                     if (toTransfer == 1) {
                         //Short circuit checking the other ones if we get down to a single stack
                         break;
@@ -302,26 +300,26 @@ public class QIOCraftingTransferHandler {
                 }
             }
             QIOFrequency frequency = container.getFrequency();
-            Byte2ObjectMap<List<SingularHashedItemSource>> sources = new Byte2ObjectArrayMap<>(inputCount);
-            Map<HashedItemSource, List<List<SingularHashedItemSource>>> shuffleLookup = frequency == null ? Collections.emptyMap() : new HashMap<>(inputCount);
-            for (Map.Entry<HashedItem, ByteList> entry : matchedItems.entrySet()) {
-                HashedItem hashedItem = entry.getKey();
-                HashedItemSource source = qioTransferHelper.getSource(hashedItem);
+            Byte2ObjectMap<List<SingularItemTypeSource>> sources = new Byte2ObjectArrayMap<>(inputCount);
+            Map<ItemTypeSource, List<List<SingularItemTypeSource>>> shuffleLookup = frequency == null ? Collections.emptyMap() : new HashMap<>(inputCount);
+            for (Map.Entry<ItemResource, ByteList> entry : matchedItems.entrySet()) {
+                ItemResource itemType = entry.getKey();
+                ItemTypeSource source = qioTransferHelper.getSource(itemType);
                 if (source == null) {
                     //If something went wrong, and we don't actually have the item we think we do, error
-                    return invalidSource(recipeHelper, hashedItem);
+                    return invalidSource(recipeHelper, itemType);
                 }
                 //Cap the amount to transfer at the max tack size. This way we allow for transferring buckets
                 // and other stuff with it. This only actually matters if the max stack size is one, due to
                 // the logic done above when calculating how much to transfer, but we do this regardless here
                 // as there is no reason not to and then if we decide to widen it up we only have to change one spot
-                int transferAmount = Math.min(toTransfer, hashedItem.getMaxStackSize());
+                int transferAmount = Math.min(toTransfer, itemType.getMaxStackSize());
                 for (byte slot : entry.getValue()) {
                     //Try to use the item and figure out where it is coming from
-                    List<SingularHashedItemSource> actualSources = source.use(transferAmount);
+                    List<SingularItemTypeSource> actualSources = source.use(transferAmount);
                     if (actualSources.isEmpty()) {
                         //If something went wrong, and we don't actually have enough of the item for some reason, error
-                        return invalidSource(recipeHelper, hashedItem);
+                        return invalidSource(recipeHelper, itemType);
                     }
                     sources.put(slot, actualSources);
                     if (frequency != null) {
@@ -330,7 +328,7 @@ public class QIOCraftingTransferHandler {
                         if (elements == 1) {
                             shuffleLookup.put(source, Collections.singletonList(actualSources));
                         } else {
-                            List<List<SingularHashedItemSource>> list = shuffleLookup.get(source);
+                            List<List<SingularItemTypeSource>> list = shuffleLookup.get(source);
                             //noinspection Java8MapApi - Capturing lambda
                             if (list == null) {
                                 list = new ArrayList<>(elements);
@@ -341,10 +339,10 @@ public class QIOCraftingTransferHandler {
                     }
                 }
             }
-            if (!hasRoomToShuffle(qioTransferHelper, frequency, craftingWindow, container.getHotBarSlots(), container.getMainInventorySlots(), shuffleLookup)) {
+            if (!hasRoomToShuffle(qioTransferHelper, frequency, craftingWindow, container.getPlayerSlots(), container.getNumPlayerSlots(), shuffleLookup)) {
                 return recipeHelper.createNoRoomError();
             }
-            if (action.execute()) {
+            if (execute) {
                 //Note: We skip doing a validation check on if the recipe matches or not, as there is a chance that for some recipes
                 // things may not fully be accurate on the client side with the stacks that JEI lets us know match the recipe, as
                 // they may require extra NBT that is server side only.
@@ -355,28 +353,26 @@ public class QIOCraftingTransferHandler {
         return null;
     }
 
-    private static <RESULT> RESULT invalidSource(RVRecipeInfo<RESULT, ?, ?> recipeHelper, @NotNull HashedItem type) {
+    private static <RESULT> RESULT invalidSource(RVRecipeInfo<RESULT, ?, ?> recipeHelper, ItemResource type) {
         Mekanism.logger.warn("Error finding source for: {}. This should not be possible.", type);
         return recipeHelper.createInternalError();
     }
 
-    /**
-     * Loosely based on how {@link mekanism.common.content.qio.QIOServerCraftingTransferHandler}'s hasRoomToShuffle method works.
-     *
-     * @implNote As it simplifies the logic (and is what we had initially written), this simulates if we can shuffle with the player inventory before checking the
-     * frequency. (I believe this is also more efficient than doing the simulated checks against the frequency)
-     */
+    /// Loosely based on how [mekanism.common.content.qio.QIOServerCraftingTransferHandler]'s hasRoomToShuffle method works.
+    ///
+    /// @implNote As it simplifies the logic (and is what we had initially written), this simulates if we can shuffle with the player inventory before checking the
+    /// frequency. (I believe this is also more efficient than doing the simulated checks against the frequency)
     private static boolean hasRoomToShuffle(QIOCraftingTransferHelper qioTransferHelper, @Nullable QIOFrequency frequency, QIOCraftingWindow craftingWindow,
-          List<HotBarSlot> hotBarSlots, List<MainInventorySlot> mainInventorySlots, Map<HashedItemSource, List<List<SingularHashedItemSource>>> shuffleLookup) {
+          Iterable<TransactionalSlot> playerSlots, int numPlayerSlots, Map<ItemTypeSource, List<List<SingularItemTypeSource>>> shuffleLookup) {
         //Map used to keep track of inputs while also merging identical inputs, so we can cut down
         // on how many times we have to check if things can stack
-        Object2IntMap<HashedItem> leftOverInput = new Object2IntArrayMap<>(9);
-        for (byte slotIndex = 0; slotIndex < 9; slotIndex++) {
+        Object2IntMap<ItemResource> leftOverInput = new Object2IntArrayMap<>(QIOCraftingWindow.SLOTS_PER_WINDOW);
+        for (byte slotIndex = 0; slotIndex < QIOCraftingWindow.SLOTS_PER_WINDOW; slotIndex++) {
             IInventorySlot slot = craftingWindow.getInputSlot(slotIndex);
             if (!slot.isEmpty()) {
                 //Note: We can use raw as we are not modifying the stack or persisting the reference
-                HashedItem type = HashedItem.raw(slot.getStack());
-                HashedItemSource source = qioTransferHelper.getSource(type);
+                ItemResource type = slot.resource();
+                ItemTypeSource source = qioTransferHelper.getSource(type);
                 if (source == null) {
                     //Something went wrong, this should never be null for the things in the crafting slots
                     return false;
@@ -391,17 +387,17 @@ public class QIOCraftingTransferHandler {
         if (!leftOverInput.isEmpty()) {
             //If we have any leftover inputs in the crafting inventory, then get a simulated view of what the player's inventory
             // will look like after things are changed
-            BaseSimulatedInventory simulatedInventory = new BaseSimulatedInventory(hotBarSlots, mainInventorySlots) {
+            BaseSimulatedInventory simulatedInventory = new BaseSimulatedInventory(playerSlots, numPlayerSlots) {
                 @Override
                 protected int getRemaining(int slot, ItemStack currentStored) {
-                    HashedItemSource source = qioTransferHelper.getSource(HashedItem.raw(currentStored));
+                    ItemTypeSource source = qioTransferHelper.getSource(ItemResource.of(currentStored));
                     if (source == null) {
-                        return currentStored.getCount();
+                        return currentStored.count();
                     }
-                    return source.getSlotRemaining((byte) (slot + 9));
+                    return source.getSlotRemaining((byte) (slot + QIOCraftingWindow.SLOTS_PER_WINDOW));
                 }
             };
-            Object2IntMap<HashedItem> stillLeftOver = simulatedInventory.shuffleInputs(leftOverInput, frequency != null);
+            Object2IntMap<ItemResource> stillLeftOver = simulatedInventory.shuffleInputs(leftOverInput, frequency != null);
             if (stillLeftOver == null) {
                 //If we have remaining items and no frequency then we don't have room to shuffle
                 return false;
@@ -414,12 +410,12 @@ public class QIOCraftingTransferHandler {
                 //Note: We calculate these numbers as a difference so that it is easier to make sure none of the numbers accidentally overflow
                 int availableItemTypes = frequency.getTotalItemTypeCapacity() - frequency.getTotalItemTypes(true);
                 long availableItemSpace = frequency.getTotalItemCountCapacity() - frequency.getTotalItemCount();
-                Object2BooleanMap<HashedItemSource> usedQIOSource = new Object2BooleanArrayMap<>(shuffleLookup.size());
-                for (Map.Entry<HashedItemSource, List<List<SingularHashedItemSource>>> entry : shuffleLookup.entrySet()) {
-                    HashedItemSource source = entry.getKey();
+                Object2BooleanMap<ItemTypeSource> usedQIOSource = new Object2BooleanArrayMap<>(shuffleLookup.size());
+                for (Map.Entry<ItemTypeSource, List<List<SingularItemTypeSource>>> entry : shuffleLookup.entrySet()) {
+                    ItemTypeSource source = entry.getKey();
                     boolean usedQIO = false;
-                    for (List<SingularHashedItemSource> usedSources : entry.getValue()) {
-                        for (SingularHashedItemSource usedSource : usedSources) {
+                    for (List<SingularItemTypeSource> usedSources : entry.getValue()) {
+                        for (SingularItemTypeSource usedSource : usedSources) {
                             UUID qioSource = usedSource.getQioSource();
                             if (qioSource != null) {
                                 //Free up however much space as we used of the item
@@ -434,14 +430,14 @@ public class QIOCraftingTransferHandler {
                     }
                     usedQIOSource.put(source, usedQIO);
                 }
-                for (ObjectIterator<Object2IntMap.Entry<HashedItem>> iterator = Object2IntMaps.fastIterator(stillLeftOver); iterator.hasNext(); ) {
-                    Object2IntMap.Entry<HashedItem> entry = iterator.next();
+                for (ObjectIterator<Object2IntMap.Entry<ItemResource>> iterator = Object2IntMaps.fastIterator(stillLeftOver); iterator.hasNext(); ) {
+                    Object2IntMap.Entry<ItemResource> entry = iterator.next();
                     availableItemSpace -= entry.getIntValue();
                     if (availableItemSpace <= 0) {
                         //No room for all our items, fail
                         return false;
                     }
-                    HashedItemSource source = qioTransferHelper.getSource(entry.getKey());
+                    ItemTypeSource source = qioTransferHelper.getSource(entry.getKey());
                     if (source == null) {
                         //Something went wrong, this should never be null for the things in the crafting slots
                         return false;

@@ -18,27 +18,24 @@ import mekanism.common.network.to_server.PacketGuiInteract;
 import mekanism.common.network.to_server.PacketGuiInteract.GuiInteraction;
 import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.tile.interfaces.ITileFilterHolder;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public abstract class GuiFilterHolder<FILTER extends IFilter<?>, TILE extends TileEntityMekanism & ITileFilterHolder<FILTER>, CONTAINER extends MekanismTileContainer<TILE>>
       extends GuiMekanismTile<TILE, CONTAINER> {
 
-    /**
-     * The number of filters that can be displayed
-     */
+    /// The number of filters that can be displayed
     private static final int FILTER_COUNT = 4;
-    protected GuiInnerScreen leftScreen;
+    @Nullable
+    private GuiInnerScreen leftScreen;
+    @Nullable
     private GuiScrollBar scrollBar;
 
     protected GuiFilterHolder(CONTAINER container, Inventory inv, Component title) {
-        super(container, inv, title);
-        imageHeight += 88;
-        imageWidth += 100;
+        super(container, inv, title, DEFAULT_IMAGE_WIDTH + 100, DEFAULT_IMAGE_HEIGHT + 88);
         inventoryLabelX += 50;
         inventoryLabelY = imageHeight - 94;
         dynamicSlots = true;
@@ -56,25 +53,21 @@ public abstract class GuiFilterHolder<FILTER extends IFilter<?>, TILE extends Ti
         scrollBar = addRenderableWidget(new GuiScrollBar(this, 253, 17, 140, filterManager::count, () -> FILTER_COUNT));
         //Add each of the buttons and then just change visibility state to match filter info
         for (int i = 0; i < FILTER_COUNT; i++) {
-            addFilterButton(new MovableFilterButton(this, 96, 18 + i * 29, i, scrollBar::getCurrentSelection, filterManager, index -> {
+            addFilterButton(new MovableFilterButton(this, 96, 18 + i * 29, i, scrollBar::getCurrentSelection, filterManager, (event, index) -> {
                 if (index > 0) {
-                    GuiInteraction interaction = hasShiftDown() ? GuiInteraction.MOVE_FILTER_TO_TOP : GuiInteraction.MOVE_FILTER_UP;
+                    GuiInteraction interaction = event.hasShiftDown() ? GuiInteraction.MOVE_FILTER_TO_TOP : GuiInteraction.MOVE_FILTER_UP;
                     PacketUtils.sendToServer(new PacketGuiInteract(interaction, tile, index));
                 }
-            }, index -> {
+            },  (event, index) -> {
                 if (index < filterManager.count() - 1) {
-                    GuiInteraction interaction = hasShiftDown() ? GuiInteraction.MOVE_FILTER_TO_BOTTOM : GuiInteraction.MOVE_FILTER_DOWN;
+                    GuiInteraction interaction = event.hasShiftDown() ? GuiInteraction.MOVE_FILTER_TO_BOTTOM : GuiInteraction.MOVE_FILTER_DOWN;
                     PacketUtils.sendToServer(new PacketGuiInteract(interaction, tile, index));
                 }
             }, this::onClick, index -> PacketUtils.sendToServer(new PacketGuiInteract(GuiInteraction.TOGGLE_FILTER_STATE, tile, index)), this::getRenderStacks));
         }
     }
 
-    protected void drawScreenText(GuiGraphics guiGraphics, Component text, int y) {
-        drawScreenText(guiGraphics, text, 0, y);
-    }
-
-    protected void drawScreenText(GuiGraphics guiGraphics, Component text, int x, int y) {
+    protected void drawScreenText(GuiGraphicsExtractor guiGraphics, Component text, int x, int y) {
         //TODO: Do we want to make usages of this method eventually set the text to be rendered within the gui element for the screen?
         if (leftScreen != null) {//Validate it was properly set
             leftScreen.drawScaledScrollingString(guiGraphics, text, x, y, TextAlignment.LEFT, screenTextColor(), leftScreen.getXSize() - x, 5, false, 0.8F);
@@ -84,7 +77,7 @@ public abstract class GuiFilterHolder<FILTER extends IFilter<?>, TILE extends Ti
     private List<ItemStack> getRenderStacks(@Nullable IFilter<?> filter) {
         if (filter != null) {
             return switch (filter) {
-                case IItemStackFilter<?> itemFilter -> List.of(itemFilter.getItemStack());
+                case IItemStackFilter<?> itemFilter -> List.of(itemFilter.getItemType().toStack());
                 case ITagFilter<?> tagFilter -> getTagStacks(tagFilter.getTagName());
                 case IModIDFilter<?> modIDFilter -> getModIDStacks(modIDFilter.getModID());
                 default -> Collections.emptyList();
@@ -101,11 +94,11 @@ public abstract class GuiFilterHolder<FILTER extends IFilter<?>, TILE extends Ti
         return tile.getFilterManager();
     }
 
-    protected abstract void onClick(IFilter<?> filter, int index);
+    protected abstract void onClick(@Nullable IFilter<?> filter, int index);
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double xDelta, double yDelta) {
-        return super.mouseScrolled(mouseX, mouseY, xDelta, yDelta) || scrollBar.adjustScroll(yDelta);
+        return super.mouseScrolled(mouseX, mouseY, xDelta, yDelta) || scrollBar != null && scrollBar.adjustScroll(yDelta);
     }
 
     protected abstract List<ItemStack> getTagStacks(String tagName);
@@ -113,7 +106,7 @@ public abstract class GuiFilterHolder<FILTER extends IFilter<?>, TILE extends Ti
     protected abstract List<ItemStack> getModIDStacks(String tagName);
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.drawForegroundText(guiGraphics, mouseX, mouseY);
         renderInventoryText(guiGraphics);
     }

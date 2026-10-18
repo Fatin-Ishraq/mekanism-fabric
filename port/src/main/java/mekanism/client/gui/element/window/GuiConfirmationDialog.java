@@ -6,8 +6,9 @@ import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.button.TranslationButton;
 import mekanism.common.MekanismLang;
 import mekanism.common.inventory.container.SelectedWindowData.WindowType;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
+import org.jspecify.annotations.Nullable;
 
 public class GuiConfirmationDialog extends GuiWindow {
 
@@ -21,9 +22,9 @@ public class GuiConfirmationDialog extends GuiWindow {
         active = true;
 
         addChild(new TranslationButton(gui, relativeX + width / 2 - 51, relativeY + height - 24, 50, 18, MekanismLang.BUTTON_CANCEL, this::close));
-        addChild(new TranslationButton(gui, relativeX + width / 2 + 1, relativeY + height - 24, 50, 18, MekanismLang.BUTTON_CONFIRM, (element, mouseX, mouseY) -> {
+        addChild(new TranslationButton(gui, relativeX + width / 2 + 1, relativeY + height - 24, 50, 18, MekanismLang.BUTTON_CONFIRM, (element, event, isDoubleClick) -> {
             onConfirm.run();
-            return close(element, mouseX, mouseY);
+            return close(element, event, isDoubleClick);
         }, type.getColorSupplier()));
     }
 
@@ -35,7 +36,7 @@ public class GuiConfirmationDialog extends GuiWindow {
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         wrappedTextRenderer.render(guiGraphics, relativeX + PADDING, relativeY + 6, width - 2 * PADDING, TextAlignment.CENTER, titleTextColor());
     }
@@ -55,13 +56,13 @@ public class GuiConfirmationDialog extends GuiWindow {
         NORMAL(() -> null),
         DANGER(() -> EnumColor.RED);
 
-        private final Supplier<EnumColor> colorSupplier;
+        private final Supplier<@Nullable EnumColor> colorSupplier;
 
-        DialogType(Supplier<EnumColor> colorSupplier) {
+        DialogType(Supplier<@Nullable EnumColor> colorSupplier) {
             this.colorSupplier = colorSupplier;
         }
 
-        public Supplier<EnumColor> getColorSupplier() {
+        public Supplier<@Nullable EnumColor> getColorSupplier() {
             return colorSupplier;
         }
     }

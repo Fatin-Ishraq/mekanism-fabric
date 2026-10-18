@@ -1,13 +1,14 @@
 package mekanism.common.content.miner;
 
+import com.mojang.serialization.Codec;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2BooleanMap;
 import it.unimi.dsi.fastutil.objects.Reference2BooleanOpenHashMap;
 import java.util.BitSet;
+import java.util.Locale;
 import java.util.function.IntFunction;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.text.IHasTextComponent.IHasEnumNameTextComponent;
 import mekanism.api.text.ILangEntry;
 import mekanism.common.MekanismLang;
@@ -21,6 +22,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.ByIdMap;
+import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
@@ -30,11 +32,14 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public class ThreadMinerSearch extends Thread {
 
     private final TileEntityDigitalMiner tile;
     private final Long2ObjectMap<BitSet> oresToMine = new Long2ObjectOpenHashMap<>();
+    @Nullable
     private MinerRegionCache chunkCache;
     public State state = State.IDLE;
     public int found = 0;
@@ -85,7 +90,7 @@ public class ThreadMinerSearch extends Thread {
             if (acceptedItems.containsKey(info)) {
                 accepted = acceptedItems.getBoolean(info);
             } else {
-                if (tile.isReplaceTarget(info.asItem())) {
+                if (tile.isReplaceTarget(ItemResource.of(info))) {
                     //If it is a replace target just mark it as never being accepted
                     accepted = false;
                 } else {
@@ -95,7 +100,7 @@ public class ThreadMinerSearch extends Thread {
                 acceptedItems.put(info, accepted);
             }
             if (accepted) {
-                long chunk = ChunkPos.asLong(testPos);
+                long chunk = ChunkPos.pack(testPos);
                 oresToMine.computeIfAbsent(chunk, k -> new BitSet()).set(i);
                 found++;
             }
@@ -112,11 +117,9 @@ public class ThreadMinerSearch extends Thread {
         }
     }
 
-    /**
-     * Special cased vanilla blocks that only have one state actually have the drop and the other one just causes it to break. This includes things like two tall flowers,
-     * beds, and doors. If a data pack modifies the loot table so that the "secondary" block also provides drops those will then be handled by the fallback we have for
-     * collecting any drops that happen from breaking the block.
-     */
+    /// Special cased vanilla blocks that only have one state actually have the drop and the other one just causes it to break. This includes things like two tall
+    /// flowers, beds, and doors. If a data pack modifies the loot table so that the "secondary" block also provides drops those will then be handled by the fallback we
+    /// have for collecting any drops that happen from breaking the block.
     private boolean shouldSkipState(BlockState state) {
         if (state.getBlock() instanceof BedBlock) {
             return state.getValue(BlockStateProperties.BED_PART) == BedPart.FOOT;
@@ -126,25 +129,32 @@ public class ThreadMinerSearch extends Thread {
         return false;
     }
 
-    @NothingNullByDefault
-    public enum State implements IHasEnumNameTextComponent {
+    public enum State implements IHasEnumNameTextComponent, StringRepresentable {
         IDLE(MekanismLang.MINER_IDLE),
         SEARCHING(MekanismLang.MINER_SEARCHING),
         PAUSED(MekanismLang.MINER_PAUSED),
         FINISHED(MekanismLang.MINER_READY);
 
+        public static final Codec<State> CODEC = StringRepresentable.fromEnum(State::values);
         public static final IntFunction<State> BY_ID = ByIdMap.continuous(State::ordinal, values(), ByIdMap.OutOfBoundsStrategy.WRAP);
         public static final StreamCodec<ByteBuf, State> STREAM_CODEC = ByteBufCodecs.idMapper(BY_ID, State::ordinal);
 
+        private final String serializedName;
         private final ILangEntry langEntry;
 
         State(ILangEntry langEntry) {
+            this.serializedName = name().toLowerCase(Locale.ROOT);
             this.langEntry = langEntry;
         }
 
         @Override
         public Component getTextComponent() {
             return langEntry.translate();
+        }
+
+        @Override
+        public String getSerializedName() {
+            return serializedName;
         }
     }
 }

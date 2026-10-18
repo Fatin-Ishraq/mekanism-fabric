@@ -4,8 +4,7 @@ import dev.emi.emi.api.widget.WidgetHolder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import mekanism.api.chemical.ChemicalStack;
-import mekanism.api.functions.ConstantPredicates;
+import mekanism.api.chemical.ChemicalStackTemplate;
 import mekanism.api.recipes.PressurizedReactionRecipe;
 import mekanism.api.recipes.PressurizedReactionRecipe.PressurizedReactionRecipeOutput;
 import mekanism.client.gui.element.bar.GuiVerticalPowerBar;
@@ -18,7 +17,7 @@ import mekanism.client.recipe_viewer.RecipeViewerUtils;
 import mekanism.client.recipe_viewer.emi.MekanismEmiRecipeCategory;
 import mekanism.common.inventory.container.slot.SlotOverlay;
 import mekanism.common.tile.component.config.DataType;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.crafting.RecipeHolder;
 
 public class PressurizedReactionEmiRecipe extends MekanismEmiHolderRecipe<PressurizedReactionRecipe> {
@@ -28,18 +27,22 @@ public class PressurizedReactionEmiRecipe extends MekanismEmiHolderRecipe<Pressu
         addInputDefinition(recipe.getInputSolid());
         addInputDefinition(recipe.getInputFluid());
         addInputDefinition(recipe.getInputChemical());
-        List<ItemStack> itemOutputs = new ArrayList<>();
-        List<ChemicalStack> chemicalOutputs = new ArrayList<>();
+        List<ItemStackTemplate> itemOutputs = new ArrayList<>();
+        List<ChemicalStackTemplate> chemicalOutputs = new ArrayList<>();
         for (PressurizedReactionRecipeOutput output : recipe.getOutputDefinition()) {
-            itemOutputs.add(output.item());
-            chemicalOutputs.add(output.chemical());
+            if (output.item() != null) {
+                itemOutputs.add(output.item());
+            }
+            if (output.chemical() != null) {
+                chemicalOutputs.add(output.chemical());
+            }
         }
-        if (itemOutputs.stream().allMatch(ConstantPredicates.ITEM_EMPTY)) {
+        if (!itemOutputs.isEmpty()) {
             addOutputDefinition(Collections.emptyList());
         } else {
             addItemOutputDefinition(itemOutputs);
         }
-        if (chemicalOutputs.stream().allMatch(ConstantPredicates.CHEMICAL_EMPTY)) {
+        if (!chemicalOutputs.isEmpty()) {
             addOutputDefinition(Collections.emptyList());
         } else {
             addChemicalOutputDefinition(chemicalOutputs);

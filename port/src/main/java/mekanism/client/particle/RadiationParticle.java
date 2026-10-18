@@ -1,6 +1,5 @@
 package mekanism.client.particle;
 
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -8,8 +7,10 @@ import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.SmokeParticle;
 import net.minecraft.client.particle.SpriteSet;
+import net.minecraft.client.renderer.state.level.QuadParticleRenderState;
 import net.minecraft.core.particles.SimpleParticleType;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.util.LightCoordsUtil;
+import net.minecraft.util.RandomSource;
 
 public class RadiationParticle extends SmokeParticle {
 
@@ -19,14 +20,15 @@ public class RadiationParticle extends SmokeParticle {
     }
 
     @Override
-    public int getLightColor(float partialTick) {
-        return 190 + (int) (20F * (1.0F - Minecraft.getInstance().options.gamma().get().floatValue()));
+    public int getLightCoords(float partialTick) {
+        int block = 190 + (int) (20F * (1.0F - Minecraft.getInstance().options.gamma().get().floatValue()));
+        return LightCoordsUtil.withBlock(super.getLightCoords(partialTick), block);
     }
 
     @Override
-    public void render(@NotNull VertexConsumer vertexBuilder, @NotNull Camera renderInfo, float partialTicks) {
+    public void extract(QuadParticleRenderState particleTypeRenderState, Camera camera, float partialTickTime) {
         if (age > 0) {
-            super.render(vertexBuilder, renderInfo, partialTicks);
+            super.extract(particleTypeRenderState, camera, partialTickTime);
         }
     }
 
@@ -39,7 +41,7 @@ public class RadiationParticle extends SmokeParticle {
         }
 
         @Override
-        public Particle createParticle(@NotNull SimpleParticleType type, @NotNull ClientLevel world, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed) {
+        public Particle createParticle(SimpleParticleType type, ClientLevel world, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed, RandomSource random) {
             return new RadiationParticle(world, x, y, z, xSpeed, ySpeed, zSpeed, this.spriteSet);
         }
     }

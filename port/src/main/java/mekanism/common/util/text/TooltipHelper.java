@@ -8,14 +8,12 @@ import mekanism.common.util.UnitDisplayUtils.RadiationUnit;
 import mekanism.common.util.UnitDisplayUtils.TemperatureUnit;
 import net.minecraft.network.chat.Component;
 
-/**
- * @apiNote Do not instantiate this class directly as it will be done via the service loader. Instead, access instances of this via {@link ITooltipHelper#INSTANCE}
- */
+/// @apiNote Do not instantiate this class directly as it will be done via the service loader. Instead, access instances of this via [ITooltipHelper#INSTANCE]
 public class TooltipHelper implements ITooltipHelper {
 
     @Override
     public Component getEnergyPerMBDisplayShort(long energy) {
-        return MekanismLang.GENERIC_PER_MB.translate(MekanismUtils.getEnergyDisplayShort(energy));
+        return MekanismLang.GENERIC_PER_MB.translate(UnitDisplayUtils.getEnergyDisplayShort(energy));
     }
 
     @Override
@@ -36,5 +34,17 @@ public class TooltipHelper implements ITooltipHelper {
     @Override
     public Component getPercent(double ratio) {
         return TextUtils.getPercent(ratio);
+    }
+
+    @Override
+    public Component getEnergyDisplay(long energy, boolean perTick) {
+        Component energyDisplay = UnitDisplayUtils.getEnergyDisplayShort(energy);
+        return perTick ? MekanismLang.GENERIC_PER_TICK.translate(energyDisplay) : energyDisplay;
+    }
+
+    @Override
+    public Component getFluidDisplay(long mb, boolean perTick) {
+        Component formattedMb = Component.literal(getFormattedNumber(mb));
+        return perTick ? MekanismLang.GENERIC_PER_TICK.translate(formattedMb) : formattedMb;
     }
 }

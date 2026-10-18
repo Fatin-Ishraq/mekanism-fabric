@@ -23,9 +23,9 @@ import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
 import mezz.jei.api.helpers.IGuiHelper;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.RecipeIngredientRole;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.util.context.ContextMap;
 import net.minecraft.world.item.crafting.RecipeHolder;
-import org.jetbrains.annotations.NotNull;
 
 public class PaintingRecipeCategory extends HolderRecipeCategory<ItemStackChemicalToItemStackRecipe> {
 
@@ -47,7 +47,7 @@ public class PaintingRecipeCategory extends HolderRecipeCategory<ItemStackChemic
     }
 
     @Override
-    public void draw(RecipeHolder<ItemStackChemicalToItemStackRecipe> recipeHolder, IRecipeSlotsView recipeSlotsView, GuiGraphics guiGraphics, double mouseX, double mouseY) {
+    public void draw(RecipeHolder<ItemStackChemicalToItemStackRecipe> recipeHolder, IRecipeSlotsView recipeSlotsView, GuiGraphicsExtractor guiGraphics, double mouseX, double mouseY) {
         //Set what the "current" recipe is for our color details, before bothering to draw the arrow
         colorDetails.setIngredient(getDisplayedStack(recipeSlotsView, CHEMICAL_INPUT, MekanismJEI.TYPE_CHEMICAL, ChemicalStack.EMPTY));
         super.draw(recipeHolder, recipeSlotsView, guiGraphics, mouseX, mouseY);
@@ -55,17 +55,18 @@ public class PaintingRecipeCategory extends HolderRecipeCategory<ItemStackChemic
     }
 
     @Override
-    public void setRecipe(@NotNull IRecipeLayoutBuilder builder, RecipeHolder<ItemStackChemicalToItemStackRecipe> recipeHolder, @NotNull IFocusGroup focusGroup) {
+    public void setRecipe(IRecipeLayoutBuilder builder, RecipeHolder<ItemStackChemicalToItemStackRecipe> recipeHolder, IFocusGroup focusGroup) {
         ItemStackChemicalToItemStackRecipe recipe = recipeHolder.value();
-        initItem(builder, RecipeIngredientRole.INPUT, inputSlot, recipe.getItemInput().getRepresentations());
-        List<ChemicalStack> scaledChemicals = recipe.getChemicalInput().getRepresentations();
+        ContextMap slotDisplayContext = getSlotDisplayContext();
+        initItem(builder, RecipeIngredientRole.INPUT, inputSlot, recipe.getItemInput().getRepresentations(slotDisplayContext));
+        List<ChemicalStack> scaledChemicals = recipe.getChemicalInput().getRepresentations(slotDisplayContext);
         if (recipe.perTickUsage()) {
             scaledChemicals = scaledChemicals.stream()
-                  .map(chemical -> chemical.copyWithAmount(chemical.getAmount() * TileEntityPaintingMachine.BASE_TICKS_REQUIRED))
+                  .map(chemical -> chemical.copyWithAmount(chemical.amount() * TileEntityPaintingMachine.BASE_TICKS_REQUIRED))
                   .toList();
         }
         initChemical(builder, RecipeIngredientRole.INPUT, inputChemical, scaledChemicals)
               .setSlotName(CHEMICAL_INPUT);
-        initItem(builder, RecipeIngredientRole.OUTPUT, output, recipe.getOutputDefinition());
+        initItem(builder, output, recipe.getOutputDefinition());
     }
 }

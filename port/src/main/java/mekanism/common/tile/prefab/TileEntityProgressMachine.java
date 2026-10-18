@@ -12,12 +12,11 @@ import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.UpgradeUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
 public abstract class TileEntityProgressMachine<RECIPE extends MekanismRecipe<?>> extends TileEntityRecipeMachine<RECIPE> {
 
@@ -56,33 +55,32 @@ public abstract class TileEntityProgressMachine<RECIPE extends MekanismRecipe<?>
     }
 
     @Override
-    public void loadAdditional(@NotNull CompoundTag nbt, @NotNull HolderLookup.Provider provider) {
-        super.loadAdditional(nbt, provider);
-        operatingTicks = nbt.getInt(SerializationConstants.PROGRESS);
+    public void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
+        operatingTicks = input.getIntOr(SerializationConstants.PROGRESS, operatingTicks);
     }
 
     @Override
-    public void saveAdditional(@NotNull CompoundTag nbtTags, @NotNull HolderLookup.Provider provider) {
-        super.saveAdditional(nbtTags, provider);
-        nbtTags.putInt(SerializationConstants.PROGRESS, getOperatingTicks());
+    public void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
+        output.putInt(SerializationConstants.PROGRESS, getOperatingTicks());
     }
 
     @Override
     public void recalculateUpgrades(Upgrade upgrade) {
-        super.recalculateUpgrades(upgrade);
         if (upgrade == Upgrade.SPEED) {
             ticksRequired = MekanismUtils.getTicks(this, baseTicksRequired);
             operationsPerTick = MekanismUtils.getOperationsPerTick(this, baseTicksRequired, 1);
         }
+        super.recalculateUpgrades(upgrade);
     }
 
     public int getOperationsPerTick() {
         return this.operationsPerTick;
     }
 
-    @NotNull
     @Override
-    public List<Component> getInfo(@NotNull Upgrade upgrade) {
+    public List<Component> getInfo(Upgrade upgrade) {
         return UpgradeUtils.getMultScaledInfo(this, upgrade);
     }
 

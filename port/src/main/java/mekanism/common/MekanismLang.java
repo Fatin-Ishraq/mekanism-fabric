@@ -1,11 +1,8 @@
 package mekanism.common;
 
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.text.ILangEntry;
-import net.minecraft.Util;
-import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.util.Util;
 
-@NothingNullByDefault
 public enum MekanismLang implements ILangEntry {
     //Vanilla lang strings we use, for purposes of not having to have them copy-pasted all over the place
     REPAIR_COST("container.repair.cost"),
@@ -633,9 +630,6 @@ public enum MekanismLang implements ILangEntry {
     TEMPERATURE_AMBIENT("temperature", "ambient"),
     TEMPERATURE_AMBIENT_SHORT("temperature", "ambient.short"),
     //Energy
-    ENERGY_JOULES("energy", "joules"),
-    ENERGY_JOULES_PLURAL("energy", "joules.plural"),
-    ENERGY_JOULES_SHORT("energy", "joules.short"),
     ENERGY_FORGE("energy", "forge"),
     ENERGY_FORGE_SHORT("energy", "forge.short"),
     //Network Reader
@@ -876,7 +870,8 @@ public enum MekanismLang implements ILangEntry {
         return key;
     }
 
-    public static ILangEntry get(EquipmentSlot type) {
+    //TODO - 26.1: unused?
+    /*public static ILangEntry get(EquipmentSlot type) {
         return switch (type) {
             case HEAD -> HEAD;
             case CHEST, BODY -> BODY;
@@ -885,5 +880,5 @@ public enum MekanismLang implements ILangEntry {
             case MAINHAND -> MAINHAND;
             case OFFHAND -> OFFHAND;
         };
-    }
+    }*/
 }

@@ -6,22 +6,20 @@ import it.unimi.dsi.fastutil.objects.Object2LongMaps;
 import it.unimi.dsi.fastutil.objects.Object2LongSortedMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.UUID;
-import mekanism.api.annotations.NothingNullByDefault;
-import mekanism.common.attachments.qio.DriveContents;
-import mekanism.common.attachments.qio.DriveMetadata;
+import mekanism.common.component.qio.DriveContents;
+import mekanism.common.component.qio.DriveMetadata;
 import mekanism.common.content.qio.IQIODriveItem;
 import mekanism.common.content.qio.QIODriveData;
 import mekanism.common.content.qio.QIODriveData.QIODriveKey;
 import mekanism.common.registries.MekanismDataComponents;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.Nullable;
+import mekanism.common.util.ItemAccessUtils;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-/**
- * QIO Drive merging data helper. Duplicates a fair bit of code from {@link QIODriveData}, but without requiring a {@link QIODriveKey}, and not validating the total size
- * until writing to the output item
- */
-@NothingNullByDefault
+/// QIO Drive merging data helper. Duplicates a fair bit of code from [QIODriveData], but without requiring a [QIODriveKey], and not validating the total size until
+/// writing to the output item
 public class QIORecipeData implements RecipeUpgradeData<QIORecipeData> {
 
     //Note: We just keep track of the UUID as we know it is unique by type so there is no reason to look up the stacks for merging purposes
@@ -61,21 +59,22 @@ public class QIORecipeData implements RecipeUpgradeData<QIORecipeData> {
     }
 
     @Override
-    public boolean applyToStack(HolderLookup.Provider provider, ItemStack stack) {
+    public boolean applyToStack(ItemAccess itemAccess, TransactionContext transaction) {
         if (itemMap.isEmpty()) {
             //If we have nothing present then it is a success, but if we have data that says we should
             // have items, but we don't then fail
             return itemCount == 0;
         }
-        IQIODriveItem driveItem = (IQIODriveItem) stack.getItem();
-        if (itemCount == 0 || itemCount > driveItem.getCountCapacity(stack) || itemMap.size() > driveItem.getTypeCapacity(stack)) {
+        ItemResource itemType = itemAccess.getResource();
+        IQIODriveItem driveItem = (IQIODriveItem) itemType.getItem();
+        if (itemCount == 0 || itemCount > driveItem.getCountCapacity() || itemMap.size() > driveItem.getTypeCapacity()) {
             //If we have items stored but no types, have more items stored than the output item supports, or have more types stored
             // then return that we are not able to actually apply them to the stack
             return false;
         }
-        stack.set(MekanismDataComponents.DRIVE_METADATA, new DriveMetadata(itemCount, itemMap.size()));
-        //Note: We just directly pass the item map to it, as we don't need it anymore so the drive contents can take it over
-        stack.set(MekanismDataComponents.DRIVE_CONTENTS, new DriveContents(itemMap));
-        return true;
+        itemType = itemType.with(MekanismDataComponents.DRIVE_METADATA, new DriveMetadata(itemCount, itemMap.size()))
+              //Note: We just directly pass the item map to it, as we don't need it anymore so the drive contents can take it over
+              .with(MekanismDataComponents.DRIVE_CONTENTS, new DriveContents(itemMap));
+        return ItemAccessUtils.exchange(itemAccess, itemType, transaction);
     }
 }

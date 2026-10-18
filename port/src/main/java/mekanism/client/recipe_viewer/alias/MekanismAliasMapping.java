@@ -2,9 +2,9 @@ package mekanism.client.recipe_viewer.alias;
 
 import java.util.List;
 import java.util.Map;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.text.IHasTranslationKey;
 import mekanism.common.Mekanism;
+import mekanism.common.component.containers.type.ContainerType;
 import mekanism.common.content.blocktype.FactoryType;
 import mekanism.common.item.block.ItemBlockEnergyCube;
 import mekanism.common.registration.impl.BlockRegistryObject;
@@ -16,17 +16,14 @@ import mekanism.common.resource.IResource;
 import mekanism.common.tags.MekanismTags;
 import mekanism.common.tier.FactoryTier;
 import mekanism.common.util.EnumUtils;
-import mekanism.common.util.FluidUtils;
-import mekanism.common.util.StorageUtils;
-import net.minecraft.Util;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.Util;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.Enchantments;
 
-@NothingNullByDefault
 public final class MekanismAliasMapping implements IAliasMapping {
 
     @Override
@@ -62,17 +59,17 @@ public final class MekanismAliasMapping implements IAliasMapping {
         //Note: Jetpack module pairing with normal flight alias is in done in the gear section
         rv.addItemAliases(MekanismItems.MODULE_GRAVITATIONAL_MODULATING, MekanismAliases.CREATIVE_FLIGHT);
         rv.addItemAliases(MekanismItems.MODULE_CHARGE_DISTRIBUTION, MekanismAliases.ITEM_CHARGER);
-        rv.addItemAliases(MekanismItems.MODULE_HYDRAULIC_PROPULSION, MekanismAliases.AUTO_STEP, MekanismAliases.STEP_ASSIST, MobEffects.JUMP.value()::getDescriptionId);
+        rv.addItemAliases(MekanismItems.MODULE_HYDRAULIC_PROPULSION, MekanismAliases.AUTO_STEP, MekanismAliases.STEP_ASSIST, MobEffects.JUMP_BOOST.value()::getDescriptionId);
         rv.addItemAliases(MekanismItems.MODULE_HYDROSTATIC_REPULSOR, MekanismAliases.UNIT_HYDROSTATIC_SPEED, getTranslationKey(Enchantments.DEPTH_STRIDER));
         rv.addItemAliases(MekanismItems.MODULE_MOTORIZED_SERVO, getTranslationKey(Enchantments.SWIFT_SNEAK));
-        rv.addItemAliases(MekanismItems.MODULE_LOCOMOTIVE_BOOSTING, MobEffects.MOVEMENT_SPEED.value()::getDescriptionId);
+        rv.addItemAliases(MekanismItems.MODULE_LOCOMOTIVE_BOOSTING, MobEffects.SPEED.value()::getDescriptionId);
         rv.addItemAliases(MekanismItems.MODULE_SOUL_SURFER, getTranslationKey(Enchantments.SOUL_SPEED));
 
         rv.addModuleAliases(MekanismItems.ITEMS);
     }
 
     private static IHasTranslationKey getTranslationKey(ResourceKey<Enchantment> enchantmentKey) {
-        return () -> Util.makeDescriptionId("enchantment", enchantmentKey.location());
+        return () -> Util.makeDescriptionId("enchantment", enchantmentKey.identifier());
     }
 
     private <ITEM, FLUID, CHEMICAL> void addFactoryAliases(RVAliasHelper<ITEM, FLUID, CHEMICAL> rv) {
@@ -130,7 +127,7 @@ public final class MekanismAliasMapping implements IAliasMapping {
               MekanismItems.MEKASUIT_PANTS
         ), MekanismAliases.MEKA_SUIT_POWER_ARMOR);
 
-        rv.addAliases(FluidUtils.getFilledVariant(MekanismItems.CANTEEN, MekanismFluids.NUTRITIONAL_PASTE),
+        rv.addAliases(ContainerType.FLUID.getFilledVariant(MekanismItems.CANTEEN, MekanismFluids.NUTRITIONAL_PASTE, null),
               MekanismAliases.CANTEEN_EDIBLE,
               MekanismAliases.CANTEEN_FOOD_STORAGE
         );
@@ -238,9 +235,7 @@ public final class MekanismAliasMapping implements IAliasMapping {
               new ItemStack(MekanismBlocks.ADVANCED_ENERGY_CUBE),
               new ItemStack(MekanismBlocks.ELITE_ENERGY_CUBE),
               new ItemStack(MekanismBlocks.ULTIMATE_ENERGY_CUBE),
-              StorageUtils.getFilledEnergyVariant(
-                    ItemBlockEnergyCube.withCreativeSideConfig(ItemBlockEnergyCube.ALL_OUTPUT)
-              )
+              ContainerType.ENERGY.getFilledVariant(ItemBlockEnergyCube.withCreativeSideConfig(ItemBlockEnergyCube.ALL_OUTPUT), null)
         ), MekanismAliases.ENERGY_STORAGE, MekanismAliases.ENERGY_STORAGE_BATTERY, MekanismAliases.ITEM_CHARGER);
         rv.addItemAliases(MekanismItems.ENERGY_TABLET, MekanismAliases.ENERGY_STORAGE, MekanismAliases.ENERGY_STORAGE_BATTERY);
 
@@ -248,7 +243,7 @@ public final class MekanismAliasMapping implements IAliasMapping {
               new ItemStack(MekanismBlocks.CREATIVE_BIN),
               new ItemStack(MekanismBlocks.CREATIVE_FLUID_TANK),
               new ItemStack(MekanismBlocks.CREATIVE_CHEMICAL_TANK),
-              ItemBlockEnergyCube.withCreativeSideConfig(ItemBlockEnergyCube.ALL_INPUT)
+              ItemBlockEnergyCube.withCreativeSideConfig(ItemBlockEnergyCube.ALL_INPUT).toStack()
         ), MekanismAliases.STORAGE_TRASHCAN, MekanismAliases.STORAGE_VOID);
     }
 

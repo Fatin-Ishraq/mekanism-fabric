@@ -1,42 +1,28 @@
 package mekanism.client.gui.element.scroll;
 
-import com.mojang.blaze3d.platform.Lighting;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import java.util.List;
 import java.util.function.Supplier;
-import mekanism.api.math.MathUtils;
 import mekanism.api.robit.RobitSkin;
-import mekanism.client.RobitSpriteUploader;
-import mekanism.client.gui.GuiUtils;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.GuiElement;
 import mekanism.client.gui.element.GuiElementHolder;
 import mekanism.client.gui.element.GuiInnerScreen;
 import mekanism.client.gui.tooltip.TooltipUtils;
-import mekanism.client.model.MekanismModelCache;
-import mekanism.common.Mekanism;
 import mekanism.common.MekanismLang;
 import mekanism.common.entity.EntityRobit;
 import mekanism.common.registries.MekanismRobitSkins;
 import mekanism.common.registries.MekanismRobitSkins.SkinLookup;
 import mekanism.common.util.MekanismUtils;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.client.resources.model.BakedModel;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
-import mekanism.neoshim.neoforge.client.model.data.ModelData;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.joml.Quaternionf;
 
 public class GuiRobitSkinSelectScroll extends GuiElement {
@@ -47,8 +33,7 @@ public class GuiRobitSkinSelectScroll extends GuiElement {
 
     private final GuiScrollBar scrollBar;
 
-    private final Supplier<List<ResourceKey<RobitSkin>>> unlockedSkins;
-    private final EntityRobit robit;
+    private final Supplier<@Nullable List<ResourceKey<RobitSkin>>> unlockedSkins;
     private ResourceKey<RobitSkin> selectedSkin;
     private float rotation;
     private int ticks;
@@ -59,15 +44,15 @@ public class GuiRobitSkinSelectScroll extends GuiElement {
     @Nullable
     private ScreenRectangle cachedTooltipRect;
 
-    public GuiRobitSkinSelectScroll(IGuiWrapper gui, int x, int y, EntityRobit robit, Supplier<List<ResourceKey<RobitSkin>>> unlockedSkins) {
+    public GuiRobitSkinSelectScroll(IGuiWrapper gui, int x, int y, EntityRobit robit, Supplier<@Nullable List<ResourceKey<RobitSkin>>> unlockedSkins) {
         super(gui, x, y, INNER_DIMENSIONS + 12, INNER_DIMENSIONS);
-        this.robit = robit;
-        this.selectedSkin = this.robit.getSkin();
+        this.selectedSkin = robit.getSkinId();
         this.unlockedSkins = unlockedSkins;
         scrollBar = addChild(new GuiScrollBar(gui, relativeX + INNER_DIMENSIONS, relativeY, INNER_DIMENSIONS,
               () -> getUnlockedSkins() == null ? 0 : Mth.ceil((double) getUnlockedSkins().size() / SLOT_COUNT), () -> SLOT_COUNT));
     }
 
+    @Nullable
     private List<ResourceKey<RobitSkin>> getUnlockedSkins() {
         return unlockedSkins.get();
     }
@@ -77,11 +62,11 @@ public class GuiRobitSkinSelectScroll extends GuiElement {
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
         List<ResourceKey<RobitSkin>> skins = getUnlockedSkins();
         if (skins != null) {
-            Lighting.setupForFlatItems();
+            //Lighting.setupForFlatItems();
             //Every ten ticks consider the skin to change
             int index = ticks / MekanismUtils.TICKS_PER_HALF_SECOND;
             float oldRot = rotation;
@@ -97,23 +82,23 @@ public class GuiRobitSkinSelectScroll extends GuiElement {
                     if (skin == selectedSkin) {
                         renderSlotBackground(guiGraphics, slotX, slotY, GuiInnerScreen.SCREEN, GuiInnerScreen.SCREEN_SIZE);
                     } else {
-                        renderSlotBackground(guiGraphics, slotX, slotY, GuiElementHolder.HOLDER, GuiElementHolder.HOLDER_SIZE);
+                        renderSlotBackground(guiGraphics, slotX, slotY, GuiElementHolder.HOLDER, GuiElementHolder.HOLDER_BORDER_SIZE);
                     }
                     renderRobit(guiGraphics, skins.get(slot), slotX, slotY, rotation, index);
                 } else {
-                    renderSlotBackground(guiGraphics, slotX, slotY, GuiElementHolder.HOLDER, GuiElementHolder.HOLDER_SIZE);
+                    renderSlotBackground(guiGraphics, slotX, slotY, GuiElementHolder.HOLDER, GuiElementHolder.HOLDER_BORDER_SIZE);
                 }
             }
-            Lighting.setupFor3DItems();
+            //Lighting.setupFor3DItems();
         }
     }
 
-    private static void renderSlotBackground(@NotNull GuiGraphics guiGraphics, int slotX, int slotY, ResourceLocation resource, int size) {
-        GuiUtils.renderBackgroundTexture(guiGraphics, resource, size, size, slotX, slotY, SLOT_DIMENSIONS, SLOT_DIMENSIONS, 256, 256);
+    private static void renderSlotBackground(GuiGraphicsExtractor guiGraphics, int slotX, int slotY, Identifier resource, int size) {
+        guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, resource, size, size, slotX, slotY);
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         List<ResourceKey<RobitSkin>> skins = getUnlockedSkins();
         if (skins != null) {
@@ -126,7 +111,7 @@ public class GuiRobitSkinSelectScroll extends GuiElement {
                     // Note: Currently we have no other windows that could be in front of it
                     int slot = (slotY + scrollBar.getCurrentSelection()) * SLOT_COUNT + slotX;
                     if (checkWindows(mouseX, mouseY, slot < skins.size())) {
-                        guiGraphics.fill(RenderType.guiOverlay(), slotStartX, slotStartY, slotStartX + SLOT_DIMENSIONS, slotStartY + SLOT_DIMENSIONS, 0x70FFEA00);
+                        guiGraphics.fill(slotStartX, slotStartY, slotStartX + SLOT_DIMENSIONS, slotStartY + SLOT_DIMENSIONS, 0x70FFEA00);
                     }
                 }
             }
@@ -139,7 +124,6 @@ public class GuiRobitSkinSelectScroll extends GuiElement {
         ticks++;
     }
 
-    @NotNull
     @Override
     protected ScreenRectangle getTooltipRectangle(int mouseX, int mouseY) {
         return cachedTooltipRect == null ? super.getTooltipRectangle(mouseX, mouseY) : cachedTooltipRect;
@@ -163,14 +147,15 @@ public class GuiRobitSkinSelectScroll extends GuiElement {
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY, int button) {
-        super.onClick(mouseX, mouseY, button);
-        ResourceKey<RobitSkin> skin = getSkin(mouseX, mouseY, false);
+    public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
+        super.onClick(event, isDoubleClick);
+        ResourceKey<RobitSkin> skin = getSkin(event.x(), event.y(), false);
         if (skin != null) {
             selectedSkin = skin;
         }
     }
 
+    @Nullable
     private ResourceKey<RobitSkin> getSkin(double mouseX, double mouseY, boolean updateTooltipRect) {
         List<ResourceKey<RobitSkin>> skins = getUnlockedSkins();
         if (skins != null) {
@@ -191,16 +176,13 @@ public class GuiRobitSkinSelectScroll extends GuiElement {
         return null;
     }
 
-    private void renderRobit(GuiGraphics guiGraphics, ResourceKey<RobitSkin> skinKey, int x, int y, Quaternionf rotation, int index) {
-        SkinLookup skinLookup = MekanismRobitSkins.lookup(robit.level().registryAccess(), skinKey);
-        List<ResourceLocation> textures = skinLookup.skin().textures();
-        if (textures.isEmpty()) {
-            Mekanism.logger.error("Failed to render skin: {}, as it has no textures.", skinLookup.location());
-            return;
-        }
-        BakedModel model = MekanismModelCache.INSTANCE.getRobitSkin(skinLookup);
+    private void renderRobit(GuiGraphicsExtractor guiGraphics, ResourceKey<RobitSkin> skinKey, int x, int y, Quaternionf rotation, int index) {
+        SkinLookup skinLookup = MekanismRobitSkins.lookup(gui().registryAccess(), skinKey);
+        List<Identifier> textures = skinLookup.textures();
+        //TODO - 26.1 robit model
+        /*BakedModel model = MekanismModelCache.INSTANCE.getRobitSkin(skinLookup);
         if (model == null) {
-            Mekanism.logger.warn("Failed to render skin: {} as it does not have a model.", skinLookup.location());
+            Mekanism.logger.warn("Failed to render skin: {} as it does not have a model.", skinLookup.identifier());
             return;
         }
         MultiBufferSource.BufferSource buffer = guiGraphics.bufferSource();
@@ -215,10 +197,10 @@ public class GuiRobitSkinSelectScroll extends GuiElement {
         PoseStack.Pose matrixEntry = pose.last();
         ModelData modelData = ModelData.of(EntityRobit.SKIN_TEXTURE_PROPERTY, MathUtils.getByIndexMod(textures, index));
         for (BakedQuad quad : model.getQuads(null, null, robit.level().random, modelData, null)) {
-            builder.putBulkData(matrixEntry, quad, 1, 1, 1, 1, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
+            builder.putBulkData(matrixEntry, quad, 1, 1, 1, 1, LightCoordsUtil.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
         }
         buffer.endBatch(RobitSpriteUploader.RENDER_TYPE);
 
-        pose.popPose();
+        pose.popPose();*/
     }
 }

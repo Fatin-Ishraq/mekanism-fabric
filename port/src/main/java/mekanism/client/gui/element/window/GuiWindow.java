@@ -1,10 +1,8 @@
 package mekanism.client.gui.element.window;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import mekanism.client.gui.GuiMekanism;
-import mekanism.client.gui.GuiUtils;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.GuiElement;
 import mekanism.client.gui.element.GuiTexturedElement;
@@ -17,12 +15,16 @@ import mekanism.common.inventory.container.SelectedWindowData;
 import mekanism.common.inventory.container.SelectedWindowData.WindowPosition;
 import mekanism.common.inventory.container.SelectedWindowData.WindowType;
 import mekanism.common.lib.Color;
-import net.minecraft.Util;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
+import net.minecraft.util.ARGB;
+import net.minecraft.util.CommonColors;
+import net.minecraft.util.Util;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import org.lwjgl.glfw.GLFW;
+import org.jspecify.annotations.Nullable;
 
 public class GuiWindow extends GuiTexturedElement implements IGUIWindow {
 
@@ -33,37 +35,25 @@ public class GuiWindow extends GuiTexturedElement implements IGUIWindow {
     private int prevDX, prevDY;
     private boolean pinned;
 
+    @Nullable
     private Consumer<GuiWindow> closeListener;
+    @Nullable
     private Consumer<GuiWindow> reattachListener;
     private final long msOpened;
 
     protected InteractionStrategy interactionStrategy = InteractionStrategy.CONTAINER;
 
-    private static WindowPosition calculateOpenPosition(IGuiWrapper gui, SelectedWindowData windowData, int x, int y, int width, int height) {
-        WindowPosition lastPosition = windowData.getLastPosition();
-        int lastX = lastPosition.x();
-        if (lastX != Integer.MAX_VALUE) {
-            int guiLeft = gui.getGuiLeft();
-            if (guiLeft + lastX < 0) {
-                //If our x position would be off the screen, then we shift it to as close as we can go
-                lastX = -guiLeft;
-            } else if (guiLeft + lastX + width > minecraft.getWindow().getGuiScaledWidth()) {
-                //If our window's end would be off the screen shift it to be as close as we can go
-                lastX = minecraft.getWindow().getGuiScaledWidth() - guiLeft - width;
-            }
+    private static int calculateTarget(int lastPosition, int start, int size, int scaledSize, int defaultValue) {
+        if (lastPosition == Integer.MAX_VALUE) {
+            return defaultValue;
+        } else if (start + lastPosition < 0) {
+            //If our x position would be off the screen, then we shift it to as close as we can go
+            return -start;
+        } else if (start + lastPosition + size > scaledSize) {
+            //If our window's end would be off the screen shift it to be as close as we can go
+            return scaledSize - start - size;
         }
-        int lastY = lastPosition.y();
-        if (lastY != Integer.MAX_VALUE) {
-            int guiTop = gui.getGuiTop();
-            if (guiTop + lastY < 0) {
-                //If our y position would be off the screen, then we shift it to as close as we can go
-                lastY = -guiTop;
-            } else if (guiTop + lastY + height > minecraft.getWindow().getGuiScaledHeight()) {
-                //If our window's end would be off the screen shift it to be as close as we can go
-                lastY = minecraft.getWindow().getGuiScaledHeight() - guiTop - height;
-            }
-        }
-        return new WindowPosition(lastX == Integer.MAX_VALUE ? x : lastX, lastY == Integer.MAX_VALUE ? y : lastY, lastPosition.pinned());
+        return lastPosition;
     }
 
     public GuiWindow(IGuiWrapper gui, int x, int y, int width, int height, WindowType windowType) {
@@ -71,20 +61,18 @@ public class GuiWindow extends GuiTexturedElement implements IGUIWindow {
     }
 
     public GuiWindow(IGuiWrapper gui, int x, int y, int width, int height, SelectedWindowData windowData) {
-        //Hacky system to calculate proper x and y positions
-        this(gui, calculateOpenPosition(gui, windowData, x, y, width, height), width, height, windowData);
-    }
-
-    private GuiWindow(IGuiWrapper gui, WindowPosition calculatedPosition, int width, int height, SelectedWindowData windowData) {
-        super(GuiMekanism.BASE_BACKGROUND, gui, calculatedPosition.x(), calculatedPosition.y(), width, height);
+        WindowPosition lastPosition = windowData.getLastPosition();
+        int targetX = calculateTarget(lastPosition.x(), gui.getGuiLeft(), width, minecraft.getWindow().getGuiScaledWidth(), x);
+        int targetY = calculateTarget(lastPosition.y(), gui.getGuiTop(), height, minecraft.getWindow().getGuiScaledHeight(), y);
+        this.pinned = lastPosition.pinned();
         this.windowData = windowData;
-        this.pinned = calculatedPosition.pinned();
+        super(GuiMekanism.BASE_BACKGROUND_SLICE, gui, targetX, targetY, width, height);
         isOverlay = true;
         active = true;
         msOpened = Util.getMillis();
         if (!isFocusOverlay()) {
             addCloseButton();
-            if (this.windowData.type.canPin()) {
+            if (this.windowData.type().canPin()) {
                 addChild(new GuiPinButton(gui(), relativeX + 16, relativeY + 6, this));
             }
         }
@@ -111,14 +99,14 @@ public class GuiWindow extends GuiTexturedElement implements IGUIWindow {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        boolean ret = super.mouseClicked(mouseX, mouseY, button);
+    public boolean mouseClicked(MouseButtonEvent event, boolean isDoubleClick) {
+        boolean ret = super.mouseClicked(event, isDoubleClick);
         // drag 'safe area'
-        if (isMouseOver(mouseX, mouseY)) {
-            if (mouseY < getY() + 18) {
+        if (isMouseOver(event.x(), event.y())) {
+            if (event.y() < getY() + 18) {
                 setDragging(true);
-                dragX = mouseX;
-                dragY = mouseY;
+                dragX = event.x();
+                dragY = event.y();
                 prevDX = 0;
                 prevDY = 0;
             }
@@ -127,7 +115,7 @@ public class GuiWindow extends GuiTexturedElement implements IGUIWindow {
                 AbstractContainerMenu c = gui.getMenu();
                 if (!(c instanceof IEmptyContainer)) {
                     // allow interaction with slots
-                    if (mouseX >= getGuiLeft() && mouseX < getGuiLeft() + getGuiWidth() && mouseY >= getGuiTop() + getGuiHeight() - 90) {
+                    if (event.x() >= getGuiLeft() && event.x() < getGuiLeft() + getGuiWidth() && event.y() >= getGuiTop() + getGuiHeight() - 90) {
                         return false;
                     }
                 }
@@ -138,12 +126,12 @@ public class GuiWindow extends GuiTexturedElement implements IGUIWindow {
     }
 
     @Override
-    public void onDrag(double mouseX, double mouseY, double deltaX, double deltaY) {
-        super.onDrag(mouseX, mouseY, deltaX, deltaY);
+    protected void onDrag(MouseButtonEvent event, double deltaX, double deltaY) {
+        super.onDrag(event, deltaX, deltaY);
         if (isDragging()) {
-            int newDX = (int) Math.round(mouseX - dragX), newDY = (int) Math.round(mouseY - dragY);
-            int changeX = Mth.clamp(newDX - prevDX, -getX(), minecraft.getWindow().getGuiScaledWidth() - getRight());
-            int changeY = Mth.clamp(newDY - prevDY, -getY(), minecraft.getWindow().getGuiScaledHeight() - getBottom());
+            int newDX = (int) Math.round(event.x() - dragX), newDY = (int) Math.round(event.y() - dragY);
+            int changeX = Math.clamp(newDX - prevDX, -getX(), minecraft.getWindow().getGuiScaledWidth() - getRight());
+            int changeY = Math.clamp(newDY - prevDY, -getY(), minecraft.getWindow().getGuiScaledHeight() - getBottom());
             prevDX = newDX;
             prevDY = newDY;
             move(changeX, changeY);
@@ -151,25 +139,23 @@ public class GuiWindow extends GuiTexturedElement implements IGUIWindow {
     }
 
     @Override
-    public void renderBackgroundOverlay(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderBackgroundOverlay(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         if (isFocusOverlay()) {
-            MekanismRenderer.renderColorOverlay(guiGraphics, -getGuiLeft(), -getGuiTop(), OVERLAY_COLOR.rgba());
+            //TODO - 26.1: This used to pass rgba instead of argb, which is wrong. See if the color overlay still renders as expected, or if we wanted the messed up values
+            MekanismRenderer.renderColorOverlay(guiGraphics, -getGuiLeft(), -getGuiTop(), OVERLAY_COLOR.argb());
         } else {
-            guiGraphics.setColor(1, 1, 1, 0.75F);
-            RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
-            GuiUtils.renderBackgroundTexture(guiGraphics, GuiMekanism.SHADOW, 4, 4, relativeX - 3, relativeY - 3, width + 6, height + 6, 256, 256);
-            MekanismRenderer.resetColor(guiGraphics);
+            //todo - 26.1: check this vs the old. Looks rather strong on top of other windows
+            guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, GuiMekanism.SHADOW, relativeX - 3, relativeY - 3, width + 6, height + 6, ARGB.color(0.75F, CommonColors.WHITE));
         }
-        renderBackgroundTexture(guiGraphics, getResource(), 4, 4);
+        guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, getResource(), getButtonX(), getButtonY(), getButtonWidth(), getButtonHeight());
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (super.keyPressed(keyCode, scanCode, modifiers)) {
+    public boolean keyPressed(KeyEvent event) {
+        if (super.keyPressed(event)) {
             return true;
         }
-        if (keyCode == GLFW.GLFW_KEY_ESCAPE && !isPinned()) {
+        if (event.isEscape() && !isPinned()) {
             close();
             return true;
         }
@@ -177,7 +163,7 @@ public class GuiWindow extends GuiTexturedElement implements IGUIWindow {
     }
 
     public void setListenerTab(Supplier<? extends GuiElement> elementSupplier) {
-        setTabListeners(window -> elementSupplier.get().active = true, window -> elementSupplier.get().active = false);
+        setTabListeners(_ -> elementSupplier.get().active = true, _ -> elementSupplier.get().active = false);
     }
 
     public void setTabListeners(Consumer<GuiWindow> closeListener, Consumer<GuiWindow> reattachListener) {
@@ -193,17 +179,11 @@ public class GuiWindow extends GuiTexturedElement implements IGUIWindow {
         }
     }
 
-    public void renderBlur(GuiGraphics guiGraphics) {
-        guiGraphics.setColor(1, 1, 1, 0.3F);
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.disableDepthTest();
-        GuiUtils.renderBackgroundTexture(guiGraphics, GuiMekanism.BLUR, 4, 4, relativeX, relativeY, width, height, 256, 256);
-        MekanismRenderer.resetColor(guiGraphics);
-        RenderSystem.enableDepthTest();
+    public void renderBlur(GuiGraphicsExtractor guiGraphics) {
+        guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, GuiMekanism.BLUR, relativeX, relativeY, width, height, ARGB.color(0.3F, CommonColors.WHITE));
     }
 
-    public final boolean togglePinned(GuiElement toggler, double mouseX, double mouseY) {
+    public final boolean togglePinned(GuiElement toggler, MouseButtonEvent event, boolean isDoubleClick) {
         togglePinned();
         return true;
     }
@@ -216,7 +196,7 @@ public class GuiWindow extends GuiTexturedElement implements IGUIWindow {
         return pinned;
     }
 
-    public final boolean close(GuiElement closer, double mouseX, double mouseY) {
+    public final boolean close(GuiElement closer, MouseButtonEvent event, boolean isDoubleClick) {
         close();
         return true;
     }
@@ -236,7 +216,7 @@ public class GuiWindow extends GuiTexturedElement implements IGUIWindow {
     }
 
     @Override
-    public void drawTitleText(GuiGraphics guiGraphics, Component text, int y) {
+    public void drawTitleText(GuiGraphicsExtractor guiGraphics, Component text, int y) {
         if (isFocusOverlay()) {
             super.drawTitleText(guiGraphics, text, y);
         } else {
@@ -245,19 +225,15 @@ public class GuiWindow extends GuiTexturedElement implements IGUIWindow {
         }
     }
 
-    /**
-     * @apiNote Only used if not a {@link #isFocusOverlay()}
-     */
+    /// @apiNote Only used if not a [#isFocusOverlay()]
     protected int getTitlePadStart() {
-        if (windowData.type.canPin()) {
+        if (windowData.type().canPin()) {
             return 14 + GuiPinButton.WIDTH;
         }
         return 12;
     }
 
-    /**
-     * @apiNote Only used if not a {@link #isFocusOverlay()}
-     */
+    /// @apiNote Only used if not a [#isFocusOverlay()]
     protected int getTitlePadEnd() {
         return 0;
     }

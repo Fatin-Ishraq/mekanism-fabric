@@ -1,19 +1,19 @@
 package mekanism.common.lib.distribution.handler;
 
-/**
- * Created by Thiakil on 30/04/2021.
- */
-public abstract class IntegerHandler {
+import mekanism.common.lib.transaction.SimpleIntegerJournal;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
 
-    private int accepted;
+public abstract class IntegerHandler extends SimpleIntegerJournal {
 
-    protected void accept(int amount) {
-        accepted += amount;
+    protected int accept(int amount, TransactionContext transaction) {
+        updateSnapshots(transaction);
+        value += amount;
+        return amount;
     }
 
     public int getAccepted() {
-        return accepted;
+        return value;
     }
 
-    public abstract int perform(int amountOffered, boolean isSimulate);
+    public abstract int perform(int amountOffered, TransactionContext transaction);
 }

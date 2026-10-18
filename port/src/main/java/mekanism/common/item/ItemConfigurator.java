@@ -5,14 +5,13 @@ import io.netty.buffer.ByteBuf;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.IntFunction;
 import mekanism.api.IConfigurable;
 import mekanism.api.IIncrementalEnum;
 import mekanism.api.MekanismItemAbilities;
 import mekanism.api.RelativeSide;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.inventory.IInventorySlot;
-import mekanism.api.inventory.IMekanismInventory;
 import mekanism.api.radial.IRadialDataHelper;
 import mekanism.api.radial.RadialData;
 import mekanism.api.radial.mode.IRadialMode;
@@ -26,6 +25,7 @@ import mekanism.common.MekanismLang;
 import mekanism.common.block.attribute.Attribute;
 import mekanism.common.block.attribute.AttributeStateFacing;
 import mekanism.common.capabilities.Capabilities;
+import mekanism.common.component.containers.type.ContainerType;
 import mekanism.common.item.ItemConfigurator.ConfiguratorMode;
 import mekanism.common.item.interfaces.IItemHUDProvider;
 import mekanism.common.lib.radial.IRadialModeItem;
@@ -43,20 +43,24 @@ import mekanism.common.util.MekanismUtils.ResourceType;
 import mekanism.common.util.WorldUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.ByIdMap;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemInstance;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
@@ -64,8 +68,9 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import mekanism.neoshim.neoforge.common.ItemAbility;
 import mekanism.neoshim.neoforge.common.util.Lazy;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
 public class ItemConfigurator extends Item implements IRadialModeItem<ConfiguratorMode>, IItemHUDProvider {
 
@@ -79,52 +84,50 @@ public class ItemConfigurator extends Item implements IRadialModeItem<Configurat
     }
 
     @Override
-    public void appendHoverText(@NotNull ItemStack stack, @NotNull Item.TooltipContext context, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        super.appendHoverText(stack, context, tooltip, flag);
-        tooltip.add(MekanismLang.STATE.translateColored(EnumColor.PINK, getMode(stack)));
+    @Deprecated
+    public void appendHoverText(ItemStack stack, Item.TooltipContext context, TooltipDisplay tooltipDisplay, Consumer<Component> tooltipAdder, TooltipFlag flag) {
+        super.appendHoverText(stack, context, tooltipDisplay, tooltipAdder, flag);
+        tooltipAdder.accept(MekanismLang.STATE.translateColored(EnumColor.PINK, getMode(stack)));
     }
 
-    @NotNull
     @Override
-    public Component getName(@NotNull ItemStack stack) {
+    public Component getName(ItemStack stack) {
         return TextComponentUtil.build(EnumColor.AQUA, super.getName(stack));
     }
 
     @Override
-    public boolean canPerformAction(@NotNull ItemStack stack, @NotNull ItemAbility action) {
+    public boolean canPerformAction(ItemInstance instance, ItemAbility action) {
         if (action == MekanismItemAbilities.WRENCH_CONFIGURE) {
-            return getMode(stack).isConfigurating();
+            return getMode(instance).isConfigurating();
         } else if (action == MekanismItemAbilities.WRENCH_CONFIGURE_CHEMICALS) {
-            return getMode(stack) == ConfiguratorMode.CONFIGURATE_CHEMICALS;
+            return getMode(instance) == ConfiguratorMode.CONFIGURATE_CHEMICALS;
         } else if (action == MekanismItemAbilities.WRENCH_CONFIGURE_ENERGY) {
-            return getMode(stack) == ConfiguratorMode.CONFIGURATE_ENERGY;
+            return getMode(instance) == ConfiguratorMode.CONFIGURATE_ENERGY;
         } else if (action == MekanismItemAbilities.WRENCH_CONFIGURE_FLUIDS) {
-            return getMode(stack) == ConfiguratorMode.CONFIGURATE_FLUIDS;
+            return getMode(instance) == ConfiguratorMode.CONFIGURATE_FLUIDS;
         } else if (action == MekanismItemAbilities.WRENCH_CONFIGURE_HEAT) {
-            return getMode(stack) == ConfiguratorMode.CONFIGURATE_HEAT;
+            return getMode(instance) == ConfiguratorMode.CONFIGURATE_HEAT;
         } else if (action == MekanismItemAbilities.WRENCH_CONFIGURE_ITEMS) {
-            return getMode(stack) == ConfiguratorMode.CONFIGURATE_ITEMS;
+            return getMode(instance) == ConfiguratorMode.CONFIGURATE_ITEMS;
         } else if (action == MekanismItemAbilities.WRENCH_DISMANTLE) {
-            return getMode(stack) == ConfiguratorMode.WRENCH;
+            return getMode(instance) == ConfiguratorMode.WRENCH;
         } else if (action == MekanismItemAbilities.WRENCH_EMPTY) {
-            return getMode(stack) == ConfiguratorMode.EMPTY;
+            return getMode(instance) == ConfiguratorMode.EMPTY;
         } else if (action == MekanismItemAbilities.WRENCH_ROTATE) {
-            return getMode(stack) == ConfiguratorMode.ROTATE;
+            return getMode(instance) == ConfiguratorMode.ROTATE;
         }
-        return super.canPerformAction(stack, action);
+        return super.canPerformAction(instance, action);
     }
 
-    @NotNull
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Player player = context.getPlayer();
         Level world = context.getLevel();
-        if (!world.isClientSide && player != null) {
+        if (!world.isClientSide() && player != null) {
             BlockPos pos = context.getClickedPos();
             Direction side = context.getClickedFace();
-            ItemStack stack = context.getItemInHand();
             BlockEntity tile = WorldUtils.getTileEntity(world, pos);
-            ConfiguratorMode mode = getMode(stack);
+            ConfiguratorMode mode = getMode(context.getItemInHand());
             if (mode.isConfigurating()) { //Configurate
                 TransmissionType transmissionType = Objects.requireNonNull(mode.getTransmission(), "Configurating state requires transmission type");
                 if (tile instanceof ISideConfiguration config && config.getConfig().supports(transmissionType)) {
@@ -133,16 +136,16 @@ public class ItemConfigurator extends Item implements IRadialModeItem<Configurat
                         RelativeSide relativeSide = RelativeSide.fromDirections(config.getDirection(), side);
                         DataType dataType = info.getDataType(relativeSide);
                         if (!player.isShiftKeyDown()) {
-                            player.displayClientMessage(MekanismLang.CONFIGURATOR_VIEW_MODE.translateColored(EnumColor.GRAY, transmissionType, dataType.getColor(),
-                                  dataType, dataType.getColor().getColoredName()), true);
+                            player.sendOverlayMessage(MekanismLang.CONFIGURATOR_VIEW_MODE.translateColored(EnumColor.GRAY, transmissionType, dataType.getColor(),
+                                  dataType, dataType.getColor().getColoredName()));
                         } else if (!IBlockSecurityUtils.INSTANCE.canAccessOrDisplayError(player, world, pos, tile)) {
                             return InteractionResult.FAIL;
                         } else {
                             DataType old = dataType;
                             dataType = info.incrementDataType(relativeSide);
                             if (dataType != old) {
-                                player.displayClientMessage(MekanismLang.CONFIGURATOR_TOGGLE_MODE.translateColored(EnumColor.GRAY, transmissionType, dataType.getColor(),
-                                      dataType, dataType.getColor().getColoredName()), true);
+                                player.sendOverlayMessage(MekanismLang.CONFIGURATOR_TOGGLE_MODE.translateColored(EnumColor.GRAY, transmissionType, dataType.getColor(),
+                                      dataType, dataType.getColor().getColoredName()));
                                 config.getConfig().sideChanged(transmissionType, relativeSide);
                             }
                         }
@@ -155,12 +158,12 @@ public class ItemConfigurator extends Item implements IRadialModeItem<Configurat
                 IConfigurable config = WorldUtils.getCapability(world, Capabilities.CONFIGURABLE, pos, null, tile, side);
                 if (config != null) {
                     if (player.isShiftKeyDown()) {
-                        return config.onSneakRightClick(player);
+                        return config.onSneakRightClick(world, player);
                     }
-                    return config.onRightClick(player);
+                    return config.onRightClick(world, player);
                 }
             } else if (mode == ConfiguratorMode.EMPTY) { //Empty
-                if (tile instanceof IMekanismInventory inv && inv.hasInventory()) {
+                if (tile instanceof TileEntityMekanism inv && inv.hasInventory()) {
                     if (!IBlockSecurityUtils.INSTANCE.canAccessOrDisplayError(player, world, pos, tile)) {
                         return InteractionResult.FAIL;
                     }
@@ -169,16 +172,22 @@ public class ItemConfigurator extends Item implements IRadialModeItem<Configurat
                         //If the tile is a creative bin only allow clearing it if the player is in creative
                         // and don't bother popping the stack out
                         if (creative) {
-                            bin.getBinSlot().setEmpty();
+                            ContainerType.ITEM.clearContents(bin.getBinSlot(), null);
                             return InteractionResult.SUCCESS;
                         }
                         return InteractionResult.FAIL;
                     }
                     //TODO: Switch this to items being handled by TileEntityMekanism, energy handled here (via lambdas?)
-                    for (IInventorySlot inventorySlot : inv.getInventorySlots(null)) {
+                    for (IInventorySlot inventorySlot : inv.getInventorySlots()) {
                         if (!inventorySlot.isEmpty()) {
-                            InventoryUtils.dropStack(world, pos, side, inventorySlot.getStack().copy(), Block::popResourceFromFace);
-                            inventorySlot.setEmpty();
+                            InventoryUtils.dropStack(world, pos, side, inventorySlot.resource(), inventorySlot.amountAsLong(), (lvl, p, face, item) -> {
+                                if (face == null) {//Note: Theoretically this should never be null
+                                    Block.popResource(lvl, p, item);
+                                } else {
+                                    Block.popResourceFromFace(lvl, p, face, item);
+                                }
+                            });
+                            ContainerType.ITEM.clearContents(inventorySlot, null);
                         }
                     }
                     return InteractionResult.SUCCESS;
@@ -207,29 +216,26 @@ public class ItemConfigurator extends Item implements IRadialModeItem<Configurat
     }
 
     @Override
-    public void addHUDStrings(List<Component> list, Player player, ItemStack stack, EquipmentSlot slotType) {
-        list.add(MekanismLang.MODE.translateColored(EnumColor.PINK, getMode(stack)));
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter> void addHUDStrings(List<Component> list, Player player, ITEM instance, EquipmentSlot slotType) {
+        list.add(MekanismLang.MODE.translateColored(EnumColor.PINK, getMode(instance)));
     }
 
     @Override
-    public void changeMode(@NotNull Player player, @NotNull ItemStack stack, int shift, DisplayChange displayChange) {
-        ConfiguratorMode mode = getMode(stack);
+    public void changeMode(Player player, ItemAccess itemAccess, int shift, DisplayChange displayChange, TransactionContext transaction) {
+        ConfiguratorMode mode = getMode(itemAccess);
         ConfiguratorMode newMode = mode.adjust(shift);
-        if (mode != newMode) {
-            setMode(stack, player, newMode);
+        if (mode != newMode && setMode(itemAccess, player, newMode, transaction)) {
             displayChange.sendMessage(player, newMode, MekanismLang.CONFIGURE_STATE::translate);
         }
     }
 
-    @NotNull
     @Override
-    public Component getScrollTextComponent(@NotNull ItemStack stack) {
-        return getMode(stack).getTextComponent();
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter> Component getScrollTextComponent(ITEM instance) {
+        return getMode(instance).getTextComponent();
     }
 
-    @NotNull
     @Override
-    public RadialData<ConfiguratorMode> getRadialData(ItemStack stack) {
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter> RadialData<ConfiguratorMode> getRadialData(ITEM instance) {
         return LAZY_RADIAL_DATA.get();
     }
 
@@ -243,7 +249,6 @@ public class ItemConfigurator extends Item implements IRadialModeItem<Configurat
         return ConfiguratorMode.CONFIGURATE_ITEMS;
     }
 
-    @NothingNullByDefault
     public enum ConfiguratorMode implements IIncrementalEnum<ConfiguratorMode>, IHasEnumNameTextComponent, IRadialMode, StringRepresentable {
         CONFIGURATE_ITEMS(MekanismLang.CONFIGURATOR_CONFIGURATE, TransmissionType.ITEM, EnumColor.BRIGHT_GREEN, true, null),
         CONFIGURATE_FLUIDS(MekanismLang.CONFIGURATOR_CONFIGURATE, TransmissionType.FLUID, EnumColor.BRIGHT_GREEN, true, null),
@@ -264,9 +269,9 @@ public class ItemConfigurator extends Item implements IRadialModeItem<Configurat
         private final TransmissionType transmissionType;
         private final EnumColor color;
         private final boolean configurating;
-        private final ResourceLocation icon;
+        private final Identifier icon;
 
-        ConfiguratorMode(ILangEntry langEntry, @Nullable TransmissionType transmissionType, EnumColor color, boolean configurating, @Nullable ResourceLocation icon) {
+        ConfiguratorMode(ILangEntry langEntry, @Nullable TransmissionType transmissionType, EnumColor color, boolean configurating, @Nullable Identifier icon) {
             this.serializedName = name().toLowerCase(Locale.ROOT);
             this.langEntry = langEntry;
             this.transmissionType = transmissionType;
@@ -301,21 +306,18 @@ public class ItemConfigurator extends Item implements IRadialModeItem<Configurat
             return transmissionType;
         }
 
-        @NotNull
         @Override
         public ConfiguratorMode byIndex(int index) {
             return BY_ID.apply(index);
         }
 
-        @NotNull
         @Override
         public Component sliceName() {
             return configurating && transmissionType != null ? transmissionType.getLangEntry().translateColored(color) : getTextComponent();
         }
 
-        @NotNull
         @Override
-        public ResourceLocation icon() {
+        public Identifier icon() {
             return icon;
         }
 

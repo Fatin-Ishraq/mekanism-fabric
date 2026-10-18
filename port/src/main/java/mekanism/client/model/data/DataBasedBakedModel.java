@@ -1,25 +1,22 @@
 package mekanism.client.model.data;
 
-import java.util.List;
+//TODO - 26.1 models
+/*import java.util.List;
 import java.util.Map;
 import mekanism.api.annotations.NothingNullByDefault;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.renderer.block.BlockAndTintGetter;
+import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.client.resources.model.BakedModel;
+import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.util.TriState;
 import net.minecraft.world.level.block.state.BlockState;
-import mekanism.neoshim.neoforge.client.ChunkRenderTypeSet;
-import mekanism.neoshim.neoforge.client.model.BakedModelWrapper;
-import mekanism.neoshim.neoforge.client.model.data.ModelData;
-import mekanism.neoshim.neoforge.client.model.data.ModelProperty;
-import mekanism.neoshim.neoforge.common.util.TriState;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.model.data.ModelData;
+import mekanism.neoshim.neoforge.model.data.ModelProperty;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public class DataBasedBakedModel extends BakedModelWrapper<BakedModel> {
 
     private final Map<ModelProperty<Void>, BakedModel> propertyBased;
@@ -66,4 +63,4 @@ public class DataBasedBakedModel extends BakedModelWrapper<BakedModel> {
     public ChunkRenderTypeSet getRenderTypes(BlockState state, RandomSource rand, ModelData data) {
         return getModelForData(data).getRenderTypes(state, rand, data);
     }
-}
+}*/

@@ -1,8 +1,6 @@
 package mekanism.client.render.obj;
 
-import java.util.Collection;
-import mekanism.neoshim.neoforge.client.model.geometry.IGeometryBakingContext;
-
+/*
 public class VisibleModelConfiguration extends WrapperModelConfiguration {
 
     private final Collection<String> visibleGroups;
@@ -17,4 +15,4 @@ public class VisibleModelConfiguration extends WrapperModelConfiguration {
         //Ignore fallback as we always have a true or false answer
         return visibleGroups.contains(component);
     }
-}
+}*/

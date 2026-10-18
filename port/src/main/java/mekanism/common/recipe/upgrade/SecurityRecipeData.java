@@ -1,17 +1,15 @@
 package mekanism.common.recipe.upgrade;
 
 import java.util.UUID;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.security.IItemSecurityUtils;
 import mekanism.api.security.IOwnerObject;
 import mekanism.api.security.ISecurityObject;
 import mekanism.api.security.ISecurityUtils;
 import mekanism.api.security.SecurityMode;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public class SecurityRecipeData implements RecipeUpgradeData<SecurityRecipeData> {
 
     private final UUID owner;
@@ -34,13 +32,13 @@ public class SecurityRecipeData implements RecipeUpgradeData<SecurityRecipeData>
     }
 
     @Override
-    public boolean applyToStack(HolderLookup.Provider provider, ItemStack stack) {
-        IOwnerObject ownerObject = IItemSecurityUtils.INSTANCE.ownerCapability(stack);
+    public boolean applyToStack(ItemAccess itemAccess, TransactionContext transaction) {
+        IOwnerObject ownerObject = IItemSecurityUtils.INSTANCE.ownerCapability(itemAccess);
         if (ownerObject != null) {
-            ownerObject.setOwnerUUID(owner);
-            ISecurityObject security = IItemSecurityUtils.INSTANCE.securityCapability(stack);
+            ownerObject.setOwnerUUID(owner, transaction);
+            ISecurityObject security = IItemSecurityUtils.INSTANCE.securityCapability(itemAccess);
             if (security != null) {
-                security.setSecurityMode(mode);
+                security.setSecurityMode(mode, transaction);
             }
         }
         return true;

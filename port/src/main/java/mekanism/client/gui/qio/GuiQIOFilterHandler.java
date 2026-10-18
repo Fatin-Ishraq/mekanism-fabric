@@ -10,7 +10,7 @@ import mekanism.client.gui.element.GuiInnerScreen;
 import mekanism.client.gui.element.button.MovableFilterButton;
 import mekanism.client.gui.element.button.TranslationButton;
 import mekanism.client.gui.element.scroll.GuiScrollBar;
-import mekanism.client.gui.element.tab.GuiQIOFrequencyTab;
+import mekanism.client.gui.element.tab.GuiQIOFrequencyTab.GuiQIOFrequencyTileTab;
 import mekanism.client.gui.element.window.filter.qio.GuiQIOItemStackFilter;
 import mekanism.client.gui.element.window.filter.qio.GuiQIOModIDFilter;
 import mekanism.client.gui.element.window.filter.qio.GuiQIOTagFilter;
@@ -33,10 +33,10 @@ import mekanism.common.network.to_server.PacketGuiInteract;
 import mekanism.common.network.to_server.PacketGuiInteract.GuiInteraction;
 import mekanism.common.tile.qio.TileEntityQIOFilterHandler;
 import mekanism.common.util.text.TextUtils;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
 public class GuiQIOFilterHandler<TILE extends TileEntityQIOFilterHandler> extends GuiMekanismTile<TILE, MekanismTileContainer<TILE>> {
 
@@ -66,27 +66,26 @@ public class GuiQIOFilterHandler<TILE extends TileEntityQIOFilterHandler> extend
         };
     }
 
+    @Nullable
     private GuiScrollBar scrollBar;
 
     public GuiQIOFilterHandler(MekanismTileContainer<TILE> container, Inventory inv, Component title) {
-        super(container, inv, title);
+        super(container, inv, title, DEFAULT_IMAGE_WIDTH + 60, DEFAULT_IMAGE_HEIGHT + 74);
         dynamicSlots = true;
-        imageHeight += 74;
         inventoryLabelY = imageHeight - 94;
-        imageWidth += 60;
         inventoryLabelX += 30;
     }
 
     @Override
     protected void addGuiElements() {
         super.addGuiElements();
-        addRenderableWidget(new GuiQIOFrequencyTab(this, tile));
+        addRenderableWidget(new GuiQIOFrequencyTileTab(this, tile));
         addRenderableWidget(new GuiInnerScreen(this, 9, 16, imageWidth - 18, 12, getFrequencyText(tile)).tooltip(getFrequencyTooltip(tile)));
         //Filter holder
         addRenderableWidget(new GuiElementHolder(this, 9, 30, 204, 68));
         //new filter button border
         addRenderableWidget(new GuiElementHolder(this, 9, 98, 204, 22));
-        addRenderableWidget(new TranslationButton(this, 10, 99, 202, 20, MekanismLang.BUTTON_NEW_FILTER, (element, mouseX, mouseY) -> {
+        addRenderableWidget(new TranslationButton(this, 10, 99, 202, 20, MekanismLang.BUTTON_NEW_FILTER, (element, _, _) -> {
             GuiQIOFilterHandler<?> gui = (GuiQIOFilterHandler<?>) element.gui();
             gui.addWindow(new GuiQIOFilerSelect(gui, gui.tile));
             return true;
@@ -95,28 +94,28 @@ public class GuiQIOFilterHandler<TILE extends TileEntityQIOFilterHandler> extend
         scrollBar = addRenderableWidget(new GuiScrollBar(this, 213, 30, 90, filterManager::count, () -> FILTER_COUNT));
         //Add each of the buttons and then just change visibility state to match filter info
         for (int i = 0; i < FILTER_COUNT; i++) {
-            addRenderableWidget(new MovableFilterButton(this, 10, 31 + i * 22, 202, 22, i, scrollBar::getCurrentSelection, filterManager, index -> {
+            addRenderableWidget(new MovableFilterButton(this, 10, 31 + i * 22, 202, 22, i, scrollBar::getCurrentSelection, filterManager,  (event, index) -> {
                 if (index > 0) {
-                    GuiInteraction interaction = hasShiftDown() ? GuiInteraction.MOVE_FILTER_TO_TOP : GuiInteraction.MOVE_FILTER_UP;
+                    GuiInteraction interaction = event.hasShiftDown() ? GuiInteraction.MOVE_FILTER_TO_TOP : GuiInteraction.MOVE_FILTER_UP;
                     PacketUtils.sendToServer(new PacketGuiInteract(interaction, tile, index));
                 }
-            }, index -> {
+            },  (event, index) -> {
                 if (index < filterManager.count() - 1) {
-                    GuiInteraction interaction = hasShiftDown() ? GuiInteraction.MOVE_FILTER_TO_BOTTOM : GuiInteraction.MOVE_FILTER_DOWN;
+                    GuiInteraction interaction = event.hasShiftDown() ? GuiInteraction.MOVE_FILTER_TO_BOTTOM : GuiInteraction.MOVE_FILTER_DOWN;
                     PacketUtils.sendToServer(new PacketGuiInteract(interaction, tile, index));
                 }
             }, this::onClick, index -> PacketUtils.sendToServer(new PacketGuiInteract(GuiInteraction.TOGGLE_FILTER_STATE, tile, index)), filter -> {
                 if (filter != null) {
                     return switch (filter) {
-                        case IItemStackFilter<?> itemFilter -> List.of(itemFilter.getItemStack());
+                        case IItemStackFilter<?> itemFilter -> List.of(itemFilter.getItemType().toStack());
                         case ITagFilter<?> tagFilter -> {
                             String name = tagFilter.getTagName();
-                            if (name != null && !name.isEmpty()) {
+                            if (!name.isEmpty()) {
                                 yield TagCache.getItemTagStacks(tagFilter.getTagName());
                             }
                             yield Collections.emptyList();
                         }
-                        case IModIDFilter<?> modIDFilter -> TagCache.getItemModIDStacks(modIDFilter.getModID());
+                        case IModIDFilter<?> modIDFilter -> TagCache.getItemModIDStacks(registryAccess(), modIDFilter.getModID());
                         default -> Collections.emptyList();
                     };
                 }
@@ -125,7 +124,7 @@ public class GuiQIOFilterHandler<TILE extends TileEntityQIOFilterHandler> extend
         }
     }
 
-    protected void onClick(IFilter<?> filter, int index) {
+    protected void onClick(@Nullable IFilter<?> filter, int index) {
         if (filter instanceof IItemStackFilter) {
             addWindow(GuiQIOItemStackFilter.edit(this, tile, (QIOItemStackFilter) filter));
         } else if (filter instanceof ITagFilter) {
@@ -137,11 +136,11 @@ public class GuiQIOFilterHandler<TILE extends TileEntityQIOFilterHandler> extend
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double xDelta, double yDelta) {
-        return super.mouseScrolled(mouseX, mouseY, xDelta, yDelta) || scrollBar.adjustScroll(yDelta);
+        return super.mouseScrolled(mouseX, mouseY, xDelta, yDelta) || scrollBar != null && scrollBar.adjustScroll(yDelta);
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         renderTitleText(guiGraphics);
         renderInventoryText(guiGraphics);
         super.drawForegroundText(guiGraphics, mouseX, mouseY);

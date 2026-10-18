@@ -6,11 +6,10 @@ import net.minecraft.core.Holder;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.TagKey;
-import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.equipment.ArmorType;
 import net.minecraft.world.level.block.Block;
 import mekanism.neoshim.neoforge.common.Tags;
-import org.jetbrains.annotations.NotNull;
 
 public class LapisLazuliMaterialDefaults implements BaseMekanismMaterial {
 
@@ -30,7 +29,7 @@ public class LapisLazuliMaterialDefaults implements BaseMekanismMaterial {
     }
 
     @Override
-    public int getUses() {
+    public int getDurability() {
         return 128;
     }
 
@@ -55,7 +54,7 @@ public class LapisLazuliMaterialDefaults implements BaseMekanismMaterial {
     }
 
     @Override
-    public int getDurabilityForType(@NotNull ArmorItem.Type armorType) {
+    public int getDurabilityForType(ArmorType armorType) {
         return switch (armorType) {
             case BOOTS -> 130;
             case LEGGINGS -> 150;
@@ -65,7 +64,7 @@ public class LapisLazuliMaterialDefaults implements BaseMekanismMaterial {
     }
 
     @Override
-    public int getDefense(@NotNull ArmorItem.Type armorType) {
+    public int getDefense(ArmorType armorType) {
         return switch (armorType) {
             case BOOTS, HELMET -> 1;
             case LEGGINGS -> 3;
@@ -74,28 +73,24 @@ public class LapisLazuliMaterialDefaults implements BaseMekanismMaterial {
         };
     }
 
-    @NotNull
     @Override
     public String getRegistryPrefix() {
         return "lapis_lazuli";
     }
 
-    @NotNull
     @Override
-    public TagKey<Block> getIncorrectBlocksForDrops() {
+    public TagKey<Block> incorrectBlocksForDrops() {
         return ToolsTags.Blocks.INCORRECT_FOR_LAPIS_LAZULI_TOOL;
     }
 
-    @NotNull
     @Override
     public Holder<SoundEvent> equipSound() {
         return SoundEvents.ARMOR_EQUIP_DIAMOND;
     }
 
-    @NotNull
     @Override
-    public Ingredient getRepairIngredient() {
-        return Ingredient.of(Tags.Items.GEMS_LAPIS);
+    public TagKey<Item> getRepairItems() {
+        return Tags.Items.GEMS_LAPIS;
     }
 
     @Override

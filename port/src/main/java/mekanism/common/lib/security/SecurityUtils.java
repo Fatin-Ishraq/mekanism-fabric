@@ -4,7 +4,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.security.IOwnerObject;
 import mekanism.api.security.ISecurityObject;
 import mekanism.api.security.ISecurityUtils;
@@ -14,30 +13,26 @@ import mekanism.client.MekanismClient;
 import mekanism.common.MekanismLang;
 import mekanism.common.base.MekanismPermissions;
 import mekanism.common.config.MekanismConfig;
-import mekanism.common.lib.frequency.FrequencyType;
+import mekanism.common.lib.frequency.FrequencyTypes;
 import mekanism.common.util.MekanismUtils;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import mekanism.neoshim.neoforge.server.permission.PermissionAPI;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-/**
- * @apiNote Do not instantiate this class directly as it will be done via the service loader. Instead, access instances of this via {@link ISecurityUtils#INSTANCE}
- */
-@NothingNullByDefault
+/// @apiNote Do not instantiate this class directly as it will be done via the service loader. Instead, access instances of this via [ISecurityUtils#INSTANCE]
 public final class SecurityUtils implements ISecurityUtils {
 
     public static SecurityUtils get() {
         return (SecurityUtils) INSTANCE;
     }
 
-    /**
-     * Whether ops can bypass security and a given player is considered an Op.
-     *
-     * @param p - player to check
-     *
-     * @return if the player has operator privileges
-     */
+    /// Whether ops can bypass security and a given player is considered an Op.
+    ///
+    /// @param p player to check
+    ///
+    /// @return if the player has operator privileges
     private boolean isOp(Player p) {
         Objects.requireNonNull(p, "Player may not be null.");
         return MekanismConfig.general.opsBypassRestrictions.get() && p instanceof ServerPlayer player &&
@@ -47,12 +42,12 @@ public final class SecurityUtils implements ISecurityUtils {
     @Override
     public boolean canAccess(Player player, Supplier<@Nullable ISecurityObject> securityProvider, Supplier<@Nullable IOwnerObject> ownerProvider) {
         //If the player is an op allow bypassing any restrictions
-        return isOp(player) || canAccess(player.getUUID(), securityProvider, ownerProvider, player.level().isClientSide);
+        return isOp(player) || canAccess(player.getUUID(), securityProvider, ownerProvider, player.level().isClientSide());
     }
 
     @Override
     public <PROVIDER> boolean canAccess(Player player, PROVIDER provider, Function<PROVIDER, @Nullable ISecurityObject> securityProvider, Function<PROVIDER, @Nullable IOwnerObject> ownerProvider) {
-        return isOp(player) || canAccess(player.getUUID(), provider, securityProvider, ownerProvider, player.level().isClientSide);
+        return isOp(player) || canAccess(player.getUUID(), provider, securityProvider, ownerProvider, player.level().isClientSide());
     }
 
     @Override
@@ -103,7 +98,7 @@ public final class SecurityUtils implements ISecurityUtils {
     @Override
     public boolean canAccessObject(Player player, ISecurityObject security) {
         //If the player is an op allow bypassing any restrictions
-        return isOp(player) || canAccessObject(player.getUUID(), security, player.level().isClientSide);
+        return isOp(player) || canAccessObject(player.getUUID(), security, player.level().isClientSide());
     }
 
     @Override
@@ -130,7 +125,7 @@ public final class SecurityUtils implements ISecurityUtils {
                     // sides but I don't think there is much benefit to doing so for how complex it is to do
                     yield true;
                 }
-                SecurityFrequency frequency = FrequencyType.SECURITY.getManager(null, SecurityMode.PUBLIC).getFrequency(owner);
+                SecurityFrequency frequency = FrequencyTypes.SECURITY.getFrequency(null, SecurityMode.PUBLIC, owner);
                 //If we have no frequency handle it as if it was private, otherwise check if the player is trusted
                 yield frequency != null && frequency.isTrusted(player);
             }
@@ -171,7 +166,7 @@ public final class SecurityUtils implements ISecurityUtils {
         } else if (isClient) {
             return MekanismClient.clientSecurityMap.getOrDefault(uuid, SecurityData.DUMMY);
         }
-        SecurityFrequency frequency = FrequencyType.SECURITY.getManager(null, SecurityMode.PUBLIC).getFrequency(uuid);
+        SecurityFrequency frequency = FrequencyTypes.SECURITY.getFrequency(null, SecurityMode.PUBLIC, uuid);
         return frequency == null ? SecurityData.DUMMY : new SecurityData(frequency);
     }
 
@@ -208,15 +203,15 @@ public final class SecurityUtils implements ISecurityUtils {
         return getFinalData(securityObject, isClient).mode();
     }
 
-    public void incrementSecurityMode(Player player, @Nullable ISecurityObject security) {
+    public void incrementSecurityMode(Player player, @Nullable ISecurityObject security, @Nullable TransactionContext transaction) {
         if (security != null && security.ownerMatches(player)) {
-            security.setSecurityMode(security.getSecurityMode().getNext());
+            security.setSecurityMode(security.getSecurityMode().getNext(), transaction);
         }
     }
 
-    public void decrementSecurityMode(Player player, @Nullable ISecurityObject security) {
+    public void decrementSecurityMode(Player player, @Nullable ISecurityObject security, @Nullable TransactionContext transaction) {
         if (security != null && security.ownerMatches(player)) {
-            security.setSecurityMode(security.getSecurityMode().getPrevious());
+            security.setSecurityMode(security.getSecurityMode().getPrevious(), transaction);
         }
     }
 
@@ -228,7 +223,7 @@ public final class SecurityUtils implements ISecurityUtils {
 
     public boolean isTrusted(SecurityMode mode, @Nullable UUID ownerUUID, UUID playerUUID) {
         if (ownerUUID != null && mode == SecurityMode.TRUSTED) {
-            SecurityFrequency frequency = FrequencyType.SECURITY.getManager(null, SecurityMode.PUBLIC).getFrequency(ownerUUID);
+            SecurityFrequency frequency = FrequencyTypes.SECURITY.getFrequency(null, SecurityMode.PUBLIC, ownerUUID);
             return frequency != null && frequency.isTrusted(playerUUID);
         }
         return false;

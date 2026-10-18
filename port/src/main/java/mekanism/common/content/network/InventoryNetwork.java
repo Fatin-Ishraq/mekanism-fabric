@@ -29,10 +29,12 @@ import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.chunk.ChunkAccess;
-import mekanism.neoshim.neoforge.items.IItemHandler;
-import org.jetbrains.annotations.NotNull;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-public class InventoryNetwork extends DynamicNetwork<IItemHandler, InventoryNetwork, LogisticalTransporterBase> {
+public class InventoryNetwork extends DynamicNetwork<ResourceHandler<ItemResource>, InventoryNetwork, LogisticalTransporterBase> {
 
     public InventoryNetwork(UUID networkID) {
         super(networkID);
@@ -43,19 +45,19 @@ public class InventoryNetwork extends DynamicNetwork<IItemHandler, InventoryNetw
         adoptAllAndRegister(networks);
     }
 
-    public List<AcceptorData> calculateAcceptors(TransitRequest request, TransporterStack stack, Long2ObjectMap<ChunkAccess> chunkMap,
-          Map<GlobalPos, Set<TransporterStack>> additionalFlowingStacks, LogisticalTransporterBase start) {
+    public List<AcceptorData> calculateAcceptors(TransitRequest request, TransporterStack stack, Long2ObjectMap<ChunkAccess> chunkMap, LogisticalTransporterBase start,
+          @Nullable TransactionContext transaction) {
         List<AcceptorData> toReturn = new ArrayList<>();
-        for (ObjectIterator<Long2ObjectMap.Entry<Map<Direction, IItemHandler>>> iterator = acceptorCache.getAcceptorFastIterator(); iterator.hasNext(); ) {
-            Long2ObjectMap.Entry<Map<Direction, IItemHandler>> entry = iterator.next();
+        for (ObjectIterator<Long2ObjectMap.Entry<Map<Direction, ResourceHandler<ItemResource>>>> iterator = acceptorCache.getAcceptorFastIterator(); iterator.hasNext(); ) {
+            Long2ObjectMap.Entry<Map<Direction, ResourceHandler<ItemResource>>> entry = iterator.next();
             long pos = entry.getLongKey();
             if (pos != stack.homeLocation) {
                 BlockPos blockPos = BlockPos.of(pos);
                 BlockEntity acceptor = WorldUtils.getTileEntity(getWorld(), chunkMap, blockPos);
                 Map<TransitResponse, AcceptorData> dataMap = new HashMap<>();
                 GlobalPos position = GlobalPos.of(getWorld().dimension(), blockPos);
-                for (Map.Entry<Direction, IItemHandler> acceptorEntry : entry.getValue().entrySet()) {
-                    IItemHandler handler = acceptorEntry.getValue();
+                for (Map.Entry<Direction, ResourceHandler<ItemResource>> acceptorEntry : entry.getValue().entrySet()) {
+                    ResourceHandler<ItemResource> handler = acceptorEntry.getValue();
                     Direction side = acceptorEntry.getKey();
                     PathfinderCache.CachedPath cachedPath = PathfinderCache.getSingleCache(start, blockPos, side);
                     if (cachedPath != null && !TransporterPathfinder.checkPath(this, cachedPath.path(), stack)) {
@@ -72,7 +74,7 @@ public class InventoryNetwork extends DynamicNetwork<IItemHandler, InventoryNetw
                             }
                         }
                     }
-                    TransitResponse response = TransporterManager.getPredictedInsert(position, side, handler, request, additionalFlowingStacks);
+                    TransitResponse response = TransporterManager.getPredictedInsert(position, side, handler, request, transaction);
                     if (!response.isEmpty()) {
                         Direction opposite = side.getOpposite();
                         //If the response isn't empty, check if we already have acceptor data for
@@ -118,7 +120,6 @@ public class InventoryNetwork extends DynamicNetwork<IItemHandler, InventoryNetw
         return "[InventoryNetwork] " + transmittersSize() + " transmitters, " + getAcceptorCount() + " acceptors.";
     }
 
-    @NotNull
     @Override
     public Component getTextComponent() {
         return MekanismLang.NETWORK_DESCRIPTION.translate(MekanismLang.INVENTORY_NETWORK, transmittersSize(), getAcceptorCount());

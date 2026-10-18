@@ -1,23 +1,20 @@
 package mekanism.common.lib.radiation;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.IntSupplier;
-import mekanism.api.annotations.NothingNullByDefault;
+import mekanism.api.SerializationConstants;
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.config.listener.ConfigBasedCachedIntSupplier;
 import mekanism.common.lib.collection.IndexedCuboidMap;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup.Provider;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.util.Mth;
-import mekanism.neoshim.neoforge.common.util.INBTSerializable;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.ValueOutput.TypedOutputList;
+import mekanism.neoshim.neoforge.common.util.ValueIOSerializable;
 
-@NothingNullByDefault
-public class RadiationLevelData implements INBTSerializable<ListTag> {
+public class RadiationLevelData implements ValueIOSerializable {
     private static final IntSupplier MAX_BLOCK_RANGE = new ConfigBasedCachedIntSupplier(() -> {
         int chunkRadius = MekanismConfig.general.radiationChunkCheckRadius.get();
         // we only compute exposure when within the MAX_RANGE bounds
@@ -92,35 +89,26 @@ public class RadiationLevelData implements INBTSerializable<ListTag> {
         this.sources.clear();
     }
 
-    @Deprecated(forRemoval = true, since = "10.7.15") //backcompat
-    public Collection<RadiationSource> values() {
-        return sources.values();
-    }
-
     public Iterator<RadiationSource> getSources(int chunkX, int chunkZ) {
         return sources.allCenteredInChunk(chunkX, chunkZ);
     }
 
     @Override
-    @Nullable
-    public ListTag serializeNBT(Provider provider) {
-        if (isEmpty()) {
-            return null;
+    public void serialize(ValueOutput output) {
+        if (!isEmpty()) {
+            TypedOutputList<RadiationSource> sourceOutput = output.list(SerializationConstants.RADIATION, RadiationSource.CODEC);
+            for (RadiationSource source : sources.values()) {
+                sourceOutput.add(source);
+            }
         }
-        ListTag tag = new ListTag()/*FABRIC: no capacity ctor*/;
-        for (RadiationSource value : sources.values()) {
-            tag.add(value.serializeNBT());
-        }
-        return tag;
     }
 
     @Override
-    public void deserializeNBT(Provider provider, ListTag nbt) {
-        for (int i = 0; i < nbt.size(); i++) {
-            RadiationSource src = RadiationSource.deserializeNBT(nbt.getCompound(i));
-            if (src != null) {
-                addNew(src);
-            }
+    public void deserialize(ValueInput input) {
+        //TODO - 26.1: Re-evaluate if we want this to be stored under radiation, as previously it was just as a list without needing a key
+        // Also figure out if this properly supports being lenient if say one radiation source is of a broken format
+        for (RadiationSource source : input.listOrEmpty(SerializationConstants.RADIATION, RadiationSource.CODEC)) {
+            addNew(source);
         }
     }
 }

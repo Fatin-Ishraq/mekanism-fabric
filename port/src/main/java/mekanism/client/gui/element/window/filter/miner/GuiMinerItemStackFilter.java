@@ -7,7 +7,8 @@ import mekanism.common.config.MekanismConfig;
 import mekanism.common.content.miner.MinerItemStackFilter;
 import mekanism.common.tile.machine.TileEntityDigitalMiner;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public class GuiMinerItemStackFilter extends GuiItemStackFilter<MinerItemStackFilter, TileEntityDigitalMiner> implements GuiMinerFilterHelper {
 
@@ -40,14 +41,14 @@ public class GuiMinerItemStackFilter extends GuiItemStackFilter<MinerItemStackFi
         return new IGhostItemConsumer() {
             @Nullable
             @Override
-            public ItemStack supportedTarget(Object ingredient) {
+            public ItemStack supportedTarget(@Nullable Object ingredient) {
                 //Note: The miner requires the player to actually get targets, unless configured server side to be "easy"
                 return MekanismConfig.general.easyMinerFilters.get() ? IGhostItemConsumer.super.supportedTarget(ingredient) : null;
             }
 
             @Override
             public void accept(Object ingredient) {
-                setFilterStackWithSound(((ItemStack) ingredient).copyWithCount(1));
+                setFilterStackWithSound(ItemResource.of((ItemStack) ingredient));
             }
         };
     }

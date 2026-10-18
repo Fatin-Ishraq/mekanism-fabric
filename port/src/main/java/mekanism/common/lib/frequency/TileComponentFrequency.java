@@ -1,7 +1,5 @@
 package mekanism.common.lib.frequency;
 
-import com.mojang.serialization.DataResult;
-import com.mojang.serialization.DynamicOps;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
@@ -9,15 +7,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import mekanism.api.SerializationConstants;
+import mekanism.api.functions.TriConsumer;
 import mekanism.api.security.SecurityMode;
-import mekanism.common.Mekanism;
-import mekanism.common.attachments.FrequencyAware;
+import mekanism.common.component.FrequencyAware;
 import mekanism.common.inventory.container.MekanismContainer;
 import mekanism.common.inventory.container.sync.SyncableFrequency;
 import mekanism.common.inventory.container.sync.list.SyncableFrequencyList;
@@ -30,18 +28,14 @@ import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.tile.component.ITileComponent;
 import mekanism.common.util.WorldUtils;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponentType;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import org.jspecify.annotations.Nullable;
 
 public class TileComponentFrequency implements ITileComponent {
 
@@ -60,7 +54,7 @@ public class TileComponentFrequency implements ITileComponent {
     private boolean needsNotify;
 
     //Method refs to allocate once and reuse in hot path
-    private final BiConsumer<FrequencyType<?>, FrequencyData> updateFrequencyRef = this::updateFrequency;
+    private final TriConsumer<FrequencyType<?>, FrequencyData, Level> updateFrequencyRef = this::updateFrequency;
 
     public TileComponentFrequency(TileEntityMekanism tile) {
         this.tile = tile;
@@ -79,9 +73,9 @@ public class TileComponentFrequency implements ITileComponent {
     public void tickServer(Level level, BlockPos pos) {
         if (level.getGameTime() % 5 == tickOffset) {
             if (securityFrequency != null) {
-                updateFrequency(FrequencyType.SECURITY, securityFrequency);
+                updateFrequency(FrequencyTypes.SECURITY, securityFrequency, level);
             }
-            nonSecurityFrequencies.forEach(updateFrequencyRef);
+            nonSecurityFrequencies.forEach(level, updateFrequencyRef);
         }
         if (needsNotify) {
             tile.invalidateCapabilitiesFull();
@@ -99,7 +93,7 @@ public class TileComponentFrequency implements ITileComponent {
 
     public void track(FrequencyType<?> type, boolean needsSync, boolean needsListCache, boolean notifyNeighbors) {
         FrequencyData value = new FrequencyData(needsSync, needsListCache, notifyNeighbors);
-        if (type == FrequencyType.SECURITY) {
+        if (type == FrequencyTypes.SECURITY) {
             securityFrequency = value;
         } else {
             nonSecurityFrequencies.put(type, value);
@@ -118,16 +112,16 @@ public class TileComponentFrequency implements ITileComponent {
 
     @Nullable
     private <FREQ extends Frequency> FrequencyData getFrequencyData(FrequencyType<FREQ> type) {
-        return type == FrequencyType.SECURITY ? securityFrequency : nonSecurityFrequencies.get(type);
+        return type == FrequencyTypes.SECURITY ? securityFrequency : nonSecurityFrequencies.get(type);
     }
 
     public <FREQ extends Frequency> void unsetFrequency(FrequencyType<FREQ> type) {
         unsetFrequency(type, getFrequencyData(type));
     }
 
-    private <FREQ extends Frequency> void unsetFrequency(FrequencyType<FREQ> type, FrequencyData frequencyData) {
+    private <FREQ extends Frequency> void unsetFrequency(FrequencyType<FREQ> type, @Nullable FrequencyData frequencyData) {
         if (frequencyData != null && frequencyData.selectedFrequency != null) {
-            deactivate(type, frequencyData);
+            deactivate(tile.getLevel(), type, frequencyData);
             frequencyData.clearFrequency();
             setNeedsNotify(frequencyData);
         }
@@ -154,7 +148,7 @@ public class TileComponentFrequency implements ITileComponent {
         return (List<FREQ>) getCache(securityMode).computeIfAbsent(type, t -> new ArrayList<>());
     }
 
-    public <FREQ extends Frequency> void setFrequencyFromData(FrequencyType<FREQ> type, FrequencyIdentity data, UUID player) {
+    public <FREQ extends Frequency> void setFrequencyFromData(FrequencyType<FREQ> type, FrequencyIdentity data, @Nullable UUID player) {
         if (player != null) {
             FrequencyData frequencyData = getFrequencyData(type);
             if (frequencyData != null) {
@@ -163,12 +157,12 @@ public class TileComponentFrequency implements ITileComponent {
         }
     }
 
-    private <FREQ extends Frequency> void setFrequencyFromData(FrequencyType<FREQ> type, FrequencyIdentity data, @NotNull UUID player, FrequencyData frequencyData) {
+    private <FREQ extends Frequency> void setFrequencyFromData(FrequencyType<FREQ> type, FrequencyIdentity data, UUID player, FrequencyData frequencyData) {
         Frequency oldFrequency = frequencyData.selectedFrequency;
-        FrequencyManager<FREQ> manager = null;
+        FrequencyLookup<FREQ> manager = null;
         FREQ freq = null;
         if (!Objects.equals(data.ownerUUID(), player) && SecurityUtils.get().isTrusted(data.securityMode(), data.ownerUUID(), player)) {
-            manager = type.getManager(data, data.ownerUUID());
+            manager = type.getLookup(data, data.ownerUUID());
             freq = manager.getFrequency(data.key());
             if (freq == null) {
                 //Frequency doesn't exist, update the data to having the player as the owner
@@ -177,21 +171,22 @@ public class TileComponentFrequency implements ITileComponent {
         }
         if (freq == null) {
             //If the player is the owner, or is trying to create a new trusted frequency, create it for this player instead
-            manager = type.getManager(data, player);
+            manager = type.getLookup(data, player);
             freq = manager.getOrCreateFrequency(data, player);
         }
         if (!freq.equals(oldFrequency)) {
+            Level level = tile.getLevel();
             //If the frequency being set isn't the existing frequency, then deactivate the old one
             // and update the tile to be using the new one
-            manager.deactivate(oldFrequency, tile);
-            freq.update(tile);
+            manager.deactivate(oldFrequency, level, tile);
+            freq.update(level, tile);
             frequencyData.setFrequency(freq);
             setNeedsNotify(frequencyData);
         }
     }
 
     public void removeFrequencyFromData(FrequencyType<?> type, FrequencyIdentity data, UUID player) {
-        FrequencyManager<?> manager = type.getManager(data, data.ownerUUID() == null ? player : data.ownerUUID());
+        FrequencyLookup<?> manager = type.getLookup(data, data.ownerUUID() == null ? player : data.ownerUUID());
         if (manager != null && manager.remove(data.key(), player)) {
             FrequencyData frequencyData = getFrequencyData(type);
             if (frequencyData != null) {
@@ -200,23 +195,23 @@ public class TileComponentFrequency implements ITileComponent {
         }
     }
 
-    private <FREQ extends Frequency> void updateFrequency(FrequencyType<FREQ> type, FrequencyData frequencyData) {
+    private <FREQ extends Frequency> void updateFrequency(FrequencyType<FREQ> type, FrequencyData frequencyData, Level level) {
         if (frequencyData.selectedFrequency != null) {
             if (frequencyData.selectedFrequency.isValid()) {
                 boolean unsetFrequency = frequencyData.selectedFrequency.isRemoved();
                 //Note: Security frequencies can only be public, and security means something different on them. So even if it is set as trusted, we don't need to check this
-                if (!unsetFrequency && type != FrequencyType.SECURITY && frequencyData.selectedFrequency.getSecurity() == SecurityMode.TRUSTED) {
+                if (!unsetFrequency && type != FrequencyTypes.SECURITY && frequencyData.selectedFrequency.getSecurity() == SecurityMode.TRUSTED) {
                     //If we aren't unsetting the frequency, check if it is a trusted frequency that we no longer have access to
                     UUID ownerUUID = tile.getOwnerUUID();
                     if (ownerUUID != null && !frequencyData.selectedFrequency.ownerMatches(ownerUUID)) {
-                        SecurityFrequency security = FrequencyType.SECURITY.getManager(null, SecurityMode.PUBLIC).getFrequency(frequencyData.selectedFrequency.getOwner());
+                        SecurityFrequency security = FrequencyTypes.SECURITY.getFrequency(null, SecurityMode.PUBLIC, frequencyData.selectedFrequency.getOwner());
                         unsetFrequency = security != null && !security.isTrusted(ownerUUID);
                     }
                 }
                 if (unsetFrequency) {
-                    FrequencyManager<FREQ> manager = type.getFrequencyManager((FREQ) frequencyData.selectedFrequency);
+                    FrequencyLookup<FREQ> manager = type.getFrequencyLookup((FREQ) frequencyData.selectedFrequency);
                     if (manager != null) {
-                        manager.deactivate(frequencyData.selectedFrequency, tile);
+                        manager.deactivate(frequencyData.selectedFrequency, level, tile);
                     }
                     frequencyData.clearFrequency();
                     setNeedsNotify(frequencyData);
@@ -224,11 +219,11 @@ public class TileComponentFrequency implements ITileComponent {
                 //Note: We don't need to update the frequency for this block as in cases when it isn't invalid we do it immediately
             } else {
                 FREQ frequency = (FREQ) frequencyData.selectedFrequency;
-                FrequencyManager<FREQ> manager = type.getFrequencyManager(frequency);
+                FrequencyLookup<FREQ> manager = type.getFrequencyLookup(frequency);
                 if (manager == null) {
                     frequencyData.clearFrequency();
                 } else {
-                    frequencyData.setFrequency(manager.validateAndUpdate(tile, frequency));
+                    frequencyData.setFrequency(manager.validateAndUpdate(level, tile, frequency));
                 }
                 setNeedsNotify(frequencyData);
             }
@@ -242,11 +237,11 @@ public class TileComponentFrequency implements ITileComponent {
         needsSave = true;
     }
 
-    private <FREQ extends Frequency> void deactivate(FrequencyType<FREQ> type, FrequencyData frequencyData) {
+    private <FREQ extends Frequency> void deactivate(Level level, FrequencyType<FREQ> type, FrequencyData frequencyData) {
         if (frequencyData.selectedFrequency != null) {
-            FrequencyManager<FREQ> manager = type.getFrequencyManager((FREQ) frequencyData.selectedFrequency);
+            FrequencyLookup<FREQ> manager = type.getFrequencyLookup((FREQ) frequencyData.selectedFrequency);
             if (manager != null) {
-                manager.deactivate(frequencyData.selectedFrequency, tile);
+                manager.deactivate(frequencyData.selectedFrequency, level, tile);
             }
         }
     }
@@ -257,7 +252,7 @@ public class TileComponentFrequency implements ITileComponent {
     }
 
     @Override
-    public void applyImplicitComponents(@NotNull BlockEntity.DataComponentInput input) {
+    public void applyImplicitComponents(DataComponentGetter input) {
         if (!tile.isRemote()) {
             for (FrequencyType<?> key : nonSecurityFrequencies.keySet()) {
                 setFrequencyFromComponent(input, key);
@@ -265,7 +260,7 @@ public class TileComponentFrequency implements ITileComponent {
         }
     }
 
-    private <FREQ extends Frequency> void setFrequencyFromComponent(BlockEntity.DataComponentInput input, FrequencyType<FREQ> type) {
+    private <FREQ extends Frequency> void setFrequencyFromComponent(DataComponentGetter input, FrequencyType<FREQ> type) {
         DataComponentType<FrequencyAware<FREQ>> frequencyComponent = MekanismDataComponents.getFrequencyComponent(type);
         if (frequencyComponent != null) {
             FrequencyAware<?> frequencyAware = input.get(frequencyComponent);
@@ -284,7 +279,7 @@ public class TileComponentFrequency implements ITileComponent {
             if (frequencyComponent != null && !remapEntries.contains(frequencyComponent)) {
                 remapEntries.add(frequencyComponent);
             }
-            if (type == FrequencyType.QIO && !remapEntries.contains(MekanismDataComponents.COLOR.get())) {
+            if (type == FrequencyTypes.QIO && !remapEntries.contains(MekanismDataComponents.COLOR.get())) {
                 remapEntries.add(MekanismDataComponents.COLOR.get());
             }
         }
@@ -305,7 +300,7 @@ public class TileComponentFrequency implements ITileComponent {
                 //TODO: Do we want to support multiple frequency types each having a colored frequency?
                 // Currently we only really need the QIO to support it, as the other colorable frequency (teleporters)
                 // don't need the item to be aware of the color
-                if (type == FrequencyType.QIO && frequencyData.selectedFrequency instanceof IColorableFrequency colorableFrequency) {
+                if (type == FrequencyTypes.QIO && frequencyData.selectedFrequency instanceof IColorableFrequency colorableFrequency) {
                     builder.set(MekanismDataComponents.COLOR, colorableFrequency.getColor());
                 }
             }
@@ -313,65 +308,57 @@ public class TileComponentFrequency implements ITileComponent {
     }
 
     @Override
-    public void deserialize(CompoundTag frequencyNBT, HolderLookup.Provider provider) {
+    public void deserialize(ValueInput frequencyInput) {
         if (securityFrequency != null) {
-            deserializeFrequency(provider, frequencyNBT, FrequencyType.SECURITY, securityFrequency);
+            deserializeFrequency(frequencyInput, FrequencyTypes.SECURITY, securityFrequency);
         }
         for (Map.Entry<FrequencyType<?>, FrequencyData> entry : nonSecurityFrequencies.entrySet()) {
-            FrequencyType<?> type = entry.getKey();
-            deserializeFrequency(provider, frequencyNBT, type, entry.getValue());
+            deserializeFrequency(frequencyInput, entry.getKey(), entry.getValue());
         }
     }
 
-    private static void deserializeFrequency(HolderLookup.Provider provider, CompoundTag frequencyNBT, FrequencyType<?> type, FrequencyData frequencyData) {
-        if (frequencyNBT.contains(type.getName(), Tag.TAG_COMPOUND)) {
-            frequencyData.setFrequency(type.create(provider, frequencyNBT.getCompound(type.getName())));
+    private static void deserializeFrequency(ValueInput frequencyInput, FrequencyType<?> type, FrequencyData frequencyData) {
+        Optional<FrequencyIdentity> identity = frequencyInput.read(type.getName(), type.getIdentitySerializer().codec());
+        //noinspection OptionalIsPresent - Capturing lambda
+        if (identity.isPresent()) {
+            frequencyData.setFrequency(type.create(identity.get()));
         }
     }
 
     @Override
-    public CompoundTag serialize(HolderLookup.Provider provider) {
-        DynamicOps<Tag> ops = provider.createSerializationContext(NbtOps.INSTANCE);
-        CompoundTag frequencyNBT = new CompoundTag();
+    public void serialize(ValueOutput frequencyOutput) {
         if (securityFrequency != null) {
-            serializeFrequency(ops, FrequencyType.SECURITY, securityFrequency, frequencyNBT);
+            serializeFrequency(frequencyOutput, FrequencyTypes.SECURITY, securityFrequency);
         }
         for (Entry<FrequencyType<?>, FrequencyData> entry : nonSecurityFrequencies.entrySet()) {
-            serializeFrequency(ops, entry.getKey(), entry.getValue(), frequencyNBT);
+            serializeFrequency(frequencyOutput, entry.getKey(), entry.getValue());
         }
-        return frequencyNBT;
     }
 
-    private static void serializeFrequency(DynamicOps<Tag> ops, FrequencyType<?> type, FrequencyData frequencyData, CompoundTag frequencyNBT) {
+    private static void serializeFrequency(ValueOutput frequencyOutput, FrequencyType<?> type, FrequencyData frequencyData) {
         Frequency frequency = frequencyData.selectedFrequency;
         if (frequency != null) {
-            DataResult<Tag> encodedIdentity = type.getIdentitySerializer().codec().encodeStart(ops, frequency.getIdentity());
-            if (encodedIdentity.isSuccess()) {
-                //Note: While we save the full frequency data, and do make some use of it in reading
-                // in general this isn't needed and won't be used as the frequency will be grabbed
-                // from the frequency manager
-                frequencyNBT.put(frequency.getType().getName(), encodedIdentity.getOrThrow());
-            } else {
-                encodedIdentity.ifError(error -> Mekanism.logger.warn("Failed to serialize frequency identity: {}", error.message()));
-            }
+            //Note: While we save the full frequency data, and do make some use of it in reading
+            // in general this isn't needed and won't be used as the frequency will be grabbed
+            // from the frequency manager
+            frequencyOutput.store(frequency.getType().getName(), type.getIdentitySerializer().codec(), frequency.getIdentity());
         }
     }
 
-    public void readConfiguredFrequencies(HolderLookup.Provider provider, Player player, CompoundTag data) {
-        if (hasCustomFrequencies() && data.contains(getComponentKey(), Tag.TAG_COMPOUND)) {
-            RegistryOps<Tag> registryOps = provider.createSerializationContext(NbtOps.INSTANCE);
-            CompoundTag frequencyNBT = data.getCompound(getComponentKey());
-            for (Map.Entry<FrequencyType<?>, FrequencyData> entry : nonSecurityFrequencies.entrySet()) {
-                FrequencyType<?> type = entry.getKey();
-                //Don't allow transferring security data via config cards
-                if (type == FrequencyType.SECURITY) {
-                    continue; // should no longer happen
-                }
-                if (frequencyNBT.contains(type.getName(), Tag.TAG_COMPOUND)) {
-                    CompoundTag frequencyData = frequencyNBT.getCompound(type.getName());
-                    DataResult<FrequencyIdentity> decodedIdentity = type.getIdentitySerializer().codec().parse(registryOps, frequencyData);
-                    if (decodedIdentity.isSuccess()) {
-                        FrequencyIdentity identity = decodedIdentity.getOrThrow();
+    public void readConfiguredFrequencies(ValueInput input, Player player) {
+        if (hasCustomFrequencies()) {
+            Optional<ValueInput> child = input.child(getComponentKey());
+            if (child.isPresent()) {
+                ValueInput frequencyInput = child.get();
+                for (Map.Entry<FrequencyType<?>, FrequencyData> entry : nonSecurityFrequencies.entrySet()) {
+                    FrequencyType<?> type = entry.getKey();
+                    //Don't allow transferring security data via config cards
+                    if (type == FrequencyTypes.SECURITY) {
+                        continue; // should no longer happen
+                    }
+                    Optional<FrequencyIdentity> decodedIdentity = frequencyInput.read(type.getName(), type.getIdentitySerializer().codec());
+                    if (decodedIdentity.isPresent()) {
+                        FrequencyIdentity identity = decodedIdentity.get();
                         if (identity.ownerUUID() != null) {
                             if (identity.securityMode() == SecurityMode.PUBLIC || identity.ownerUUID().equals(player.getUUID())) {
                                 //If the frequency is public or the player is the owner allow setting the frequency
@@ -379,45 +366,39 @@ public class TileComponentFrequency implements ITileComponent {
                             }
                             continue;
                         }
-                    } else {
-                        decodedIdentity.ifError(error -> Mekanism.logger.warn("Failed to deserialize frequency identity: {}", error.message()));
                     }
+                    //If our stored data doesn't have a frequency for the specific type or there was some issue parsing the data, unset the frequency
+                    unsetFrequency(type, entry.getValue());
                 }
-                //If our stored data doesn't have a frequency for the specific type or there was some issue parsing the data, unset the frequency
-                unsetFrequency(type, entry.getValue());
             }
         }
     }
 
-    public void writeConfiguredFrequencies(HolderLookup.Provider provider, CompoundTag data) {
-        RegistryOps<Tag> registryOps = provider.createSerializationContext(NbtOps.INSTANCE);
-        CompoundTag frequencyNBT = new CompoundTag();
+    public void writeConfiguredFrequencies(ValueOutput output) {
+        String key = getComponentKey();
+        ValueOutput frequencyOutput = output.child(key);
         for (Map.Entry<FrequencyType<?>, FrequencyData> entry : nonSecurityFrequencies.entrySet()) {
             FrequencyType<?> type = entry.getKey();
             Frequency frequency = entry.getValue().selectedFrequency;
-            if (frequency != null && type != FrequencyType.SECURITY) {
+            if (frequency != null && type != FrequencyTypes.SECURITY) {
                 //Don't allow transferring security data via config cards
-                DataResult<Tag> encoded = type.getIdentitySerializer().codec().encodeStart(registryOps, frequency.getIdentity());
-                if (encoded.isSuccess()) {
-                    frequencyNBT.put(type.getName(), encoded.getOrThrow());
-                } else {
-                    encoded.ifError(error -> Mekanism.logger.warn("Failed to encode frequency identity: {}", error.message()));
-                }
+                frequencyOutput.store(type.getName(), type.getIdentitySerializer().codec(), frequency.getIdentity());
             }
         }
-        if (!frequencyNBT.isEmpty()) {
-            data.put(getComponentKey(), frequencyNBT);
+        if (frequencyOutput.isEmpty()) {
+            output.discard(key);
         }
     }
 
     @Override
     public void invalidate() {
-        if (!tile.isRemote()) {
+        Level level = tile.getLevel();
+        if (level != null && !level.isClientSide()) {
             for (Entry<FrequencyType<?>, FrequencyData> entry : nonSecurityFrequencies.entrySet()) {
-                deactivate(entry.getKey(), entry.getValue());
+                deactivate(level, entry.getKey(), entry.getValue());
             }
             if (securityFrequency != null) {
-                deactivate(FrequencyType.SECURITY, securityFrequency);
+                deactivate(level, FrequencyTypes.SECURITY, securityFrequency);
             }
         }
     }
@@ -425,7 +406,7 @@ public class TileComponentFrequency implements ITileComponent {
     @Override
     public void trackForMainContainer(MekanismContainer container) {
         if (securityFrequency != null) {
-            trackFrequencyForMainContainer(container, securityFrequency, FrequencyType.SECURITY);
+            trackFrequencyForMainContainer(container, securityFrequency, FrequencyTypes.SECURITY);
         }
         for (Map.Entry<FrequencyType<?>, FrequencyData> entry : nonSecurityFrequencies.entrySet()) {
             FrequencyData data = entry.getValue();
@@ -442,29 +423,49 @@ public class TileComponentFrequency implements ITileComponent {
         }
     }
 
-    private <FREQ extends Frequency> Consumer<@NotNull List<FREQ>> getSetter(SecurityMode securityMode, FrequencyType<FREQ> type) {
-        Map<FrequencyType<?>, List<? extends Frequency>> cache = getCache(securityMode);
-        return value -> cache.put(type, value);
+    @Nullable
+    private <FREQ extends Frequency> Consumer<List<FREQ>> getSetter(SecurityMode securityMode, FrequencyType<FREQ> type) {
+        if (type.getControllerType().supports(securityMode)) {
+            Map<FrequencyType<?>, List<? extends Frequency>> cache = getCache(securityMode);
+            return value -> cache.put(type, value);
+        }
+        return null;
     }
 
 
     private <FREQ extends Frequency> void track(MekanismContainer container, FrequencyType<FREQ> type) {
-        Consumer<@NotNull List<FREQ>> publicSetter = getSetter(SecurityMode.PUBLIC, type);
-        Consumer<@NotNull List<FREQ>> privateSetter = getSetter(SecurityMode.PRIVATE, type);
-        Consumer<@NotNull List<FREQ>> trustedSetter = getSetter(SecurityMode.TRUSTED, type);
+        Consumer<List<FREQ>> publicSetter = getSetter(SecurityMode.PUBLIC, type);
+        Consumer<List<FREQ>> privateSetter = getSetter(SecurityMode.PRIVATE, type);
+        Consumer<List<FREQ>> trustedSetter = getSetter(SecurityMode.TRUSTED, type);
 
         //Simplify out the is remote check. Note: It is important the client and server trackers are in the same order
         if (container.getLevel().isClientSide()) {
-            container.track(SyncableFrequencyList.create(type, () -> getPublicCache(type), publicSetter));
-            container.track(SyncableFrequencyList.create(type, () -> getPrivateCache(type), privateSetter));
-            container.track(SyncableFrequencyList.create(type, () -> getTrustedCache(type), trustedSetter));
+            if (publicSetter != null) {//Public setter should never be null
+                container.track(SyncableFrequencyList.create(type, () -> getPublicCache(type), publicSetter));
+            }
+            if (privateSetter != null) {
+                container.track(SyncableFrequencyList.create(type, () -> getPrivateCache(type), privateSetter));
+            }
+            if (trustedSetter != null) {
+                container.track(SyncableFrequencyList.create(type, () -> getTrustedCache(type), trustedSetter));
+            }
         } else {
-            container.track(SyncableFrequencyList.create(type, () -> type.getManagerWrapper().getPublicManager().getFrequencies(), publicSetter));
+            if (publicSetter != null) {
+                FrequencyLookup<FREQ> publicLookup = Objects.requireNonNull(type.getController().getPublicLookup());
+                container.track(SyncableFrequencyList.create(type, publicLookup::getFrequencies, publicSetter));
+            }
             //Note: We take advantage of the fact that containers are one to one even on the server, and sync
             // the private frequencies of the player who opened the container rather than the private
             // frequencies of the owner of the tile
-            container.track(SyncableFrequencyList.create(type, () -> type.getManagerWrapper().getPrivateManager(container.getPlayerUUID()).getFrequencies(), privateSetter));
-            container.track(SyncableFrequencyList.create(type, () -> type.getManagerWrapper().getTrustedManager(container.getPlayerUUID()).getFrequencies(), trustedSetter));
+            if (privateSetter != null) {
+                FrequencyLookup<FREQ> privateLookup = Objects.requireNonNull(type.getController().getPrivateLookup(container.getPlayerUUID()));
+                container.track(SyncableFrequencyList.create(type, privateLookup::getFrequencies, privateSetter));
+            }
+
+            if (trustedSetter != null) {
+                FrequencyLookup<FREQ> trustedLookup = Objects.requireNonNull(type.getController().getTrustedLookup(container.getPlayerUUID()));
+                container.track(SyncableFrequencyList.create(type, trustedLookup::getFrequencies, trustedSetter));
+            }
         }
     }
 

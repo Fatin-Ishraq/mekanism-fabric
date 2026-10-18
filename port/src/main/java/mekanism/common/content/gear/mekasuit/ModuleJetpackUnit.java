@@ -5,81 +5,85 @@ import io.netty.buffer.ByteBuf;
 import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
-import mekanism.api.annotations.NothingNullByDefault;
-import mekanism.api.annotations.ParametersAreNotNullByDefault;
-import mekanism.api.chemical.ChemicalStack;
-import mekanism.api.chemical.IChemicalHandler;
+import mekanism.api.chemical.ChemicalResource;
 import mekanism.api.gear.ICustomModule;
 import mekanism.api.gear.IHUDElement;
 import mekanism.api.gear.IModule;
 import mekanism.api.gear.IModuleContainer;
 import mekanism.api.gear.IModuleHelper;
+import mekanism.api.math.MathUtils;
+import mekanism.api.resource.IMekanismResourceHandler;
+import mekanism.api.resource.IResourceContainer;
 import mekanism.api.text.IHasTextComponent;
 import mekanism.api.text.TextComponentUtil;
 import mekanism.common.Mekanism;
 import mekanism.common.MekanismLang;
 import mekanism.common.capabilities.Capabilities;
+import mekanism.common.component.containers.type.ContainerType;
 import mekanism.common.item.interfaces.IJetpackItem.JetpackMode;
 import mekanism.common.registries.MekanismChemicals;
+import mekanism.common.util.ItemAccessUtils;
 import mekanism.common.util.StorageUtils;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.ByIdMap;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Item;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-@ParametersAreNotNullByDefault
 public record ModuleJetpackUnit(JetpackMode mode, ThrustMultiplier thrustMultiplier, ThrustMultiplier hoverThrustMultiplier) implements ICustomModule<ModuleJetpackUnit> {
 
-    public static final ResourceLocation JETPACK_MODE = Mekanism.rl("jetpack_mode");
-    public static final ResourceLocation JETPACK_MULT = Mekanism.rl("jetpack_mult");
-    public static final ResourceLocation JETPACK_HOVER_MULT = Mekanism.rl("jetpack_mult.hover");
+    public static final Identifier JETPACK_MODE = Mekanism.rl("jetpack_mode");
+    public static final Identifier JETPACK_MULT = Mekanism.rl("jetpack_mult");
+    public static final Identifier JETPACK_HOVER_MULT = Mekanism.rl("jetpack_mult.hover");
 
     public ModuleJetpackUnit(IModule<ModuleJetpackUnit> module) {
         this(module.<JetpackMode>getConfigOrThrow(JETPACK_MODE).get(), module.<ThrustMultiplier>getConfigOrThrow(JETPACK_MULT).get(), module.<ThrustMultiplier>getConfigOrThrow(JETPACK_HOVER_MULT).get());
     }
 
     @Override
-    public void addHUDElements(IModule<ModuleJetpackUnit> module, IModuleContainer moduleContainer, ItemStack stack, Player player, Consumer<IHUDElement> hudElementAdder) {
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter> void addHUDElements(IModule<ModuleJetpackUnit> module, IModuleContainer moduleContainer, ITEM instance,
+          Player player, Consumer<IHUDElement> hudElementAdder) {
         if (module.isEnabled()) {
-            IChemicalHandler chemicalHandler = Capabilities.CHEMICAL.getCapability(stack);
+            ResourceHandler<ChemicalResource> chemicalHandler = Capabilities.CHEMICAL.getCapability(ItemAccessUtils.sideEffectFreeAccess(instance));
             if (chemicalHandler == null) {
                 hudElementAdder.accept(IModuleHelper.INSTANCE.hudElementPercent(mode.getHUDIcon(), 1));
             } else {
-                ChemicalStack stored = StorageUtils.getContainedChemical(chemicalHandler, MekanismChemicals.HYDROGEN);
-                double ratio = StorageUtils.getRatio(stored.getAmount(), chemicalHandler.getChemicalTankCapacity(0));
+                long stored = StorageUtils.getContainedChemical(chemicalHandler, MekanismChemicals.HYDROGEN);
+                double ratio = MathUtils.divideToLevel(stored, chemicalHandler.getCapacityAsLong(0, chemicalHandler.getResource(0)));
                 hudElementAdder.accept(IModuleHelper.INSTANCE.hudElementPercent(mode.getHUDIcon(), ratio));
             }
         }
     }
 
     @Override
-    public void changeMode(IModule<ModuleJetpackUnit> module, Player player, IModuleContainer moduleContainer, ItemStack stack, int shift, boolean displayChangeMessage) {
+    public void changeMode(IModule<ModuleJetpackUnit> module, Player player, ItemAccess itemAccess, int shift, boolean displayChangeMessage,
+          @Nullable TransactionContext transaction) {
         JetpackMode newMode = mode.adjust(shift);
         if (mode != newMode) {
             if (displayChangeMessage) {
                 module.displayModeChange(player, MekanismLang.MODULE_JETPACK_MODE.translate(), newMode);
             }
-            moduleContainer.replaceModuleConfig(player.registryAccess(), stack, module.getDataHolder(), module.<JetpackMode>getConfigOrThrow(JETPACK_MODE).with(newMode));
+            module.replaceModuleConfig(player.registryAccess(), itemAccess, transaction, module.<JetpackMode>getConfigOrThrow(JETPACK_MODE).with(newMode));
         }
     }
 
     @Override
-    public void onRemoved(IModule<ModuleJetpackUnit> module, IModuleContainer moduleContainer, ItemStack stack, boolean last) {
+    public void onRemoved(IModule<ModuleJetpackUnit> module, ItemAccess itemAccess, boolean last, TransactionContext transaction) {
         //Vent the excess hydrogen from the jetpack
-        IChemicalHandler chemicalHandler = Capabilities.CHEMICAL.getCapability(stack);
-        if (chemicalHandler != null) {
-            for (int tank = 0, tanks = chemicalHandler.getChemicalTanks(); tank < tanks; tank++) {
-                ChemicalStack stored = chemicalHandler.getChemicalInTank(tank);
-                if (!stored.isEmpty()) {
-                    long capacity = chemicalHandler.getChemicalTankCapacity(tank);
-                    if (stored.getAmount() > capacity) {
-                        chemicalHandler.setChemicalInTank(tank, stored.copyWithAmount(capacity));
-                    }
-                }
+        if (Capabilities.CHEMICAL.getCapability(itemAccess) instanceof IMekanismResourceHandler<ChemicalResource, ?> handler) {
+            //Note: Just directly interact with the containers as we want to change the entire access and don't care about
+            // splitting between multiple items if for some reason the player has an oversized stack of the MekaSuit
+            for (IResourceContainer<ChemicalResource> container : handler.getContainers()) {
+                ContainerType.CHEMICAL.clampContents(container, transaction);
             }
         }
     }
@@ -91,7 +95,6 @@ public record ModuleJetpackUnit(JetpackMode mode, ThrustMultiplier thrustMultipl
         return thrustMultiplier.getMultiplier();
     }
 
-    @NothingNullByDefault
     public enum ThrustMultiplier implements IHasTextComponent, StringRepresentable {
         HALF(.5f),
         NORMAL(1f),

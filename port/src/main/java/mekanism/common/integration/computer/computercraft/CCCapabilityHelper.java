@@ -4,7 +4,6 @@ import dan200.computercraft.api.ComputerCraftAPI;
 import dan200.computercraft.api.peripheral.IPeripheral;
 import java.util.function.BooleanSupplier;
 import mekanism.common.capabilities.resolver.BasicCapabilityResolver;
-import mekanism.common.integration.computer.ComputerEnergyHelper;
 import mekanism.common.integration.computer.ComputerFilterHelper;
 import mekanism.common.integration.computer.IComputerTile;
 import mekanism.common.registration.impl.TileEntityTypeDeferredRegister.BlockEntityTypeBuilder;
@@ -13,7 +12,7 @@ import mekanism.common.tile.base.CapabilityTileEntity;
 import net.minecraft.core.Direction;
 import mekanism.neoshim.neoforge.capabilities.ICapabilityProvider;
 import mekanism.neoshim.neoforge.capabilities.RegisterCapabilitiesEvent;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class CCCapabilityHelper {
 
@@ -38,7 +37,6 @@ public class CCCapabilityHelper {
     }
 
     public static void registerApis() {
-        ComputerCraftAPI.registerAPIFactory(CCApiObject.create(ComputerEnergyHelper.class, "mekanismEnergyHelper"));
         ComputerCraftAPI.registerAPIFactory(CCApiObject.create(ComputerFilterHelper.class, "mekanismFilterHelper"));
     }
 }

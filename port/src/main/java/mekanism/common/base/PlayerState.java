@@ -1,6 +1,7 @@
 package mekanism.common.base;
 
 import java.util.Collections;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,7 +18,7 @@ import mekanism.common.network.to_server.PacketGearStateUpdate;
 import mekanism.common.network.to_server.PacketGearStateUpdate.GearType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -26,17 +27,19 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.LevelAccessor;
 import mekanism.neoshim.neoforge.network.PacketDistributor;
+import org.jspecify.annotations.Nullable;
 
 public class PlayerState {
 
-    private static final ResourceLocation STEP_ASSIST_MODIFIER_ID = Mekanism.rl("step_assist");
+    private static final Identifier STEP_ASSIST_MODIFIER_ID = Mekanism.rl("step_assist");
 
     //these are read from the render thread on client, so use a map which is more resilient to that (even if data is 'outdated')
     private final Set<UUID> activeJetpacks = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<UUID> activeScubaMasks = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<UUID> activeGravitationalModulators = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    private LevelAccessor world;
+    @Nullable
+    private LevelAccessor level;
 
     public void clear(boolean isRemote) {
         activeJetpacks.clear();
@@ -64,7 +67,11 @@ public class PlayerState {
     }
 
     public void init(LevelAccessor world) {
-        this.world = world;
+        this.level = world;
+    }
+
+    private LevelAccessor level() {
+        return Objects.requireNonNull(level, "Player state level has not been initialized");
     }
 
     // ----------------------
@@ -84,8 +91,9 @@ public class PlayerState {
             activeJetpacks.add(uuid);
         }
 
+        LevelAccessor level = level();
         // If something changed, and we're in a remote world, take appropriate action
-        if (changed && world.isClientSide()) {
+        if (changed && level.isClientSide()) {
             // If the player is the "local" player, we need to tell the server the state has changed
             if (isLocal) {
                 PacketUtils.sendToServer(new PacketGearStateUpdate(GearType.JETPACK, uuid, isActive));
@@ -93,7 +101,7 @@ public class PlayerState {
 
             // Start a sound playing if the person is now flying
             if (isActive && MekanismConfig.client.enablePlayerSounds.get()) {
-                SoundHandler.startSound(world, uuid, SoundType.JETPACK);
+                SoundHandler.startSound(level, uuid, SoundType.JETPACK);
             }
         }
     }
@@ -121,8 +129,9 @@ public class PlayerState {
             activeScubaMasks.add(uuid); // Off -> on
         }
 
+        LevelAccessor level = level();
         // If something changed, and we're in a remote world, take appropriate action
-        if (changed && world.isClientSide()) {
+        if (changed && level.isClientSide()) {
             // If the player is the "local" player, we need to tell the server the state has changed
             if (isLocal) {
                 PacketUtils.sendToServer(new PacketGearStateUpdate(GearType.SCUBA_MASK, uuid, isActive));
@@ -130,7 +139,7 @@ public class PlayerState {
 
             // Start a sound playing if the person is now using a scuba mask
             if (isActive && MekanismConfig.client.enablePlayerSounds.get()) {
-                SoundHandler.startSound(world, uuid, SoundType.SCUBA_MASK);
+                SoundHandler.startSound(level, uuid, SoundType.SCUBA_MASK);
             }
         }
     }
@@ -154,7 +163,7 @@ public class PlayerState {
     }
 
     //Note: The attributes that currently use this cannot be converted to just being attributes on the items, as they can be disabled based on the player state
-    private void updateAttribute(Player player, Holder<Attribute> attribute, ResourceLocation id, ToFloatFunction<Player> additionalSupplier) {
+    private void updateAttribute(Player player, Holder<Attribute> attribute, Identifier id, ToFloatFunction<Player> additionalSupplier) {
         AttributeInstance attributeInstance = player.getAttribute(attribute);
         if (attributeInstance != null) {
             AttributeModifier existing = attributeInstance.getModifier(id);
@@ -190,8 +199,9 @@ public class PlayerState {
             activeGravitationalModulators.add(uuid); // Off -> on
         }
 
+        LevelAccessor level = level();
         // If something changed, and we're in a remote world, take appropriate action
-        if (changed && world.isClientSide()) {
+        if (changed && level.isClientSide()) {
             // If the player is the "local" player, we need to tell the server the state has changed
             if (isLocal) {
                 PacketUtils.sendToServer(new PacketGearStateUpdate(GearType.GRAVITATIONAL_MODULATOR, uuid, isActive));
@@ -199,7 +209,7 @@ public class PlayerState {
 
             // Start a sound playing if the person is now using a gravitational modulator
             if (isActive && MekanismConfig.client.enablePlayerSounds.get()) {
-                SoundHandler.startSound(world, uuid, SoundType.GRAVITATIONAL_MODULATOR);
+                SoundHandler.startSound(level, uuid, SoundType.GRAVITATIONAL_MODULATOR);
             }
         }
     }

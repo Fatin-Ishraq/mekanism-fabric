@@ -7,10 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.stream.IntStream;
 import mekanism.api.chemical.ChemicalStack;
-import mekanism.api.chemical.IChemicalHandler;
 import mekanism.api.text.TextComponentUtil;
 import mekanism.client.gui.GuiUtils.TilingDirection;
 import mekanism.client.gui.IGuiWrapper;
@@ -25,12 +23,14 @@ import mekanism.common.base.TagCache;
 import mekanism.common.block.interfaces.IHasTileEntity;
 import mekanism.common.capabilities.Capabilities;
 import mekanism.common.util.EnumUtils;
-import net.minecraft.client.gui.GuiGraphics;
+import mekanism.common.util.ItemAccessUtils;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -42,20 +42,21 @@ import net.minecraft.world.item.alchemy.PotionContents;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.level.block.Block;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
-import mekanism.neoshim.neoforge.fluids.capability.IFluidHandlerItem;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.resource.RegisteredResource;
+import org.jspecify.annotations.Nullable;
 
 public class GuiDictionaryTarget extends GuiElement implements IRecipeViewerGhostTarget {
 
     private final Map<DictionaryTagType, List<String>> tags = new EnumMap<>(DictionaryTagType.class);
-    private final Consumer<Set<DictionaryTagType>> tagSetter;
+    private final BiConsumer<GuiDictionaryTarget, Set<DictionaryTagType>> tagSetter;
     @Nullable
     private Object target;
     @Nullable
     private Tooltip lastTooltip;
 
-    public GuiDictionaryTarget(IGuiWrapper gui, int x, int y, Consumer<Set<DictionaryTagType>> tagSetter) {
+    public GuiDictionaryTarget(IGuiWrapper gui, int x, int y, BiConsumer<GuiDictionaryTarget, Set<DictionaryTagType>> tagSetter) {
         super(gui, x, y, 16, 16);
         this.tagSetter = tagSetter;
     }
@@ -74,25 +75,25 @@ public class GuiDictionaryTarget extends GuiElement implements IRecipeViewerGhos
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         if (target instanceof ItemStack stack) {
             gui().renderItem(guiGraphics, stack, relativeX, relativeY);
         } else if (target instanceof FluidStack stack) {
-            MekanismRenderer.color(guiGraphics, stack);
-            drawTiledSprite(guiGraphics, relativeX, relativeY, height, width, height, MekanismRenderer.getFluidTexture(stack, FluidTextureType.STILL), TilingDirection.DOWN_RIGHT);
+            drawTiledSprite(guiGraphics, relativeX, relativeY, height, width, height, MekanismRenderer.getFluidTexture(stack, FluidTextureType.STILL), TilingDirection.DOWN_RIGHT, MekanismRenderer.color(stack));
             MekanismRenderer.resetColor(guiGraphics);
         } else if (target instanceof ChemicalStack stack) {
-            MekanismRenderer.color(guiGraphics, stack);
-            drawTiledSprite(guiGraphics, relativeX, relativeY, height, width, height, MekanismRenderer.getChemicalTexture(stack), TilingDirection.DOWN_RIGHT);
+            drawTiledSprite(guiGraphics, relativeX, relativeY, height, width, height, MekanismRenderer.getChemicalTexture(stack), TilingDirection.DOWN_RIGHT, MekanismRenderer.color(stack));
             MekanismRenderer.resetColor(guiGraphics);
         }
     }
 
     @Override
-    public void renderToolTip(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderToolTip(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderToolTip(guiGraphics, mouseX, mouseY);
         if (target instanceof ItemStack stack) {
-            guiGraphics.renderTooltip(font(), stack, mouseX, mouseY);
+            //TODO - 26.1: Validate this (and all other places we now use setTooltipForNextFrame) is an acceptable replacement for the old setTooltip,
+            // and we don't have to do something to allow it to be this frame
+            guiGraphics.setTooltipForNextFrame(font(), stack, mouseX, mouseY);
         }
     }
 
@@ -102,8 +103,8 @@ public class GuiDictionaryTarget extends GuiElement implements IRecipeViewerGhos
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY, int button) {
-        if (Screen.hasShiftDown()) {
+    public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
+        if (event.hasShiftDown()) {
             if (target != null) {
                 setTargetSlot(null);
             }
@@ -140,11 +141,12 @@ public class GuiDictionaryTarget extends GuiElement implements IRecipeViewerGhos
                         }
                     }
                     //Entity type tags
-                    if (item instanceof SpawnEggItem spawnEggItem) {
-                        tags.put(DictionaryTagType.ENTITY_TYPE, TagCache.getTagsAsStrings(spawnEggItem.getType(stack).getTags()));
+                    EntityType<?> type = SpawnEggItem.getType(stack);
+                    if (type != null) {
+                        tags.put(DictionaryTagType.ENTITY_TYPE, TagCache.getTagsAsStrings(type.getTags()));
                     }
                     //Enchantment tags
-                    ItemEnchantments enchantments = stack.getEnchantments();
+                    ItemEnchantments enchantments = stack.getEnchantments();//TODO - 26.1: fix this
                     if (!enchantments.isEmpty()) {
                         tags.put(DictionaryTagType.ENCHANTMENT, TagCache.getTagsAsStrings(enchantments.keySet().stream().flatMap(Holder::tags).distinct()));
                     }
@@ -160,7 +162,7 @@ public class GuiDictionaryTarget extends GuiElement implements IRecipeViewerGhos
                     }
                     //Get any attribute tags
                     Set<Holder<Attribute>> attributes = new HashSet<>();
-                    BiConsumer<Holder<Attribute>, AttributeModifier> attributeCollector = (holder, modifier) -> attributes.add(holder);
+                    BiConsumer<Holder<Attribute>, AttributeModifier> attributeCollector = (holder, _) -> attributes.add(holder);
                     for (EquipmentSlot slotType : EnumUtils.EQUIPMENT_SLOT_TYPES) {
                         itemStack.forEachModifier(slotType, attributeCollector);
                     }
@@ -171,26 +173,11 @@ public class GuiDictionaryTarget extends GuiElement implements IRecipeViewerGhos
                               .distinct()
                         ));
                     }
+                    ItemAccess itemAccess = ItemAccessUtils.sideEffectFreeAccess(itemStack);
                     //Get tags of any contained fluids
-                    IFluidHandlerItem fluidHandler = Capabilities.FLUID.getCapability(stack);
-                    if (fluidHandler != null) {
-                        tags.put(DictionaryTagType.FLUID, TagCache.getTagsAsStrings(IntStream.range(0, fluidHandler.getTanks())
-                              .mapToObj(fluidHandler::getFluidInTank)
-                              .filter(fluidInTank -> !fluidInTank.isEmpty())
-                              .flatMap(FluidStack::getTags)
-                              .distinct()
-                        ));
-                    }
+                    collectTags(DictionaryTagType.FLUID, Capabilities.FLUID.getCapability(itemAccess));
                     //Get tags of any contained chemicals
-                    IChemicalHandler chemicalHandler = Capabilities.CHEMICAL.getCapability(stack);
-                    if (chemicalHandler != null) {
-                        tags.put(DictionaryTagType.CHEMICAL, TagCache.getTagsAsStrings(IntStream.range(0, chemicalHandler.getChemicalTanks())
-                              .mapToObj(chemicalHandler::getChemicalInTank)
-                              .filter(chemicalInTank -> !chemicalInTank.isEmpty())
-                              .flatMap(ChemicalStack::getTags)
-                              .distinct()
-                        ));
-                    }
+                    collectTags(DictionaryTagType.CHEMICAL, Capabilities.CHEMICAL.getCapability(itemAccess));
                     //TODO: Support other types of things?
                 }
             }
@@ -199,7 +186,7 @@ public class GuiDictionaryTarget extends GuiElement implements IRecipeViewerGhos
                     setTarget(null);
                 } else {
                     setTarget(fluidStack.copy());
-                    tags.put(DictionaryTagType.FLUID, TagCache.getTagsAsStrings(fluidStack.getFluidHolder()));
+                    tags.put(DictionaryTagType.FLUID, TagCache.getTagsAsStrings(fluidStack.typeHolder()));
                 }
             }
             case ChemicalStack chemicalStack -> {
@@ -207,7 +194,7 @@ public class GuiDictionaryTarget extends GuiElement implements IRecipeViewerGhos
                     setTarget(null);
                 } else {
                     setTarget(chemicalStack.copy());
-                    tags.put(DictionaryTagType.CHEMICAL, TagCache.getTagsAsStrings(chemicalStack.getChemicalHolder()));
+                    tags.put(DictionaryTagType.CHEMICAL, TagCache.getTagsAsStrings(chemicalStack.typeHolder()));
                 }
             }
             default -> {
@@ -216,8 +203,19 @@ public class GuiDictionaryTarget extends GuiElement implements IRecipeViewerGhos
             }
         }
         //Update the list being viewed
-        tagSetter.accept(tags.keySet());
+        tagSetter.accept(this, tags.keySet());
         playClickSound(BUTTON_CLICK_SOUND);
+    }
+
+    private <RESOURCE extends RegisteredResource<?>> void collectTags(DictionaryTagType tagType, @Nullable ResourceHandler<RESOURCE> handler) {
+        if (handler != null) {
+            tags.put(tagType, TagCache.getTagsAsStrings(IntStream.range(0, handler.size())
+                  .mapToObj(handler::getResource)
+                  .filter(typeInTank -> !typeInTank.isEmpty())
+                  .flatMap(fs -> fs.typeHolder().tags())
+                  .distinct()
+            ));
+        }
     }
 
     @Override
@@ -233,21 +231,18 @@ public class GuiDictionaryTarget extends GuiElement implements IRecipeViewerGhos
         tags.putAll(old.tags);
     }
 
-    @Nullable
     @Override
-    public IRecipeViewerGhostTarget.IGhostIngredientConsumer getGhostHandler() {
+    public IRecipeViewerGhostTarget.@Nullable IGhostIngredientConsumer getGhostHandler() {
         return new IGhostIngredientConsumer() {
             @Nullable
             @Override
-            public Object supportedTarget(Object ingredient) {
-                if (ingredient instanceof ItemStack stack) {
-                    return stack.isEmpty() ? null : stack;
-                } else if (ingredient instanceof FluidStack stack) {
-                    return stack.isEmpty() ? null : stack;
-                } else if (ingredient instanceof ChemicalStack stack) {
-                    return stack.isEmpty() ? null : stack;
-                }
-                return null;
+            public Object supportedTarget(@Nullable Object ingredient) {
+                return switch (ingredient) {
+                    case ItemStack stack -> stack.isEmpty() ? null : stack;
+                    case FluidStack stack -> stack.isEmpty() ? null : stack;
+                    case ChemicalStack stack -> stack.isEmpty() ? null : stack;
+                    case null, default -> null;
+                };
             }
 
             @Override

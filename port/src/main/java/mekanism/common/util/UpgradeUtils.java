@@ -13,6 +13,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
 
 public class UpgradeUtils {
 
@@ -25,6 +26,10 @@ public class UpgradeUtils {
 
     public static ItemStack getStack(Upgrade upgrade, int count) {
         return new ItemStack(getItem(upgrade), count);
+    }
+
+    public static ItemResource getResource(Upgrade upgrade) {
+        return ItemResource.of(getItem(upgrade));
     }
 
     public static Holder<Item> getItem(Upgrade upgrade) {
@@ -54,7 +59,7 @@ public class UpgradeUtils {
     public static List<Component> getMultScaledInfo(IUpgradeTile tile, Upgrade upgrade) {
         List<Component> ret = new ArrayList<>();
         if (tile.supportsUpgrades() && upgrade.getMax() > 1) {
-            double effect = Math.pow(MekanismConfig.general.maxUpgradeMultiplier.get(), tile.getComponent().getUpgrades(upgrade) / (float) upgrade.getMax());
+            double effect = Math.pow(MekanismConfig.general.maxUpgradeMultiplier.get(), tile.getUpgrades(upgrade) / (float) upgrade.getMax());
             ret.add(MekanismLang.UPGRADES_EFFECT.translate(Math.round(effect * 100) / 100F));
         }
         return ret;
@@ -63,7 +68,7 @@ public class UpgradeUtils {
     public static List<Component> getExpScaledInfo(IUpgradeTile tile, Upgrade upgrade) {
         List<Component> ret = new ArrayList<>();
         if (tile.supportsUpgrades() && upgrade.getMax() > 1) {
-            ret.add(MekanismLang.UPGRADES_EFFECT.translate(Math.pow(2, (float) tile.getComponent().getUpgrades(upgrade))));
+            ret.add(MekanismLang.UPGRADES_EFFECT.translate(Math.pow(2, (float) tile.getUpgrades(upgrade))));
         }
         return ret;
     }

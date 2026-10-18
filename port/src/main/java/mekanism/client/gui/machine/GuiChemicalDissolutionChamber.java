@@ -12,13 +12,14 @@ import mekanism.client.gui.element.tab.GuiEnergyTab;
 import mekanism.common.inventory.container.tile.MekanismTileContainer;
 import mekanism.common.inventory.warning.WarningTracker.WarningType;
 import mekanism.common.tile.machine.TileEntityChemicalDissolutionChamber;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
 public class GuiChemicalDissolutionChamber extends GuiConfigurableTile<TileEntityChemicalDissolutionChamber, MekanismTileContainer<TileEntityChemicalDissolutionChamber>> {
 
+    @Nullable
     private GuiElement inputGauge;
 
     public GuiChemicalDissolutionChamber(MekanismTileContainer<TileEntityChemicalDissolutionChamber> container, Inventory inv, Component title) {
@@ -30,21 +31,25 @@ public class GuiChemicalDissolutionChamber extends GuiConfigurableTile<TileEntit
     @Override
     protected void addGuiElements() {
         super.addGuiElements();
-        addRenderableWidget(new GuiHorizontalPowerBar(this, tile.getEnergyContainer(), 115, 75))
+        addRenderableWidget(new GuiHorizontalPowerBar(this, tile.energyContainer(), 115, 75))
               .warning(WarningType.NOT_ENOUGH_ENERGY, tile.getWarningCheck(RecipeError.NOT_ENOUGH_ENERGY))
               .warning(WarningType.NOT_ENOUGH_ENERGY_REDUCED_RATE, tile.getWarningCheck(RecipeError.NOT_ENOUGH_ENERGY_REDUCED_RATE));
-        addRenderableWidget(new GuiEnergyTab(this, tile.getEnergyContainer(), tile::getActive));
-        inputGauge = addRenderableWidget(new GuiChemicalGauge(() -> tile.injectTank, () -> tile.getChemicalTanks(null), GaugeType.STANDARD, this, 7, 4))
+        addRenderableWidget(new GuiEnergyTab(this, tile.energyContainer(), tile::getActive));
+        inputGauge = addRenderableWidget(new GuiChemicalGauge(() -> tile.injectTank, tile::getChemicalTanks, GaugeType.STANDARD, this, 7, 4))
               .warning(WarningType.NO_MATCHING_RECIPE, tile.getWarningCheck(RecipeError.NOT_ENOUGH_SECONDARY_INPUT));
-        addRenderableWidget(new GuiChemicalGauge(() -> tile.outputTank, () -> tile.getChemicalTanks(null), GaugeType.STANDARD, this, 131, 13))
+        addRenderableWidget(new GuiChemicalGauge(() -> tile.outputTank, tile::getChemicalTanks, GaugeType.STANDARD, this, 131, 13))
               .warning(WarningType.NO_SPACE_IN_OUTPUT, tile.getWarningCheck(RecipeError.NOT_ENOUGH_OUTPUT_SPACE));
         addRenderableWidget(new GuiProgress(tile::getScaledProgress, ProgressType.LARGE_RIGHT, this, 64, 40).recipeViewerCategory(tile))
               .warning(WarningType.INPUT_DOESNT_PRODUCE_OUTPUT, tile.getWarningCheck(RecipeError.INPUT_DOESNT_PRODUCE_OUTPUT));
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        renderTitleTextWithOffset(guiGraphics, inputGauge.getRelativeRight());
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
+        if (inputGauge == null) {
+            renderTitleText(guiGraphics);
+        } else {
+            renderTitleTextWithOffset(guiGraphics, inputGauge.getRelativeRight());
+        }
         super.drawForegroundText(guiGraphics, mouseX, mouseY);
     }
 }

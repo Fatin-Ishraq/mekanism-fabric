@@ -1,22 +1,22 @@
 package mekanism.client.render.lib;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormatElement;
 import java.util.Arrays;
 import java.util.function.Consumer;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.common.lib.Color;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
 import net.minecraft.core.Vec3i;
+import net.minecraft.util.ARGB;
+import net.minecraft.util.LightCoordsUtil;
 import mekanism.neoshim.neoforge.client.model.pipeline.QuadBakingVertexConsumer;
 import org.joml.Vector3f;
+import org.jspecify.annotations.Nullable;
 
+//TODO - 26.1 - can we get rid of these?
 public class Quad {
 
     private final Vertex[] vertices;
@@ -40,13 +40,14 @@ public class Quad {
     }
 
     public Quad(BakedQuad quad) {
-        side = quad.getDirection();
-        sprite = quad.getSprite();
-        tintIndex = quad.getTintIndex();
-        shade = quad.isShade();
-        hasAmbientOcclusion = quad.hasAmbientOcclusion();
+        side = quad.direction();
+        sprite = quad.materialInfo().sprite();
+        tintIndex = quad.materialInfo().tintIndex();
+        shade = quad.materialInfo().shade();
+        hasAmbientOcclusion = quad.materialInfo().ambientOcclusion();
         BakedQuadUnpacker unpacker = new BakedQuadUnpacker();
-        unpacker.putBulkData(new PoseStack().last(), quad, 1, 1, 1, 1, 0, OverlayTexture.NO_OVERLAY, true);
+        //TODO - 26.1: no existy. Hopefully yeet this class. Validate this properly works, it used to pass readAlpha as true, but that no longer is a parameter
+        //unpacker.putBulkData(new PoseStack().last(), quad, 1, 1, 1, 1, 0, OverlayTexture.NO_OVERLAY);
         vertices = unpacker.getVertices();
     }
 
@@ -110,11 +111,11 @@ public class Quad {
 
     public BakedQuad bake() {
         QuadBakingVertexConsumer quadBaker = new QuadBakingVertexConsumer();
-        quadBaker.setSprite(sprite);
+        //TODO - 26.1 quadBaker.setSprite(sprite);
         quadBaker.setDirection(side);
         quadBaker.setTintIndex(tintIndex);
         quadBaker.setShade(shade);
-        quadBaker.setHasAmbientOcclusion(hasAmbientOcclusion);
+        quadBaker.setAmbientOcclusion(hasAmbientOcclusion);
         for (Vertex vertex : vertices) {
             vertex.write(quadBaker);
         }
@@ -137,7 +138,6 @@ public class Quad {
         return new Quad(sprite, side.getOpposite(), flipped, tintIndex, shade, hasAmbientOcclusion);
     }
 
-    @NothingNullByDefault
     private static class BakedQuadUnpacker implements VertexConsumer {
 
         private final Vertex[] vertices = new Vertex[4];
@@ -159,13 +159,18 @@ public class Quad {
                 }
             }
             building = true;
-            vertices[vertexIndex] = new Vertex().pos(new Vector3f(x, y, z));
+            vertices[vertexIndex] = new Vertex(x, y, z);
             return this;
         }
 
         @Override
         public VertexConsumer setColor(int red, int green, int blue, int alpha) {
-            vertices[vertexIndex].color(red, green, blue, alpha);
+            return setColor(ARGB.color(alpha, red, green, blue));
+        }
+
+        @Override
+        public VertexConsumer setColor(int color) {
+            vertices[vertexIndex].color(color);
             return this;
         }
 
@@ -194,6 +199,12 @@ public class Quad {
         }
 
         @Override
+        public VertexConsumer setLineWidth(float width) {
+            //TODO - 26.1: Do we need to be implementing this? I doubt it actually gets called for the usage, but we need to make sure
+            return this;
+        }
+
+        @Override
         public VertexConsumer misc(VertexFormatElement element, int... rawData) {
             vertices[vertexIndex].misc(element, Arrays.copyOf(rawData, rawData.length));
             return this;
@@ -206,6 +217,7 @@ public class Quad {
         private final Direction side;
         private Color color = Color.WHITE;
 
+        @Nullable
         private Vector3f vec1, vec2, vec3, vec4;
 
         private float minU, minV, maxU, maxV;
@@ -222,7 +234,7 @@ public class Quad {
         }
 
         public Builder light(int light) {
-            return light(LightTexture.block(light), LightTexture.sky(light));
+            return light(LightCoordsUtil.block(light), LightCoordsUtil.sky(light));
         }
 
         public Builder light(int u, int v) {
@@ -286,7 +298,7 @@ public class Quad {
             start = start.mul(scale, scale, scale, new Vector3f());
             Vector3f end;
             if (side.getAxis().isHorizontal()) {
-                Vec3i normal = side.getNormal();
+                Vec3i normal = side.getUnitVec3i();
                 end = start.add(normal.getZ() * width * scale, 0, normal.getX() * width * scale, new Vector3f());
                 if (side.getAxis() == Axis.X) {
                     //Wind vertices in a different order so that it faces the correct direction
@@ -301,6 +313,9 @@ public class Quad {
         }
 
         public Quad build() {
+            if (vec1 == null || vec2 == null || vec3 == null || vec4 == null) {
+                throw new IllegalStateException("Quad vertices not defined");
+            }
             Vertex[] vertices = new Vertex[4];
             //Note: We don't need to create a new Vector3f for the cross multiplication, as it will just mutate the new one we used for the first subtraction
             Vector3f normal = vec3.sub(vec2, new Vector3f()).cross(vec1.sub(vec2,  new Vector3f())).normalize();

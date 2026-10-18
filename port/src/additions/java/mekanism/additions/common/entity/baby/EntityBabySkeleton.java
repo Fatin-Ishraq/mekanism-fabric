@@ -4,17 +4,17 @@ import mekanism.additions.common.config.MekanismAdditionsConfig;
 import mekanism.additions.common.registries.AdditionsEntityTypes;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.entity.ConversionParams;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Pose;
-import net.minecraft.world.entity.monster.Skeleton;
-import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.entity.monster.skeleton.Skeleton;
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.LevelEvent;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class EntityBabySkeleton extends Skeleton {
 
@@ -29,31 +29,34 @@ public class EntityBabySkeleton extends Skeleton {
         return true;
     }
 
-    @NotNull
     @Override
-    public EntityDimensions getDefaultDimensions(@NotNull Pose pose) {
+    public EntityDimensions getDefaultDimensions(Pose pose) {
         //Note: We already have the age scale factored into the dimensions
         return getType().getDimensions();
     }
 
     @Override
     protected void doFreezeConversion() {
-        convertTo(AdditionsEntityTypes.BABY_STRAY.value(), true);
+        this.convertTo(AdditionsEntityTypes.BABY_STRAY.value(), ConversionParams.single(this, true, true), stray -> {
+            mekanism.neoshim.neoforge.event.EventHooks.onLivingConvert(this, stray);
+            if (!this.isSilent()) {
+                this.level().levelEvent(null, 1048, this.blockPosition(), 0);
+            }
+        });
         if (!this.isSilent()) {
             level().levelEvent(null, LevelEvent.SOUND_SKELETON_TO_STRAY, this.blockPosition(), 0);
         }
     }
 
-    @NotNull
     @Override
-    protected AbstractArrow getArrow(@NotNull ItemStack arrow, float velocity, @Nullable ItemStack weapon) {
+    protected AbstractArrow getArrow(ItemStack arrow, float velocity, @Nullable ItemStack weapon) {
         AbstractArrow projectile = super.getArrow(arrow, velocity, weapon);
-        projectile.setBaseDamage(projectile.getBaseDamage() * MekanismAdditionsConfig.additions.babyArrowDamageMultiplier.get());
+        projectile.setBaseDamage(projectile.baseDamage * MekanismAdditionsConfig.additions.babyArrowDamageMultiplier.get());
         return projectile;
     }
 
     @Override
-    protected void populateDefaultEquipmentSlots(@NotNull RandomSource random, @NotNull DifficultyInstance difficulty) {
+    protected void populateDefaultEquipmentSlots(RandomSource random, DifficultyInstance difficulty) {
         super.populateDefaultEquipmentSlots(random, difficulty);
         for (EquipmentSlot slot : EquipmentSlot.values()) {
             if (slot.getType() == EquipmentSlot.Type.HUMANOID_ARMOR) {

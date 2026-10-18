@@ -17,19 +17,19 @@ import mekanism.common.block.BlockBounding;
 import mekanism.common.entity.EntityRobit;
 import mekanism.common.integration.lookingat.LookingAtUtils;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult.Type;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @SuppressWarnings("unused")
 public class MekanismWTHITPlugin implements IWailaPlugin {
 
-    static final ResourceLocation MEK_DATA = Mekanism.rl("wthit_data");
+    static final Identifier MEK_DATA = Mekanism.rl("wthit_data");
 
     @Override
     public void register(IRegistrar registration) {

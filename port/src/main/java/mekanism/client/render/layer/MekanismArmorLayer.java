@@ -1,47 +1,49 @@
 package mekanism.client.render.layer;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import mekanism.api.annotations.ParametersAreNotNullByDefault;
 import mekanism.client.render.armor.ICustomArmor;
 import mekanism.client.render.armor.ISpecialGear;
 import net.minecraft.client.model.HumanoidModel;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
+import net.minecraft.client.renderer.entity.layers.EquipmentLayerRenderer;
 import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
-import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.client.resources.model.ModelManager;
+import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.equipment.Equippable;
 import mekanism.neoshim.neoforge.client.extensions.common.IClientItemExtensions;
 
-@ParametersAreNotNullByDefault
-public class MekanismArmorLayer<T extends LivingEntity, M extends HumanoidModel<T>, A extends HumanoidModel<T>> extends HumanoidArmorLayer<T, M, A> {
+public class MekanismArmorLayer<STATE extends HumanoidRenderState, MODEL extends HumanoidModel<STATE>, A extends HumanoidModel<STATE>> extends HumanoidArmorLayer<STATE, MODEL, A> {
 
-    public MekanismArmorLayer(RenderLayerParent<T, M> entityRenderer, HumanoidArmorLayer<T, M, A> vanillaLayer, ModelManager manager) {
-        super(entityRenderer, vanillaLayer.innerModel, vanillaLayer.outerModel, manager);
+    public MekanismArmorLayer(RenderLayerParent<STATE, MODEL> entityRenderer, HumanoidArmorLayer<STATE, MODEL, A> vanillaLayer, EquipmentLayerRenderer equipmentRenderer) {
+        super(entityRenderer, vanillaLayer.modelSet, vanillaLayer.babyModelSet, equipmentRenderer);
     }
 
     @Override
-    public void render(PoseStack matrix, MultiBufferSource renderer, int packedLightIn, T entity, float limbSwing, float limbSwingAmount, float partialTicks,
-          float ageInTicks, float netHeadYaw, float headPitch) {
-        renderArmorPart(matrix, renderer, entity, EquipmentSlot.CHEST, packedLightIn, partialTicks);
-        renderArmorPart(matrix, renderer, entity, EquipmentSlot.LEGS, packedLightIn, partialTicks);
-        renderArmorPart(matrix, renderer, entity, EquipmentSlot.FEET, packedLightIn, partialTicks);
-        renderArmorPart(matrix, renderer, entity, EquipmentSlot.HEAD, packedLightIn, partialTicks);
+    public void submit(PoseStack poseStack, SubmitNodeCollector nodeCollector, int lightCoords, STATE state, float yRot, float xRot) {
+        renderArmorPart(poseStack, nodeCollector, state.chestEquipment, EquipmentSlot.CHEST, state, lightCoords);
+        renderArmorPart(poseStack, nodeCollector, state.legsEquipment, EquipmentSlot.LEGS, state, lightCoords);
+        renderArmorPart(poseStack, nodeCollector, state.feetEquipment, EquipmentSlot.FEET, state, lightCoords);
+        renderArmorPart(poseStack, nodeCollector, state.headEquipment, EquipmentSlot.HEAD, state, lightCoords);
     }
 
-    private void renderArmorPart(PoseStack matrix, MultiBufferSource renderer, T entity, EquipmentSlot slot, int light, float partialTicks) {
-        ItemStack stack = entity.getItemBySlot(slot);
-        Item item = stack.getItem();
-        if (item instanceof ArmorItem armorItem && armorItem.getEquipmentSlot() == slot && IClientItemExtensions.of(item) instanceof ISpecialGear specialGear) {
+    //copied from super private method
+    private A getArmorModel(STATE state, EquipmentSlot slot) {
+        return (state.isBaby ? this.babyModelSet : this.modelSet).get(slot);
+    }
+    
+    //PoseStack poseStack, SubmitNodeCollector submitNodeCollector, ItemStack itemStack, EquipmentSlot slot, int lightCoords, S state
+    private void renderArmorPart(PoseStack poseStack, SubmitNodeCollector nodeCollector, ItemStack stack, EquipmentSlot slot, STATE state, int lightCoords) {
+        Equippable equippable = stack.get(DataComponents.EQUIPPABLE);
+        //TODO - 26.1: Should we check there is an asset id like super does?
+        if (equippable != null && equippable.slot() == slot && IClientItemExtensions.of(stack.getItem()) instanceof ISpecialGear specialGear) {
             ICustomArmor model = specialGear.gearModel();
-            A coreModel = slot == EquipmentSlot.LEGS ? innerModel : outerModel;
-            getParentModel().copyPropertiesTo(coreModel);
-            setPartVisibility(coreModel, slot);
-            model.render(coreModel, matrix, renderer, light, OverlayTexture.NO_OVERLAY, partialTicks, stack.hasFoil(), entity, stack);
+            //TODO - 26.1: Fix this as it seems baby models now get handled via this
+            //TODO - 26.1: Figure out baby vs not
+            A coreModel = getArmorModel(state, slot);
+            model.render(coreModel, poseStack, nodeCollector, lightCoords, state, stack);
         }
     }
 }

@@ -35,9 +35,9 @@ import mekanism.common.tile.component.config.DataType;
 import mekanism.common.tile.interfaces.ISideConfiguration;
 import mekanism.common.util.EnumUtils;
 import mekanism.common.util.text.BooleanStateDisplay.OnOff;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.MouseButtonEvent;
+import org.jspecify.annotations.Nullable;
 
 public class GuiSideConfiguration<TILE extends TileEntityMekanism & ISideConfiguration> extends GuiWindow {
 
@@ -49,7 +49,7 @@ public class GuiSideConfiguration<TILE extends TileEntityMekanism & ISideConfigu
 
     public GuiSideConfiguration(IGuiWrapper gui, int x, int y, TILE tile, SelectedWindowData windowData) {
         super(gui, x, y, 156, 135, windowData);
-        if (windowData.type != WindowType.SIDE_CONFIG) {
+        if (windowData.type() != WindowType.SIDE_CONFIG) {
             throw new IllegalArgumentException("Side configs must have a side config window type");
         }
         this.tile = tile;
@@ -73,20 +73,20 @@ public class GuiSideConfiguration<TILE extends TileEntityMekanism & ISideConfigu
             return Collections.emptyList();
         }));
         for (int i = 0; i < transmissions.size(); i++) {
-            GuiConfigTypeTab tab = new GuiConfigTypeTab(gui, transmissions.get(i), relativeX + (i < 4 ? -26 : width), relativeY + (2 + 28 * (i % 4)), this, i < 4);
+            GuiConfigTypeTab tab = new GuiConfigTypeTab(gui, transmissions.get(i), relativeX + (i < 4 ? -26 : width), relativeY + 2 + 28 * (i % 4), this, i < 4);
             addChild(tab);
             configTabs.add(tab);
         }
         ejectButton = addChild(new MekanismImageButton(gui, relativeX + 136, relativeY + 6, 14, getButtonLocation("auto_eject"),
-              (element, mouseX, mouseY) -> PacketUtils.sendToServer(new PacketEjectConfiguration(this.tile.getBlockPos(), currentType))))
+              (_, _, _) -> PacketUtils.sendToServer(new PacketEjectConfiguration(this.tile.getBlockPos(), currentType))))
               .setTooltip(MekanismLang.AUTO_EJECT);
         addChild(new TooltipToggleButton(gui, relativeX + 136, relativeY + 95, 14, getButtonLocation("clear_sides"),
-              () -> getTargetType(DataType::getNext) == DataType.NONE, (element, mouseX, mouseY) -> {
-            DataType targetType = getTargetType(DataType::getNext);
-            return PacketUtils.sendToServer(new PacketBatchConfiguration(this.tile.getBlockPos(), Screen.hasShiftDown() ? null : currentType, targetType));
-        }, (element, mouseX, mouseY) -> {
-            DataType targetType = getTargetType(DataType::getPrevious);
-            return PacketUtils.sendToServer(new PacketBatchConfiguration(this.tile.getBlockPos(), Screen.hasShiftDown() ? null : currentType, targetType));
+              () -> getTargetType(minecraft.hasShiftDown(), DataType::getNext) == DataType.NONE, (_, event, _) -> {
+            DataType targetType = getTargetType(event, DataType::getNext);
+            return PacketUtils.sendToServer(new PacketBatchConfiguration(this.tile.getBlockPos(), event.hasShiftDown() ? null : currentType, targetType));
+        }, (_, event, _) -> {
+            DataType targetType = getTargetType(event, DataType::getPrevious);
+            return PacketUtils.sendToServer(new PacketBatchConfiguration(this.tile.getBlockPos(), event.hasShiftDown() ? null : currentType, targetType));
         }, TooltipUtils.create(MekanismLang.SIDE_CONFIG_CLEAR, MekanismLang.SIDE_CONFIG_CLEAR_ALL), TooltipUtils.create(MekanismLang.SIDE_CONFIG_INCREMENT)));
         addSideDataButton(RelativeSide.BOTTOM, 67, 92);
         addSideDataButton(RelativeSide.TOP, 67, 46);
@@ -99,8 +99,12 @@ public class GuiSideConfiguration<TILE extends TileEntityMekanism & ISideConfigu
         PacketUtils.sendToServer(new PacketGuiInteract(GuiInteraction.CONTAINER_TRACK_SIDE_CONFIG, tile, MekanismContainer.SIDE_CONFIG_WINDOW));
     }
 
-    private DataType getTargetType(BiFunction<DataType, Predicate<DataType>, DataType> shift) {
-        if (Screen.hasShiftDown()) {
+    private DataType getTargetType(MouseButtonEvent event, BiFunction<DataType, Predicate<DataType>, DataType> shift) {
+        return getTargetType(event.hasShiftDown(), shift);
+    }
+
+    private DataType getTargetType(boolean hasShiftDown, BiFunction<DataType, Predicate<DataType>, DataType> shift) {
+        if (hasShiftDown) {
             return DataType.NONE;
         }
         ConfigInfo info = tile.getConfig().getConfig(currentType);
@@ -168,7 +172,7 @@ public class GuiSideConfiguration<TILE extends TileEntityMekanism & ISideConfigu
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         drawTitleText(guiGraphics, MekanismLang.CONFIG_TYPE.translate(currentType), 5);
         drawScrollingString(guiGraphics, MekanismLang.SLOTS.translate(), 0, 120, TextAlignment.CENTER, subheadingTextColor(), 4, false);

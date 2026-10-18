@@ -2,25 +2,22 @@ package mekanism.common;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMaps;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
+import java.util.Deque;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
 import java.util.function.Predicate;
-import mekanism.api.SerializationConstants;
 import mekanism.api.security.IBlockSecurityUtils;
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.content.qio.IQIOCraftingWindowHolder;
-import mekanism.common.content.qio.QIOGlobalItemLookup;
 import mekanism.common.inventory.container.item.PortableQIODashboardContainer;
-import mekanism.common.lib.frequency.FrequencyManager;
-import mekanism.common.lib.multiblock.MultiblockManager;
+import mekanism.common.lib.frequency.FrequencyControllerManager;
 import mekanism.common.lib.radiation.RadiationManager;
 import mekanism.common.util.WorldUtils;
 import mekanism.common.world.GenHandler;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -29,18 +26,14 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.state.BlockState;
 import mekanism.neoshim.bus.api.EventPriority;
 import mekanism.neoshim.bus.api.SubscribeEvent;
 import mekanism.neoshim.neoforge.event.entity.EntityJoinLevelEvent;
-import mekanism.neoshim.neoforge.event.level.BlockEvent;
-import mekanism.neoshim.neoforge.event.level.ChunkDataEvent;
-import mekanism.neoshim.neoforge.event.level.ChunkEvent;
-import mekanism.neoshim.neoforge.event.level.LevelEvent;
+import mekanism.neoshim.neoforge.event.level.block.BreakBlockEvent;
 import mekanism.neoshim.neoforge.event.tick.LevelTickEvent;
 import mekanism.neoshim.neoforge.event.tick.ServerTickEvent;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class CommonWorldTickHandler {
 
@@ -48,8 +41,10 @@ public class CommonWorldTickHandler {
 
     //TODO: I believe this may be fine as is with just the load and save methods being synchronized
     // but there is a chance this is not the case in which case we should adjust how this is done
-    private Map<ResourceLocation, Object2IntMap<ChunkPos>> chunkVersions;
-    private Map<ResourceLocation, Queue<ChunkPos>> chunkRegenMap;
+    @Nullable
+    private Map<Identifier, Object2IntMap<ChunkPos>> chunkVersions;//TODO - 26.1 move this to chunk attachment
+    @Nullable
+    private Map<Identifier, Queue<ChunkPos>> chunkRegenMap;//TODO - 26.1: move this to a level attachment
     public static boolean flushTagAndRecipeCaches;
     public static boolean monitoringCardboardBox;
     @Nullable
@@ -59,9 +54,9 @@ public class CommonWorldTickHandler {
         if (chunkRegenMap == null) {
             chunkRegenMap = new Object2ObjectArrayMap<>();
         }
-        ResourceLocation dimensionName = dimension.location();
+        Identifier dimensionName = dimension.identifier();
         if (!chunkRegenMap.containsKey(dimensionName)) {
-            LinkedList<ChunkPos> list = new LinkedList<>();
+            Deque<ChunkPos> list = new LinkedList<>();
             list.add(chunkCoord);
             chunkRegenMap.put(dimensionName, list);
         } else {
@@ -90,7 +85,7 @@ public class CommonWorldTickHandler {
                 entity.discard();
                 event.setCanceled(true);
             }
-        } else if (!event.getLevel().isClientSide && fallbackItemCollector != null && event.getEntity() instanceof ItemEntity entity && fallbackItemCollector.test(entity.getItem())) {
+        } else if (!event.getLevel().isClientSide() && fallbackItemCollector != null && event.getEntity() instanceof ItemEntity entity && fallbackItemCollector.test(entity.getItem())) {
             //If we have a fallback item collector active and the entity that is being added is an item,
             // try to let our fallback collector handle the item and keep track of it instead of actually adding it to the world
             entity.discard();
@@ -99,33 +94,34 @@ public class CommonWorldTickHandler {
     }
 
     @SubscribeEvent
-    public void onBlockBreak(BlockEvent.BreakEvent event) {
+    public void onBlockBreak(BreakBlockEvent event) {
         BlockState state = event.getState();
-        //Skip empty block, shouldn't be a null state but the BreakEvent still handles that as the empty block,
-        // so we need to skip handling it that way, and check if the player has access to destroy it
-        //Note: The level should always be an instance of Level based on what is passed to the constructor of BreakEvent,
+        //Skip empty block, and check if the player has access to destroy it
+        //Note: The level should always be an instance of Level based on what is passed to the constructor of BreakBlockEvent,
         // but we instance check it just to be safe
-        if (state != null && !state.isAir() && event.getLevel() instanceof Level level &&
-            !IBlockSecurityUtils.INSTANCE.canAccess(event.getPlayer(), level, event.getPos())) {
+        if (!state.isAir() && event.getLevel() instanceof Level level && !IBlockSecurityUtils.INSTANCE.canAccess(event.getPlayer(), level, event.getPos())) {
+            //TODO - 26.1 Do we need to use event.setNotifyClient ?
             //If they don't because it is something that is locked, then cancel the event
             event.setCanceled(true);
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    //TODO - 26.1 move this to chunk attachment
+    /*@SubscribeEvent(priority = EventPriority.HIGHEST)
     public synchronized void chunkSave(ChunkDataEvent.Save event) {
         LevelAccessor world = event.getLevel();
         if (!world.isClientSide() && world instanceof Level level) {
             int chunkVersion = MekanismConfig.world.userGenVersion.get();
             if (chunkVersions != null) {
-                chunkVersion = chunkVersions.getOrDefault(level.dimension().location(), Object2IntMaps.emptyMap())
+                chunkVersion = chunkVersions.getOrDefault(level.dimension().identifier(), Object2IntMaps.emptyMap())
                       .getOrDefault(event.getChunk().getPos(), chunkVersion);
             }
             event.getData().putInt(SerializationConstants.WORLD_GEN_VERSION, chunkVersion);
         }
-    }
+    }*/
 
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    //TODO - 26.1 move this to chunk attachment
+    /*@SubscribeEvent(priority = EventPriority.HIGHEST)
     public synchronized void onChunkDataLoad(ChunkDataEvent.Load event) {
         if (event.getLevel() instanceof Level level && !level.isClientSide()) {
             int version = event.getData().getInt(SerializationConstants.WORLD_GEN_VERSION);
@@ -138,7 +134,7 @@ public class CommonWorldTickHandler {
                 }
                 ChunkPos chunkCoord = event.getChunk().getPos();
                 ResourceKey<Level> dimension = level.dimension();
-                chunkVersions.computeIfAbsent(dimension.location(), dim -> new Object2IntOpenHashMap<>())
+                chunkVersions.computeIfAbsent(dimension.identifier(), dim -> new Object2IntOpenHashMap<>())
                       .put(chunkCoord, version);
                 if (MekanismConfig.world.enableRegeneration.get()) {
                     //If retrogen is enabled, then we also need to mark the chunk as needing retrogen
@@ -146,41 +142,12 @@ public class CommonWorldTickHandler {
                 }
             }
         }
-    }
-
-    @SubscribeEvent
-    public void chunkUnloadEvent(ChunkEvent.Unload event) {
-        if (event.getLevel() instanceof Level level && !level.isClientSide() && chunkVersions != null) {
-            //When a chunk unloads, free up the memory tracking what version it has
-            Object2IntMap<ChunkPos> levelMap = chunkVersions.get(level.dimension().location());
-            if (levelMap != null) {
-                levelMap.removeInt(event.getChunk().getPos());
-            }
-        }
-    }
-
-    @SubscribeEvent
-    public void worldUnloadEvent(LevelEvent.Unload event) {
-        LevelAccessor world = event.getLevel();
-        if (!world.isClientSide() && world instanceof Level level && chunkVersions != null) {
-            //When a world unloads, free up memory tracking the versions of the chunks in it
-            chunkVersions.remove(level.dimension().location());
-        }
-    }
-
-    @SubscribeEvent
-    public void worldLoadEvent(LevelEvent.Load event) {
-        if (!event.getLevel().isClientSide()) {
-            FrequencyManager.load();
-            MultiblockManager.createOrLoadAll();
-            QIOGlobalItemLookup.INSTANCE.createOrLoad();
-        }
-    }
+    }*/
 
     @SubscribeEvent
     public void onTick(ServerTickEvent.Post event) {
         boolean tickingNormally = event.getServer().tickRateManager().runsNormally();
-        FrequencyManager.tick(tickingNormally);
+        FrequencyControllerManager.tick(tickingNormally);
     }
 
     @SubscribeEvent
@@ -193,7 +160,7 @@ public class CommonWorldTickHandler {
                 for (ServerPlayer player : world.players()) {
                     if (player.containerMenu instanceof PortableQIODashboardContainer qioDashboard) {
                         for (byte index = 0; index < IQIOCraftingWindowHolder.MAX_CRAFTING_WINDOWS; index++) {
-                            qioDashboard.getCraftingWindow(index).invalidateRecipe();
+                            qioDashboard.getCraftingWindow(index).invalidateRecipe(world);
                         }
                     }
                 }
@@ -203,7 +170,7 @@ public class CommonWorldTickHandler {
             if (chunkRegenMap == null || !MekanismConfig.world.enableRegeneration.get()) {
                 return;
             }
-            ResourceLocation dimensionName = world.dimension().location();
+            Identifier dimensionName = world.dimension().identifier();
             //Credit to E. Beef
             if (chunkRegenMap.containsKey(dimensionName)) {
                 Queue<ChunkPos> chunksToGen = chunkRegenMap.get(dimensionName);

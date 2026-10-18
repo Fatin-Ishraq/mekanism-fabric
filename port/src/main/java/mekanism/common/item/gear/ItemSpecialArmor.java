@@ -1,35 +1,27 @@
 package mekanism.common.item.gear;
 
+import mekanism.common.registries.MekanismArmorMaterials;
 import net.minecraft.core.Holder;
-import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.ArmorMaterial;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.item.equipment.ArmorMaterial;
+import net.minecraft.world.item.equipment.ArmorType;
 
-public abstract class ItemSpecialArmor extends ArmorItem {
+public abstract class ItemSpecialArmor extends Item {
 
-    protected ItemSpecialArmor(Holder<ArmorMaterial> material, ArmorItem.Type armorType, Properties properties) {
-        super(material, armorType, properties);
+    protected ItemSpecialArmor(ArmorMaterial material, ArmorType armorType, Item.Properties properties) {
+        super(MekanismArmorMaterials.apply(properties, material, armorType));
     }
 
     @Override
-    public boolean isEnchantable(@NotNull ItemStack stack) {
-        return material.value().enchantmentValue() > 0 && stack.getMaxStackSize() == 1;
+    public boolean isPrimaryItemFor(ItemStack stack, Holder<Enchantment> enchantment) {
+        return stack.has(DataComponents.ENCHANTABLE) && super.isPrimaryItemFor(stack, enchantment);
     }
 
     @Override
-    public boolean isBookEnchantable(@NotNull ItemStack stack, @NotNull ItemStack book) {
-        return isEnchantable(stack) && super.isBookEnchantable(stack, book);
-    }
-
-    @Override
-    public boolean isPrimaryItemFor(@NotNull ItemStack stack, @NotNull Holder<Enchantment> enchantment) {
-        return isEnchantable(stack) && super.isPrimaryItemFor(stack, enchantment);
-    }
-
-    @Override
-    public boolean supportsEnchantment(@NotNull ItemStack stack, @NotNull Holder<Enchantment> enchantment) {
-        return isEnchantable(stack) && super.supportsEnchantment(stack, enchantment);
+    public boolean supportsEnchantment(ItemStack stack, Holder<Enchantment> enchantment) {
+        return stack.has(DataComponents.ENCHANTABLE) && super.supportsEnchantment(stack, enchantment);
     }
 }

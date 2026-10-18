@@ -1,7 +1,6 @@
 package mekanism.additions.common.entity;
 
 import java.util.Optional;
-import java.util.UUID;
 import mekanism.additions.common.AdditionsTags;
 import mekanism.additions.common.registries.AdditionsEntityTypes;
 import mekanism.additions.common.registries.AdditionsItems;
@@ -15,8 +14,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
 import net.minecraft.core.particles.DustParticleOptions;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -26,6 +23,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityReference;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
@@ -34,35 +33,24 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import mekanism.neoshim.neoforge.entity.IEntityWithComplexSpawn;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.joml.Vector3f;
+import org.jspecify.annotations.Nullable;
 
 public class EntityBalloon extends Entity implements IEntityWithComplexSpawn {
 
-    private static final EntityDataAccessor<Byte> IS_LATCHED = SynchedEntityData.defineId(EntityBalloon.class, EntityDataSerializers.BYTE);
-    private static final EntityDataAccessor<Integer> LATCHED_X = SynchedEntityData.defineId(EntityBalloon.class, EntityDataSerializers.INT);
-    private static final EntityDataAccessor<Integer> LATCHED_Y = SynchedEntityData.defineId(EntityBalloon.class, EntityDataSerializers.INT);
-    private static final EntityDataAccessor<Integer> LATCHED_Z = SynchedEntityData.defineId(EntityBalloon.class, EntityDataSerializers.INT);
-    private static final EntityDataAccessor<Integer> LATCHED_ID = SynchedEntityData.defineId(EntityBalloon.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Optional<BlockPos>> LATCHED_POS = SynchedEntityData.defineId(EntityBalloon.class, EntityDataSerializers.OPTIONAL_BLOCK_POS);
+    private static final EntityDataAccessor<Optional<EntityReference<LivingEntity>>> LATCHED_ENTITY = SynchedEntityData.defineId(EntityBalloon.class, EntityDataSerializers.OPTIONAL_LIVING_ENTITY_REFERENCE);
     public static final float OFFSET = -0.275F;
 
     private EnumColor color = EnumColor.DARK_BLUE;
-    private BlockPos latched;
-    public LivingEntity latchedEntity;
-    /* server-only */
-    private boolean hasCachedEntity;
-    private UUID cachedEntityUUID;
 
     public EntityBalloon(EntityType<EntityBalloon> type, Level world) {
         super(type, world);
-
-        noCulling = true;
         blocksBuilding = true;
         setPos(getX() + 0.5F, getY() + 3F, getZ() + 0.5F);
         setDeltaMovement(getDeltaMovement().x(), 0.04, getDeltaMovement().z());
@@ -70,56 +58,38 @@ public class EntityBalloon extends Entity implements IEntityWithComplexSpawn {
 
     @Nullable
     public static EntityBalloon create(Level world, double x, double y, double z, EnumColor c) {
-        EntityBalloon balloon = AdditionsEntityTypes.BALLOON.get().create(world);
+        EntityBalloon balloon = AdditionsEntityTypes.BALLOON.get().create(world, EntitySpawnReason.EVENT);
         if (balloon == null) {
             return null;
         }
-        balloon.setPos(x + 0.5F, y + 3F, z + 0.5F);
-        balloon.xo = balloon.getX();
-        balloon.yo = balloon.getY();
-        balloon.zo = balloon.getZ();
+        balloon.absSnapTo(x + 0.5F, y + 3F, z + 0.5F);
         balloon.color = c;
         return balloon;
     }
 
     @Nullable
     public static EntityBalloon create(LivingEntity entity, EnumColor c) {
-        EntityBalloon balloon = AdditionsEntityTypes.BALLOON.get().create(entity.level());
+        EntityBalloon balloon = AdditionsEntityTypes.BALLOON.get().create(entity.level(), EntitySpawnReason.EVENT);
         if (balloon == null) {
             return null;
         }
-        balloon.latchedEntity = entity;
-        float height = balloon.latchedEntity.getBbHeight();
-        balloon.setPos(balloon.latchedEntity.getX(), balloon.latchedEntity.getY() + height + 1.7F, balloon.latchedEntity.getZ());
-
-        balloon.xo = balloon.getX();
-        balloon.yo = balloon.getY();
-        balloon.zo = balloon.getZ();
+        float height = entity.getBbHeight();
+        balloon.absSnapTo(entity.getX(), entity.getY() + height + 1.7F, entity.getZ());
 
         balloon.color = c;
-        balloon.entityData.set(IS_LATCHED, (byte) 2);
-        balloon.entityData.set(LATCHED_ID, entity.getId());
+        balloon.entityData.set(LATCHED_ENTITY, Optional.of(EntityReference.of(entity)));
         return balloon;
     }
 
     @Nullable
     public static EntityBalloon create(Level world, BlockPos pos, EnumColor c) {
-        EntityBalloon balloon = AdditionsEntityTypes.BALLOON.get().create(world);
+        EntityBalloon balloon = AdditionsEntityTypes.BALLOON.get().create(world, EntitySpawnReason.EVENT);
         if (balloon == null) {
             return null;
         }
-        balloon.latched = pos;
-        balloon.setPos(balloon.latched.getX() + 0.5F, balloon.latched.getY() + 1.8F, balloon.latched.getZ() + 0.5F);
-
-        balloon.xo = balloon.getX();
-        balloon.yo = balloon.getY();
-        balloon.zo = balloon.getZ();
-
+        balloon.absSnapTo(pos.getX() + 0.5F, pos.getY() + 1.8F, pos.getZ() + 0.5F);
         balloon.color = c;
-        balloon.entityData.set(IS_LATCHED, (byte) 1);
-        balloon.entityData.set(LATCHED_X, balloon.latched.getX());
-        balloon.entityData.set(LATCHED_Y, balloon.latched.getY());
-        balloon.entityData.set(LATCHED_Z, balloon.latched.getZ());
+        balloon.entityData.set(LATCHED_POS, Optional.of(pos.immutable()));
         return balloon;
     }
 
@@ -129,69 +99,54 @@ public class EntityBalloon extends Entity implements IEntityWithComplexSpawn {
 
     @Override
     public void tick() {
-        xo = getX();
-        yo = getY();
-        zo = getZ();
+        setOldPos();
 
-        if (getY() >= level().getMaxBuildHeight()) {
+        //TODO - 26.1: Re-evaluate all these cases where we have getMaxY() + 1, to make sure the logic makes sense having the +1
+        if (getY() >= level().getMaxY() + 1) {
             pop();
             return;
         }
 
-        if (level().isClientSide) {
-            if (entityData.get(IS_LATCHED) == 1) {
-                latched = new BlockPos(entityData.get(LATCHED_X), entityData.get(LATCHED_Y), entityData.get(LATCHED_Z));
-            } else {
-                latched = null;
-            }
-            if (entityData.get(IS_LATCHED) == 2) {
-                latchedEntity = (LivingEntity) level().getEntity(entityData.get(LATCHED_ID));
-            } else {
-                latchedEntity = null;
-            }
-        } else {
-            if (hasCachedEntity) {
-                if (level() instanceof ServerLevel serverLevel) {
-                    Entity entity = serverLevel.getEntity(cachedEntityUUID);
-                    if (entity instanceof LivingEntity) {
-                        latchedEntity = (LivingEntity) entity;
-                    }
-                }
-                cachedEntityUUID = null;
-                hasCachedEntity = false;
-            }
-            if (tickCount == 1) {
-                byte isLatched;
-                if (latched != null) {
-                    isLatched = 1;
-                } else if (latchedEntity != null) {
-                    isLatched = 2;
-                } else {
-                    isLatched = 0;
-                }
-                entityData.set(IS_LATCHED, isLatched);
-                entityData.set(LATCHED_X, latched == null ? 0 : latched.getX());
-                entityData.set(LATCHED_Y, latched == null ? 0 : latched.getY());
-                entityData.set(LATCHED_Z, latched == null ? 0 : latched.getZ());
-                entityData.set(LATCHED_ID, latchedEntity == null ? -1 : latchedEntity.getId());
-            }
-        }
+        LivingEntity latchedEntity = latchedEntity();
 
-        if (!level().isClientSide) {
-            if (latched != null) {
-                Optional<BlockState> blockState = WorldUtils.getBlockState(level(), latched);
+        if (!level().isClientSide()) {
+            BlockPos latchedPos = latchedPos();
+            if (latchedPos != null) {
+                Optional<BlockState> blockState = WorldUtils.getBlockState(level(), latchedPos);
                 if (blockState.isPresent() && blockState.get().isAir()) {
-                    latched = null;
-                    entityData.set(IS_LATCHED, (byte) 0);
+                    //If the block this balloon was attached to is no longer present, mark the balloon as not being latched to a block
+                    entityData.set(LATCHED_POS, Optional.empty());
                 }
             }
             if (latchedEntity != null && !latchedEntity.isAlive()) {
                 latchedEntity = null;
-                entityData.set(IS_LATCHED, (byte) 0);
+                entityData.set(LATCHED_ENTITY, Optional.empty());
             }
         }
 
-        if (!isLatched()) {
+        if (isLatchedToPos()) {
+            setDeltaMovement(0, 0, 0);
+        } else if (latchedEntity != null && latchedEntity.isAlive()) {
+            if (!isFlying(latchedEntity)) {
+                //If an entity is flying (creative flight), don't adjust the height they are at
+                Vec3 motion = latchedEntity.getDeltaMovement();
+                double targetElevation = getTargetElevation(latchedEntity);
+                if (latchedEntity.getY() - Mth.EPSILON < targetElevation) {
+                    //The entity is below the target height, apply vertical motion to it
+                    // Note: We allow for a smaller level of precision than when comparing to if it is above the height
+                    // so that we can ensure entities move to above the position for purposes of pushing them over blocks
+                    latchedEntity.setDeltaMovement(motion.x(), Math.max(0.04, motion.y() * 1.015), motion.z());
+                    latchedEntity.needsSync = true;
+                } else if (latchedEntity.getY() - 0.1 > targetElevation) {
+                    //The entity is above the target height, apply negative vertical motion to it
+                    latchedEntity.setDeltaMovement(motion.x(), Math.min(-0.04, motion.y() * 1.015), motion.z());
+                    latchedEntity.needsSync = true;
+                } else {//The entity is at the target elevation, remove any vertical motion
+                    latchedEntity.setDeltaMovement(motion.x(), 0, motion.z());
+                }
+            }
+            setPos(latchedEntity.getX(), latchedEntity.getY() + getAddedHeight(latchedEntity), latchedEntity.getZ());
+        } else {
             Vec3 motion = getDeltaMovement();
             setDeltaMovement(motion.x(), Math.min(motion.y() * 1.02F, 0.2F), motion.z());
 
@@ -208,28 +163,6 @@ public class EntityBalloon extends Entity implements IEntityWithComplexSpawn {
                 motion = motion.add(0, 0.04, 0);
             }
             setDeltaMovement(motion);
-        } else if (latched != null) {
-            setDeltaMovement(0, 0, 0);
-        } else if (latchedEntity != null && latchedEntity.getHealth() > 0) {
-            if (!isFlying(latchedEntity)) {
-                //If an entity is flying (creative flight), don't adjust the height they are at
-                Vec3 motion = latchedEntity.getDeltaMovement();
-                double targetElevation = getTargetElevation(latchedEntity);
-                if (latchedEntity.getY() - Mth.EPSILON < targetElevation) {
-                    //The entity is below the target height, apply vertical motion to it
-                    // Note: We allow for a smaller level of precision than when comparing to if it is above the height
-                    // so that we can ensure entities move to above the position for purposes of pushing them over blocks
-                    latchedEntity.setDeltaMovement(motion.x(), Math.max(0.04, motion.y() * 1.015), motion.z());
-                    latchedEntity.hasImpulse = true;
-                } else if (latchedEntity.getY() - 0.1 > targetElevation) {
-                    //The entity is above the target height, apply negative vertical motion to it
-                    latchedEntity.setDeltaMovement(motion.x(), Math.min(-0.04, motion.y() * 1.015), motion.z());
-                    latchedEntity.hasImpulse = true;
-                } else {//The entity is at the target elevation, remove any vertical motion
-                    latchedEntity.setDeltaMovement(motion.x(), 0, motion.z());
-                }
-            }
-            setPos(latchedEntity.getX(), latchedEntity.getY() + getAddedHeight(), latchedEntity.getZ());
         }
     }
 
@@ -237,7 +170,7 @@ public class EntityBalloon extends Entity implements IEntityWithComplexSpawn {
         return entity instanceof Player player && player.getAbilities().flying;
     }
 
-    public double getAddedHeight() {
+    public double getAddedHeight(LivingEntity latchedEntity) {
         return latchedEntity.getBbHeight() + 0.8;
     }
 
@@ -246,7 +179,7 @@ public class EntityBalloon extends Entity implements IEntityWithComplexSpawn {
         BlockPos.MutableBlockPos posi = new BlockPos.MutableBlockPos(pos.getX(), pos.getY(), pos.getZ());
         CollisionContext collisionContext = CollisionContext.of(entity);
         for (; posi.getY() > 0; posi.move(Direction.DOWN)) {
-            if (posi.getY() < level().getMaxBuildHeight()) {
+            if (posi.getY() < level().getMaxY() + 1) {
                 BlockState state = level().getBlockState(posi);
                 if (!state.isAir()) {
                     double stateOffset = state.getCollisionShape(level(), posi, collisionContext).max(Axis.Y);
@@ -265,9 +198,8 @@ public class EntityBalloon extends Entity implements IEntityWithComplexSpawn {
 
     private void pop() {
         playSound(AdditionsSounds.POP.get(), 1, 1);
-        if (!level().isClientSide) {
-            Vector3f col = new Vector3f(color.getColor(0), color.getColor(1), color.getColor(2));
-            DustParticleOptions redstoneParticleData = new DustParticleOptions(col, 1.0F);
+        if (!level().isClientSide()) {
+            DustParticleOptions redstoneParticleData = new DustParticleOptions(color.getPackedColor(), 1.0F);
             Vec3 center = getBoundingBox().getCenter();
             for (int i = 0; i < 10; i++) {
                 ((ServerLevel) level()).sendParticles(redstoneParticleData, center.x() + 0.6 * random.nextFloat() - 0.3, center.y() + 0.6 * random.nextFloat() - 0.3,
@@ -280,7 +212,7 @@ public class EntityBalloon extends Entity implements IEntityWithComplexSpawn {
 
     @Override
     public boolean isPushable() {
-        return latched == null;
+        return !isLatchedToPos();
     }
 
     @Override
@@ -288,44 +220,33 @@ public class EntityBalloon extends Entity implements IEntityWithComplexSpawn {
         return isAlive();
     }
 
-    @NotNull
     @Override
     protected MovementEmission getMovementEmission() {
         return MovementEmission.NONE;
     }
 
     @Override
-    protected void defineSynchedData(@NotNull SynchedEntityData.Builder builder) {
-        builder.define(IS_LATCHED, (byte) 0);
-        builder.define(LATCHED_X, 0);
-        builder.define(LATCHED_Y, 0);
-        builder.define(LATCHED_Z, 0);
-        builder.define(LATCHED_ID, -1);
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        builder.define(LATCHED_POS, Optional.empty());
+        builder.define(LATCHED_ENTITY, Optional.empty());
     }
 
     @Override
-    protected void readAdditionalSaveData(@NotNull CompoundTag nbtTags) {
-        NBTUtils.setEnumIfPresent(nbtTags, SerializationConstants.COLOR, EnumColor.BY_ID, color -> this.color = color);
-        NBTUtils.setBlockPosIfPresent(nbtTags, SerializationConstants.LATCHED, pos -> latched = pos);
-        NBTUtils.setUUIDIfPresent(nbtTags, SerializationConstants.OWNER_UUID, uuid -> {
-            hasCachedEntity = true;
-            cachedEntityUUID = uuid;
-        });
+    public void readAdditionalSaveData(ValueInput input) {
+        NBTUtils.setEnumIfPresent(input, SerializationConstants.COLOR, EnumColor.BY_ID, color -> this.color = color);
+        entityData.set(LATCHED_POS, input.read(SerializationConstants.LATCHED, BlockPos.CODEC));
+        entityData.set(LATCHED_ENTITY, input.read(SerializationConstants.LATCHED_ENTITY, EntityReference.codec()));
     }
 
     @Override
-    protected void addAdditionalSaveData(@NotNull CompoundTag nbtTags) {
-        NBTUtils.writeEnum(nbtTags, SerializationConstants.COLOR, color);
-        if (latched != null) {
-            nbtTags.put(SerializationConstants.LATCHED, NbtUtils.writeBlockPos(latched));
-        }
-        if (latchedEntity != null) {
-            nbtTags.putUUID(SerializationConstants.OWNER_UUID, latchedEntity.getUUID());
-        }
+    protected void addAdditionalSaveData(ValueOutput output) {
+        NBTUtils.writeEnum(output, SerializationConstants.COLOR, color);
+        output.storeNullable(SerializationConstants.LATCHED, BlockPos.CODEC, latchedPos());
+        output.storeNullable(SerializationConstants.LATCHED_ENTITY, EntityReference.codec(), entityData.get(LATCHED_ENTITY).orElse(null));
     }
 
     @Override
-    public boolean skipAttackInteraction(@NotNull Entity entity) {
+    public boolean skipAttackInteraction(Entity entity) {
         pop();
         if (entity instanceof ServerPlayer player) {
             CriteriaTriggers.PLAYER_KILLED_ENTITY.trigger(player, this, damageSources().playerAttack(player));
@@ -336,35 +257,19 @@ public class EntityBalloon extends Entity implements IEntityWithComplexSpawn {
     @Override
     public void writeSpawnData(RegistryFriendlyByteBuf buffer) {
         buffer.writeEnum(color);
-        if (latched != null) {
-            buffer.writeByte((byte) 1);
-            buffer.writeBlockPos(latched);
-        } else if (latchedEntity != null) {
-            buffer.writeByte((byte) 2);
-            buffer.writeVarInt(latchedEntity.getId());
-        } else {
-            buffer.writeByte((byte) 0);
-        }
     }
 
     @Override
     public void readSpawnData(RegistryFriendlyByteBuf buffer) {
         color = buffer.readEnum(EnumColor.class);
-        byte type = buffer.readByte();
-        if (type == 1) {
-            latched = buffer.readBlockPos();
-        } else if (type == 2) {
-            latchedEntity = (LivingEntity) level().getEntity(buffer.readVarInt());
-        } else {
-            latched = null;
-        }
     }
 
     @Override
-    public void remove(@NotNull RemovalReason reason) {
+    public void remove(RemovalReason reason) {
         super.remove(reason);
+        LivingEntity latchedEntity = latchedEntity();
         if (latchedEntity != null) {
-            latchedEntity.hasImpulse = false;
+            latchedEntity.needsSync = false;
         }
     }
 
@@ -378,13 +283,17 @@ public class EntityBalloon extends Entity implements IEntityWithComplexSpawn {
         return true;
     }
 
-    @Override
-    public boolean isInvulnerableTo(@NotNull DamageSource source) {
-        return source.is(AdditionsTags.DamageTypes.BALLOON_INVULNERABLE) || super.isInvulnerableTo(source);
+    public boolean isInvulnerableTo(DamageSource source) {
+        return source.is(AdditionsTags.DamageTypes.BALLOON_INVULNERABLE) || super.isInvulnerableToBase(source);
     }
 
     @Override
-    public boolean hurt(@NotNull DamageSource dmgSource, float damage) {
+    public boolean hurtClient(DamageSource source) {
+        return !isInvulnerableTo(source);
+    }
+
+    @Override
+    public boolean hurtServer(ServerLevel level, DamageSource dmgSource, float damage) {
         if (isInvulnerableTo(dmgSource)) {
             return false;
         }
@@ -395,21 +304,37 @@ public class EntityBalloon extends Entity implements IEntityWithComplexSpawn {
         return true;
     }
 
-    public boolean isLatched() {
-        if (level().isClientSide) {
-            return entityData.get(IS_LATCHED) > 0;
+    @Nullable
+    private BlockPos latchedPos() {
+        return entityData.get(LATCHED_POS).orElse(null);
+    }
+
+    public boolean isLatchedToPos() {
+        return entityData.get(LATCHED_POS).isPresent();
+    }
+
+    @Nullable
+    public LivingEntity latchedEntity() {
+        Optional<EntityReference<LivingEntity>> reference = entityData.get(LATCHED_ENTITY);
+        //noinspection OptionalIsPresent - capturing lambda
+        if (reference.isPresent()) {
+            return reference.get().getEntity(level(), LivingEntity.class);
         }
-        return latched != null || latchedEntity != null;
+        return null;
     }
 
-    public boolean isLatchedToEntity() {
-        return entityData.get(IS_LATCHED) == 2 && latchedEntity != null;
+    public boolean isLatchedTo(LivingEntity entity) {
+        Optional<EntityReference<LivingEntity>> reference = entityData.get(LATCHED_ENTITY);
+        //noinspection OptionalIsPresent - capturing lambda
+        if (reference.isPresent()) {
+            return reference.get().matches(entity);
+        }
+        return false;
     }
 
-    @NotNull
     @Override
-    protected AABB makeBoundingBox() {
-        AABB boundingBox = super.makeBoundingBox();
+    protected AABB makeBoundingBox(Vec3 position) {
+        AABB boundingBox = super.makeBoundingBox(position);
         return boundingBox.setMinY(boundingBox.minY - OFFSET)
               .setMaxY(boundingBox.maxY - OFFSET);
     }
@@ -420,7 +345,7 @@ public class EntityBalloon extends Entity implements IEntityWithComplexSpawn {
     }
 
     @Override
-    public ItemStack getPickedResult(HitResult target) {
+    public ItemStack getPickResult() {
         return AdditionsItems.BALLOONS.get(color).asStack();
     }
 }

@@ -16,8 +16,8 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.StructureManager;
@@ -31,7 +31,7 @@ import net.minecraft.world.level.levelgen.WorldgenRandom;
 import net.minecraft.world.level.levelgen.XoroshiroRandomSource;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.placement.PlacementContext;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class GenHandler {
 
@@ -41,23 +41,19 @@ public class GenHandler {
     @Nullable
     private static List<MekFeature> cachedFeatures;
 
-    /**
-     * Call to clear the cached holder lookup of placed features.
-     */
+    /// Call to clear the cached holder lookup of placed features.
     public static void reset() {
         cachedFeatures = null;
     }
 
-    /**
-     * @return {@code true} if some retro-generation happened.
-     *
-     * @apiNote Only call this method if the chunk at the given position is loaded.
-     * @implNote Adapted from {@link ChunkGenerator#applyBiomeDecoration(WorldGenLevel, ChunkAccess, StructureManager)}.
-     */
+    /// @return `true` if some retro-generation happened.
+    ///
+    /// @apiNote Only call this method if the chunk at the given position is loaded.
+    /// @implNote Adapted from [ChunkGenerator#applyBiomeDecoration(WorldGenLevel, ChunkAccess, StructureManager)].
     public static boolean generate(ServerLevel world, ChunkPos chunkPos) {
         boolean generated = false;
         if (!SharedConstants.debugVoidTerrain(chunkPos)) {
-            SectionPos sectionPos = SectionPos.of(chunkPos, world.getMinSection());
+            SectionPos sectionPos = SectionPos.of(chunkPos, world.getMinSectionY());
             BlockPos blockPos = sectionPos.origin();
             ChunkGenerator chunkGenerator = world.getChunkSource().getGenerator();
             WorldgenRandom random = new WorldgenRandom(new XoroshiroRandomSource(RandomSupport.generateUniqueSeed()));
@@ -100,7 +96,7 @@ public class GenHandler {
             return cachedFeatures;
         }
         cachedFeatures = new ArrayList<>();
-        Registry<PlacedFeature> placedFeatures = registryAccess.registryOrThrow(Registries.PLACED_FEATURE);
+        Registry<PlacedFeature> placedFeatures = registryAccess.lookupOrThrow(Registries.PLACED_FEATURE);
         for (OreType type : EnumUtils.ORE_TYPES) {
             for (int vein = 0, features = type.getBaseConfigs().size(); vein < features; vein++) {
                 OreVeinType oreVeinType = new OreVeinType(type, vein);
@@ -120,15 +116,15 @@ public class GenHandler {
     private record MekFeature(Holder<PlacedFeature> feature, Holder<PlacedFeature> retrogen, String retrogenKey) {
 
         @Nullable
-        public static MekFeature create(Registry<PlacedFeature> placedFeatures, ResourceLocation name) {
-            Optional<Reference<PlacedFeature>> placedFeature = placedFeatures.getHolder(ResourceKey.create(Registries.PLACED_FEATURE, name));
+        public static MekFeature create(Registry<PlacedFeature> placedFeatures, Identifier name) {
+            Optional<Reference<PlacedFeature>> placedFeature = placedFeatures.get(ResourceKey.create(Registries.PLACED_FEATURE, name));
             if (placedFeature.isEmpty()) {
                 Mekanism.logger.error("Failed to retrieve placed feature ({}).", name);
                 return null;
             }
-            ResourceLocation retrogenName = name.withSuffix("_retrogen");
+            Identifier retrogenName = name.withSuffix("_retrogen");
             ResourceKey<PlacedFeature> retrogenKey = ResourceKey.create(Registries.PLACED_FEATURE, retrogenName);
-            Optional<Reference<PlacedFeature>> retrogenFeature = placedFeatures.getHolder(retrogenKey);
+            Optional<Reference<PlacedFeature>> retrogenFeature = placedFeatures.get(retrogenKey);
             if (retrogenFeature.isEmpty()) {
                 Mekanism.logger.error("Failed to retrieve retrogen placed feature ({}).", retrogenName);
                 return null;

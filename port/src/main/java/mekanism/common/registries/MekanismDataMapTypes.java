@@ -19,7 +19,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.damagesource.DamageType;
 import mekanism.neoshim.neoforge.registries.datamaps.DataMapType;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class MekanismDataMapTypes implements IMekanismDataMapTypes {
 
@@ -73,7 +73,7 @@ public class MekanismDataMapTypes implements IMekanismDataMapTypes {
             //Reference holders can query data map values
             return holder.getData(type);
         }
-        Optional<Registry<TYPE>> registry = registryAccess.registry(registryName);
+        Optional<Registry<TYPE>> registry = registryAccess.lookup(registryName);
         //noinspection OptionalIsPresent - Capturing lambda
         if (registry.isPresent()) {
             return registry.get().wrapAsHolder(holder.value()).getData(type);

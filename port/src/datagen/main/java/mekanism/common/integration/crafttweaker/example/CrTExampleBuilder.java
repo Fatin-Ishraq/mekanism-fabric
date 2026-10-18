@@ -10,11 +10,12 @@ import mekanism.common.integration.crafttweaker.example.component.CrTExampleRemo
 import mekanism.common.integration.crafttweaker.example.component.CrTImportsComponent;
 import mekanism.common.integration.crafttweaker.example.component.ICrTExampleComponent;
 import mekanism.common.integration.crafttweaker.recipe.manager.MekanismRecipeManager;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
 public class CrTExampleBuilder<BUILDER_TYPE extends CrTExampleBuilder<BUILDER_TYPE>> {
 
-    protected final List<ICrTExampleComponent> contents = new ArrayList<>();
+    protected final List<@Nullable ICrTExampleComponent> contents = new ArrayList<>();
     private final BaseCrTExampleProvider exampleProvider;
     private final CrTImportsComponent importsComponent = new CrTImportsComponent();
     protected final String name;
@@ -66,13 +67,13 @@ public class CrTExampleBuilder<BUILDER_TYPE extends CrTExampleBuilder<BUILDER_TY
         return recipeComponentBuilder;
     }
 
-    public BUILDER_TYPE removeRecipes(MekanismRecipeManager<?, ?> recipeManager, ResourceLocation... recipeNames) {
+    public BUILDER_TYPE removeRecipes(MekanismRecipeManager<?, ?> recipeManager, Identifier... recipeNames) {
         return addComponent(new CrTExampleRemoveRecipesComponent(exampleProvider, recipeManager, recipeNames));
     }
 
     public CrTExampleSnipComponentBuilder<BUILDER_TYPE> modLoadedSnip(String modid) {
         //Note: We don't make use of all the possible supported modloaded conditions, but it doesn't really matter for now as we don't need them
-        if (!ResourceLocation.isValidNamespace(modid)) {
+        if (!Identifier.isValidNamespace(modid)) {
             throw new IllegalArgumentException("Invalid modid: '" + modid + "' found non [a-z0-9_.-] character.");
         }
         return snip("modloaded", modid);
@@ -100,9 +101,7 @@ public class CrTExampleBuilder<BUILDER_TYPE extends CrTExampleBuilder<BUILDER_TY
         return self();
     }
 
-    /**
-     * If specified goes where it is specified, if not goes at the top.
-     */
+    /// If specified goes where it is specified, if not goes at the top.
     public BUILDER_TYPE imports() {
         //TODO: Figure out the handling of this when in the snip component builder
         if (importsComponent.hasImports()) {

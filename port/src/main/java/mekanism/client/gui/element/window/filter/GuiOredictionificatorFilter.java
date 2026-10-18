@@ -3,21 +3,22 @@ package mekanism.client.gui.element.window.filter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import mekanism.api.functions.CharPredicate;
+import java.util.function.IntPredicate;
 import mekanism.api.text.ILangEntry;
 import mekanism.api.text.TextComponentUtil;
+import mekanism.client.MekanismClient;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.button.MekanismImageButton;
+import mekanism.client.gui.element.text.GuiTextField;
 import mekanism.common.MekanismLang;
 import mekanism.common.content.oredictionificator.OredictionificatorItemFilter;
 import mekanism.common.tile.machine.TileEntityOredictionificator;
-import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.text.InputValidator;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public class GuiOredictionificatorFilter extends GuiTextFilter<OredictionificatorItemFilter, TileEntityOredictionificator> {
 
@@ -43,7 +44,7 @@ public class GuiOredictionificatorFilter extends GuiTextFilter<Oredictionificato
     @Override
     protected void init() {
         super.init();
-        addChild(new MekanismImageButton(gui(), relativeX + 3, relativeY + 38, 12, getButtonLocation("left"), (element, mouseX, mouseY) -> {
+        addChild(new MekanismImageButton(gui(), relativeX + 3, relativeY + 38, 12, getButtonLocation("left"), (_, _, _) -> {
             if (filter.hasFilter()) {
                 filter.previous();
                 slotDisplay.updateStackList();
@@ -51,7 +52,7 @@ public class GuiOredictionificatorFilter extends GuiTextFilter<Oredictionificato
             }
             return false;
         })).setTooltip(MekanismLang.LAST_ITEM);
-        addChild(new MekanismImageButton(gui(), relativeX + 16, relativeY + 38, 12, getButtonLocation("right"), (element, mouseX, mouseY) -> {
+        addChild(new MekanismImageButton(gui(), relativeX + 16, relativeY + 38, 12, getButtonLocation("right"), (_, _, _) -> {
             if (filter.hasFilter()) {
                 filter.next();
                 slotDisplay.updateStackList();
@@ -62,7 +63,7 @@ public class GuiOredictionificatorFilter extends GuiTextFilter<Oredictionificato
     }
 
     @Override
-    protected CharPredicate getInputValidator() {
+    protected IntPredicate getInputValidator() {
         return InputValidator.RESOURCE_LOCATION;
     }
 
@@ -72,7 +73,7 @@ public class GuiOredictionificatorFilter extends GuiTextFilter<Oredictionificato
     }
 
     @Override
-    protected boolean setText() {
+    protected boolean setText(GuiTextField text) {
         String name = text.getText();
         if (name.isEmpty()) {
             filterSaveFailed(getNoFilterSaveError());
@@ -93,7 +94,7 @@ public class GuiOredictionificatorFilter extends GuiTextFilter<Oredictionificato
             filterSaveFailed(MekanismLang.OREDICTIONIFICATOR_FILTER_INVALID_PATH);
             return false;
         }
-        ResourceLocation filterLocation = ResourceLocation.fromNamespaceAndPath(modid, newFilter);
+        Identifier filterLocation = Identifier.fromNamespaceAndPath(modid, newFilter);
         if (filter.hasFilter() && filter.filterMatches(filterLocation)) {
             filterSaveFailed(MekanismLang.TAG_FILTER_SAME_TAG);
         } else if (TileEntityOredictionificator.isValidTarget(filterLocation)) {
@@ -113,7 +114,7 @@ public class GuiOredictionificatorFilter extends GuiTextFilter<Oredictionificato
         if (filter.hasFilter()) {
             ItemStack renderStack = slotDisplay.getRenderStack();
             if (!renderStack.isEmpty()) {
-                list.add(MekanismLang.GENERIC_WITH_PARENTHESIS.translate(renderStack, MekanismUtils.getModId(renderStack)));
+                list.add(MekanismLang.GENERIC_WITH_PARENTHESIS.translate(renderStack, MekanismClient.getModId(renderStack)));
             }
             list.add(TextComponentUtil.getString(filter.getFilterText()));
         }
@@ -125,11 +126,10 @@ public class GuiOredictionificatorFilter extends GuiTextFilter<Oredictionificato
         return new OredictionificatorItemFilter();
     }
 
-    @NotNull
     @Override
     protected List<ItemStack> getRenderStacks() {
-        ItemStack result = filter.getResult();
-        return result.isEmpty() ? Collections.emptyList() : Collections.singletonList(result);
+        ItemResource result = filter.getResult();
+        return result.isEmpty() ? Collections.emptyList() : Collections.singletonList(result.toStack());
     }
 
     @Nullable

@@ -7,10 +7,9 @@ import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Pose;
-import net.minecraft.world.entity.monster.WitherSkeleton;
+import net.minecraft.world.entity.monster.skeleton.WitherSkeleton;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import org.jetbrains.annotations.NotNull;
 
 public class EntityBabyWitherSkeleton extends WitherSkeleton {
 
@@ -25,15 +24,14 @@ public class EntityBabyWitherSkeleton extends WitherSkeleton {
         return true;
     }
 
-    @NotNull
     @Override
-    public EntityDimensions getDefaultDimensions(@NotNull Pose pose) {
+    public EntityDimensions getDefaultDimensions(Pose pose) {
         //Note: We already have the age scale factored into the dimensions
         return getType().getDimensions();
     }
 
     @Override
-    protected void populateDefaultEquipmentSlots(@NotNull RandomSource random, @NotNull DifficultyInstance difficulty) {
+    protected void populateDefaultEquipmentSlots(RandomSource random, DifficultyInstance difficulty) {
         super.populateDefaultEquipmentSlots(random, difficulty);
         for (EquipmentSlot slot : EquipmentSlot.values()) {
             if (slot.getType() == EquipmentSlot.Type.HUMANOID_ARMOR) {

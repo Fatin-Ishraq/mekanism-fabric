@@ -1,11 +1,11 @@
 package mekanism.common.item.block;
 
-import java.util.List;
+import java.util.function.Consumer;
 import mekanism.api.security.IBlockSecurityUtils;
 import mekanism.api.text.EnumColor;
 import mekanism.common.CommonWorldTickHandler;
 import mekanism.common.MekanismLang;
-import mekanism.common.attachments.BlockData;
+import mekanism.common.component.BlockData;
 import mekanism.common.block.BlockCardboardBox;
 import mekanism.common.block.states.BlockStateHelper;
 import mekanism.common.config.MekanismConfig;
@@ -19,20 +19,20 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import mekanism.neoshim.neoforge.common.NeoForge;
-import mekanism.neoshim.neoforge.event.level.BlockEvent;
-import org.jetbrains.annotations.NotNull;
+import mekanism.neoshim.neoforge.event.level.block.BreakBlockEvent;
 
 public class ItemBlockCardboardBox extends ItemBlockMekanism<BlockCardboardBox> {
 
@@ -41,19 +41,22 @@ public class ItemBlockCardboardBox extends ItemBlockMekanism<BlockCardboardBox> 
     }
 
     @Override
-    public void appendHoverText(@NotNull ItemStack stack, @NotNull Item.TooltipContext context, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
+    @Deprecated
+    public void appendHoverText(ItemStack stack, Item.TooltipContext context, TooltipDisplay tooltipDisplay, Consumer<Component> tooltipAdder, TooltipFlag flag) {
+        super.appendHoverText(stack, context, tooltipDisplay, tooltipAdder, flag);
         BlockData existingData = stack.get(MekanismDataComponents.BLOCK_DATA);
-        tooltip.add(MekanismLang.BLOCK_DATA.translateColored(EnumColor.INDIGO, YesNo.of(existingData != null, true)));
-        if (existingData != null) {
-            existingData.addToTooltip(tooltip::add);
-        }
+        //TODO - 26.1: Can we somehow move whether it has block data or not to the data component? Likely would require adding a default component for NO block data
+        tooltipAdder.accept(MekanismLang.BLOCK_DATA.translateColored(EnumColor.INDIGO, YesNo.of(existingData != null, true)));
+        //TODO - 26.1: Make a Neo PR adding a supplier variant of this? so that mods don't have to call get?
+        stack.addToTooltip(MekanismDataComponents.BLOCK_DATA.get(), context, tooltipDisplay, tooltipAdder, flag);
     }
 
     private static boolean canReplace(Level world, Player player, BlockPos pos, Direction sideClicked, BlockState state, ItemStack stack) {
         //Check if the player is allowed to use the cardboard box in the given position
         if (world.mayInteract(player, pos) && player.mayUseItemAt(pos.relative(sideClicked), sideClicked, stack)) {
             //If they are then check if they can "break" the block that is in that spot
-            if (!NeoForge.EVENT_BUS.post(new BlockEvent.BreakEvent(world, pos, state, player)).isCanceled()) {
+            //TODO - 26.1: Check about if we need to fire this on the client as well, or maybe just default mark it as notifying the client?
+            if (!NeoForge.EVENT_BUS.post(new BreakBlockEvent(world, pos, state, player)).isCanceled()) {
                 //If they can then we need to see if they are allowed to "place" the cardboard box in the given position
                 //TODO: Once forge fixes https://github.com/MinecraftForge/MinecraftForge/issues/7609 use block snapshots
                 // and fire a place event to see if the player is able to "place" the cardboard box
@@ -63,7 +66,6 @@ public class ItemBlockCardboardBox extends ItemBlockMekanism<BlockCardboardBox> 
         return false;
     }
 
-    @NotNull
     @Override
     public InteractionResult onItemUseFirst(ItemStack stack, UseOnContext context) {
         Player player = context.getPlayer();
@@ -78,7 +80,7 @@ public class ItemBlockCardboardBox extends ItemBlockMekanism<BlockCardboardBox> 
                 if (state.is(MekanismTags.Blocks.CARDBOARD_BLACKLIST)) {
                     return InteractionResult.FAIL;
                 }
-                ResourceLocation stateName = RegistryUtils.getName(state.getBlockHolder());
+                Identifier stateName = RegistryUtils.getName(state.typeHolder());
                 if (stateName == null || MekanismConfig.general.cardboardModBlacklist.get().contains(stateName.getNamespace()) ||
                     !canReplace(world, player, pos, context.getClickedFace(), state, stack)) {
                     return InteractionResult.FAIL;
@@ -89,11 +91,9 @@ public class ItemBlockCardboardBox extends ItemBlockMekanism<BlockCardboardBox> 
                     // don't allow them to pick it up with a cardboard box
                     return InteractionResult.FAIL;
                 }
-                if (!world.isClientSide) {
+                if (!world.isClientSide()) {
                     BlockData data = new BlockData(world.registryAccess(), state, tile);
-                    if (!player.isCreative()) {
-                        stack.shrink(1);
-                    }
+                    stack.consume(1, player);
                     //Mark that we are monitoring item drops that might have been created due to using the cardboard box
                     // and then replace the block with the cardboard box, which will cause items to drop and then get
                     // cancelled by our listener in CommonWorldTickHandler

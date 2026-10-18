@@ -1,18 +1,19 @@
 package mekanism.client.recipe_viewer.emi.widget;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import dev.emi.emi.api.widget.Bounds;
 import dev.emi.emi.api.widget.Widget;
 import java.util.Collections;
 import java.util.List;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.client.gui.element.GuiElement;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
+import org.joml.Matrix3x2fStack;
 
-@NothingNullByDefault
 public class MekanismEmiWidget extends Widget {
 
     private final boolean forwardClicks;
@@ -31,19 +32,19 @@ public class MekanismEmiWidget extends Widget {
     }
 
     @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float delta) {
-        PoseStack pose = guiGraphics.pose();
-        pose.pushPose();
+    public void render(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float delta) {
+        Matrix3x2fStack pose = guiGraphics.pose();
+        pose.pushMatrix();
         pose.translate(element.getGuiLeft(), element.getGuiTop(), 0);
         element.renderShifted(guiGraphics, mouseX, mouseY, 0);
         element.onDrawBackground(guiGraphics, mouseX, mouseY, 0);
         //Note: We don't care that onRenderForeground updates the maxZOffset in the mekanism gui as that is just used for rendering windows
         // and as our categories don't support windows we don't need to worry about that
         int zOffset = 200;
-        pose.pushPose();
-        element.onRenderForeground(guiGraphics, mouseX, mouseY, zOffset, zOffset);
-        pose.popPose();
-        pose.popPose();
+        pose.popMatrix();
+        element.onRenderForeground(guiGraphics, mouseX, mouseY);
+        pose.popMatrix();
+        pose.popMatrix();
     }
 
     @Override
@@ -51,7 +52,7 @@ public class MekanismEmiWidget extends Widget {
         //Note: EMI only calls this method if we are over it
         //Start by updating the tooltip for the element in case it is conditionally dependent on the mouse position
         element.updateTooltip(mouseX, mouseY);
-        Tooltip tooltip = element.getTooltip();
+        Tooltip tooltip = element.tooltip.get();
         if (tooltip != null) {
             return tooltip.toCharSequence(Minecraft.getInstance()).stream()
                   .map(ClientTooltipComponent::create)
@@ -62,11 +63,11 @@ public class MekanismEmiWidget extends Widget {
 
     @Override
     public boolean mouseClicked(int mouseX, int mouseY, int button) {
-        return forwardClicks && element.mouseClicked(mouseX, mouseY, button);
+        return forwardClicks && element.mouseClicked(new MouseButtonEvent(mouseX, mouseY, new MouseButtonInfo(button, 0)), false);
     }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        return element.keyPressed(keyCode, scanCode, modifiers);
+        return element.keyPressed(new KeyEvent(keyCode, scanCode, modifiers));
     }
 }

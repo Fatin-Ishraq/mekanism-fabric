@@ -11,8 +11,8 @@ import net.minecraft.core.RegistrySetBuilder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.placement.PlacementModifier;
@@ -20,7 +20,6 @@ import mekanism.neoshim.neoforge.common.data.DatapackBuiltinEntriesProvider;
 import mekanism.neoshim.neoforge.common.world.BiomeModifier;
 import mekanism.neoshim.neoforge.common.world.StructureModifier;
 import mekanism.neoshim.neoforge.registries.NeoForgeRegistries;
-import org.jetbrains.annotations.NotNull;
 
 public abstract class BaseDatapackRegistryProvider extends DatapackBuiltinEntriesProvider {
 
@@ -31,17 +30,16 @@ public abstract class BaseDatapackRegistryProvider extends DatapackBuiltinEntrie
         this.modid = modid;
     }
 
-    @NotNull
     @Override
     public String getName() {
         return "Datapack registries: " + modid;
     }
 
-    protected static void registerPlacedFeature(BootstrapContext<PlacedFeature> context, ResourceLocation name, Boolean2ObjectFunction<List<PlacementModifier>> placementModifiers) {
+    protected static void registerPlacedFeature(BootstrapContext<PlacedFeature> context, Identifier name, Boolean2ObjectFunction<List<PlacementModifier>> placementModifiers) {
         registerPlacedFeature(context, name, name, placementModifiers);
     }
 
-    protected static void registerPlacedFeature(BootstrapContext<PlacedFeature> context, ResourceLocation name, ResourceLocation retrogenName,
+    protected static void registerPlacedFeature(BootstrapContext<PlacedFeature> context, Identifier name, Identifier retrogenName,
           Boolean2ObjectFunction<List<PlacementModifier>> placementModifiers) {
         HolderGetter<ConfiguredFeature<?, ?>> configuredFeatures = context.lookup(Registries.CONFIGURED_FEATURE);
 
@@ -52,19 +50,19 @@ public abstract class BaseDatapackRegistryProvider extends DatapackBuiltinEntrie
         context.register(placedFeature(name.withSuffix("_retrogen")), new PlacedFeature(retrogenConfiguredFeature, placementModifiers.get(true)));
     }
 
-    protected static ResourceKey<ConfiguredFeature<?, ?>> configuredFeature(ResourceLocation name) {
+    protected static ResourceKey<ConfiguredFeature<?, ?>> configuredFeature(Identifier name) {
         return ResourceKey.create(Registries.CONFIGURED_FEATURE, name);
     }
 
-    protected static ResourceKey<PlacedFeature> placedFeature(ResourceLocation name) {
+    protected static ResourceKey<PlacedFeature> placedFeature(Identifier name) {
         return ResourceKey.create(Registries.PLACED_FEATURE, name);
     }
 
-    protected static ResourceKey<BiomeModifier> biomeModifier(ResourceLocation name) {
+    protected static ResourceKey<BiomeModifier> biomeModifier(Identifier name) {
         return ResourceKey.create(NeoForgeRegistries.Keys.BIOME_MODIFIERS, name);
     }
 
-    protected static ResourceKey<StructureModifier> structureModifier(ResourceLocation name) {
+    protected static ResourceKey<StructureModifier> structureModifier(Identifier name) {
         return ResourceKey.create(NeoForgeRegistries.Keys.STRUCTURE_MODIFIERS, name);
     }
 }

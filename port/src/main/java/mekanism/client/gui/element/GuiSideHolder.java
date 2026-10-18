@@ -1,15 +1,13 @@
 package mekanism.client.gui.element;
 
 import mekanism.client.SpecialColors;
-import mekanism.client.gui.GuiUtils;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.render.MekanismRenderer;
 import mekanism.client.render.lib.ColorAtlas.ColorRegistryObject;
-import mekanism.common.util.MekanismUtils;
-import mekanism.common.util.MekanismUtils.ResourceType;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
+import mekanism.common.Mekanism;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
 
 public abstract class GuiSideHolder extends GuiTexturedElement {
 
@@ -20,14 +18,14 @@ public abstract class GuiSideHolder extends GuiTexturedElement {
     public static GuiSideHolder create(IGuiWrapper gui, int x, int y, int height, boolean left, boolean slotHolder, ColorRegistryObject tabColor) {
         return new GuiSideHolder(gui, x, y, height, left, slotHolder) {
             @Override
-            protected void colorTab(GuiGraphics guiGraphics) {
-                MekanismRenderer.color(guiGraphics, tabColor);
+            protected int getTabColor(GuiGraphicsExtractor guiGraphics) {
+                return MekanismRenderer.color(tabColor);
             }
         };
     }
 
-    private static final ResourceLocation HOLDER_LEFT = MekanismUtils.getResource(ResourceType.GUI, "holder_left.png");
-    private static final ResourceLocation HOLDER_RIGHT = MekanismUtils.getResource(ResourceType.GUI, "holder_right.png");
+    private static final Identifier HOLDER_LEFT = Mekanism.rl("holder_left");
+    private static final Identifier HOLDER_RIGHT = Mekanism.rl("holder_right");
     private static final int TEXTURE_WIDTH = 26;
     private static final int TEXTURE_HEIGHT = 9;
 
@@ -44,10 +42,10 @@ public abstract class GuiSideHolder extends GuiTexturedElement {
         }
     }
 
-    protected abstract void colorTab(GuiGraphics guiGraphics);
+    protected abstract int getTabColor(GuiGraphicsExtractor guiGraphics);
 
     @Override
-    public void renderWidget(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void renderWidget(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.renderWidget(guiGraphics, mouseX, mouseY, partialTicks);
         if (this.slotHolder) {
             //Slot holders need to draw here to render behind the slots instead of in front of them
@@ -56,20 +54,15 @@ public abstract class GuiSideHolder extends GuiTexturedElement {
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
         if (!this.slotHolder) {
             draw(guiGraphics);
         }
     }
 
-    protected void draw(@NotNull GuiGraphics guiGraphics) {
-        colorTab(guiGraphics);
-        drawUncolored(guiGraphics);
-        MekanismRenderer.resetColor(guiGraphics);
+    protected void draw(GuiGraphicsExtractor guiGraphics) {
+        guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, getResource(), relativeX, relativeY, width, height, getTabColor(guiGraphics));
     }
 
-    protected void drawUncolored(@NotNull GuiGraphics guiGraphics) {
-        GuiUtils.blitNineSlicedSized(guiGraphics, getResource(), relativeX, relativeY, width, height, 4, TEXTURE_WIDTH, TEXTURE_HEIGHT, 0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
-    }
 }

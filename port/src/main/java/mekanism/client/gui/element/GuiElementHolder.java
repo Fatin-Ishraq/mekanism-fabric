@@ -4,32 +4,29 @@ import com.mojang.blaze3d.platform.NativeImage;
 import java.io.InputStream;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.common.Mekanism;
-import mekanism.common.lib.Color;
-import mekanism.common.util.MekanismUtils;
-import mekanism.common.util.MekanismUtils.ResourceType;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.FastColor;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
 
 public class GuiElementHolder extends GuiScalableElement {
 
-    public static final ResourceLocation HOLDER = MekanismUtils.getResource(ResourceType.GUI, "element_holder.png");
-    public static final int HOLDER_SIZE = 32;
+    public static final Identifier HOLDER = Mekanism.rl("element_holder");
+    public static final int HOLDER_BORDER_SIZE = 1;
     private static int BACKGROUND_COLOR = 0xFF787878;
 
     public GuiElementHolder(IGuiWrapper gui, int x, int y, int width, int height) {
-        super(HOLDER, gui, x, y, width, height, HOLDER_SIZE, HOLDER_SIZE);
+        super(HOLDER, gui, x, y, width, height, HOLDER_BORDER_SIZE, HOLDER_BORDER_SIZE);
     }
 
     @Override
-    public void renderWidget(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
-        renderBackgroundTexture(guiGraphics, getResource(), sideWidth, sideHeight);
+    public void renderWidget(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
+        guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, getResource(), getButtonX(), getButtonY(), getButtonWidth(), getButtonHeight());
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
     }
 
     public static int getBackgroundColor() {
@@ -39,10 +36,11 @@ public class GuiElementHolder extends GuiScalableElement {
     public static void updateBackgroundColor() {
         //TODO: Try to do this in a more generic way. We don't directly use our ColorAtlas because we want to automatically
         // get it from the texture
-        try (InputStream stream = Minecraft.getInstance().getResourceManager().open(HOLDER);
+        //todo - 26.1: get it from the gui sprites atlas instead
+        try (InputStream stream = Minecraft.getInstance().getResourceManager().open(HOLDER.withPrefix("textures/gui/sprites/").withSuffix(".png"));
              NativeImage image = NativeImage.read(stream)) {
-            int argb = Color.argbToFromABGR(image.getPixelRGBA(HOLDER_SIZE + 1, HOLDER_SIZE + 1));
-            if (FastColor.ARGB32.alpha(argb) == 0) {
+            int argb = image.getPixel(HOLDER_BORDER_SIZE + 1, HOLDER_BORDER_SIZE + 1);
+            if (ARGB.alpha(argb) == 0) {
                 //Don't allow fully transparent colors, fallback to default color.
                 // Mark as null for now so that it can default to the proper color
                 argb = 0xFF787878;

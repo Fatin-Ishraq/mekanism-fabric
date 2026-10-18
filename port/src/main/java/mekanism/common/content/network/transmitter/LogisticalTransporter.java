@@ -4,6 +4,7 @@ import mekanism.api.SerializationConstants;
 import mekanism.api.text.EnumColor;
 import mekanism.common.MekanismLang;
 import mekanism.common.block.attribute.Attribute;
+import mekanism.common.content.network.InventoryNetwork;
 import mekanism.common.content.transporter.PathfinderCache;
 import mekanism.common.tier.TransporterTier;
 import mekanism.common.tile.transmitter.TileEntityTransmitter;
@@ -13,13 +14,14 @@ import mekanism.common.util.NBTUtils;
 import mekanism.common.util.TransporterUtils;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
 public class LogisticalTransporter extends LogisticalTransporterBase implements IUpgradeableTransmitter<LogisticalTransporterUpgradeData> {
 
@@ -27,7 +29,7 @@ public class LogisticalTransporter extends LogisticalTransporterBase implements 
     private EnumColor color;
 
     public LogisticalTransporter(Holder<Block> blockProvider, TileEntityTransmitter tile) {
-        super(tile, Attribute.getTier(blockProvider, TransporterTier.class));
+        super(tile, Attribute.getTierNN(blockProvider, TransporterTier.class));
     }
 
     @Override
@@ -48,33 +50,35 @@ public class LogisticalTransporter extends LogisticalTransporterBase implements 
     @Override
     public InteractionResult onConfigure(Player player, Direction side) {
         setColor(TransporterUtils.increment(getColor()));
-        PathfinderCache.onChanged(getTransmitterNetwork());
+        InventoryNetwork network = getTransmitterNetwork();
+        if (network != null) {//Should not be null, but double check
+            PathfinderCache.onChanged(network);
+        }
         getTransmitterTile().sendUpdatePacket();
         EnumColor color = getColor();
-        player.displayClientMessage(MekanismLang.TOGGLE_COLOR.translateColored(EnumColor.GRAY, color == null ? MekanismLang.NONE.translateColored(EnumColor.WHITE) : color.getColoredName()), true);
+        player.sendOverlayMessage(MekanismLang.TOGGLE_COLOR.translateColored(EnumColor.GRAY, color == null ? MekanismLang.NONE.translateColored(EnumColor.WHITE) : color.getColoredName()));
         return InteractionResult.SUCCESS;
     }
 
     @Override
-    public InteractionResult onRightClick(Player player, Direction side) {
+    public InteractionResult onRightClick(Level level, Player player, Direction side) {
         EnumColor color = getColor();
-        player.displayClientMessage(MekanismLang.CURRENT_COLOR.translateColored(EnumColor.GRAY, color == null ? MekanismLang.NONE.translateColored(EnumColor.WHITE) : color.getColoredName()), true);
-        return super.onRightClick(player, side);
+        player.sendOverlayMessage(MekanismLang.CURRENT_COLOR.translateColored(EnumColor.GRAY, color == null ? MekanismLang.NONE.translateColored(EnumColor.WHITE) : color.getColoredName()));
+        return super.onRightClick(level, player, side);
     }
 
-    @Nullable
     @Override
     public LogisticalTransporterUpgradeData getUpgradeData() {
         return new LogisticalTransporterUpgradeData(redstoneReactive, getConnectionTypesRaw(), getColor(), transit, needsSync, nextId, delay, delayCount);
     }
 
     @Override
-    public boolean dataTypeMatches(@NotNull TransmitterUpgradeData data) {
+    public boolean dataTypeMatches(TransmitterUpgradeData data) {
         return data instanceof LogisticalTransporterUpgradeData;
     }
 
     @Override
-    public void parseUpgradeData(@NotNull LogisticalTransporterUpgradeData data) {
+    public void parseUpgradeData(LogisticalTransporterUpgradeData data, TransactionContext transaction) {
         redstoneReactive = data.redstoneReactive;
         setConnectionTypesRaw(data.connectionTypes);
         setColor(data.color);
@@ -86,33 +90,31 @@ public class LogisticalTransporter extends LogisticalTransporterBase implements 
     }
 
     @Override
-    protected void readFromNBT(HolderLookup.Provider provider, CompoundTag nbtTags) {
-        super.readFromNBT(provider, nbtTags);
-        setColor(NBTUtils.getEnum(nbtTags, SerializationConstants.COLOR, EnumColor.BY_ID));
+    public void read(ValueInput input) {
+        super.read(input);
+        setColor(NBTUtils.getEnum(input, SerializationConstants.COLOR, EnumColor.BY_ID));
     }
 
     @Override
-    public void writeToNBT(HolderLookup.Provider provider, CompoundTag nbtTags) {
-        super.writeToNBT(provider, nbtTags);
+    public void write(ValueOutput output) {
+        super.write(output);
         if (getColor() != null) {
-            NBTUtils.writeEnum(nbtTags, SerializationConstants.COLOR, getColor());
+            NBTUtils.writeEnum(output, SerializationConstants.COLOR, getColor());
         }
     }
 
-    @NotNull
     @Override
-    public CompoundTag getReducedUpdateTag(@NotNull HolderLookup.Provider provider, CompoundTag updateTag) {
-        updateTag = super.getReducedUpdateTag(provider, updateTag);
+    public void writeReducedUpdatedTag(ValueOutput output) {
+        super.writeReducedUpdatedTag(output);
         if (getColor() != null) {
-            NBTUtils.writeEnum(updateTag, SerializationConstants.COLOR, getColor());
+            NBTUtils.writeEnum(output, SerializationConstants.COLOR, getColor());
         }
-        return updateTag;
     }
 
     @Override
-    public boolean handleUpdateTag(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider provider) {
-        boolean refreshModelData = super.handleUpdateTag(tag, provider);
-        EnumColor color = NBTUtils.getEnum(tag, SerializationConstants.COLOR, EnumColor.BY_ID);
+    public boolean handleUpdateTag(ValueInput input) {
+        boolean refreshModelData = super.handleUpdateTag(input);
+        EnumColor color = NBTUtils.getEnum(input, SerializationConstants.COLOR, EnumColor.BY_ID);
         if (this.color != color) {
             setColor(color);
             //Color changed, mark the model data as needing to be refreshed

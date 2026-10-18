@@ -3,20 +3,20 @@ package mekanism.common.tile.multiblock;
 import java.util.LinkedList;
 import java.util.Queue;
 import mekanism.api.SerializationConstants;
-import mekanism.common.Mekanism;
 import mekanism.common.content.sps.SPSMultiblockData;
-import mekanism.common.lib.multiblock.MultiblockManager;
+import mekanism.common.lib.multiblock.MekanismMultiblocks;
+import mekanism.common.lib.multiblock.MultiblockType;
 import mekanism.common.particle.SPSOrbitEffect;
 import mekanism.common.registries.MekanismBlocks;
 import mekanism.common.tile.prefab.TileEntityMultiblock;
-import mekanism.common.util.NBTUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
 public class TileEntitySPSCasing extends TileEntityMultiblock<SPSMultiblockData> {
 
@@ -34,8 +34,8 @@ public class TileEntitySPSCasing extends TileEntityMultiblock<SPSMultiblockData>
     }
 
     @Override
-    protected void onUpdateClient() {
-        super.onUpdateClient();
+    protected void onUpdateClient(Level level) {
+        super.onUpdateClient(level);
         if (isMaster()) {
             //If we are still the master tick each effect and remove it if it is done
             orbitEffects.removeIf(SPSOrbitEffect::tick);
@@ -46,8 +46,8 @@ public class TileEntitySPSCasing extends TileEntityMultiblock<SPSMultiblockData>
     }
 
     @Override
-    protected boolean onUpdateServer(SPSMultiblockData multiblock) {
-        boolean needsPacket = super.onUpdateServer(multiblock);
+    protected boolean onUpdateServer(ServerLevel level, SPSMultiblockData multiblock) {
+        boolean needsPacket = super.onUpdateServer(level, multiblock);
         boolean active = multiblock.isFormed() && multiblock.handlesSound(this) && multiblock.lastProcessed > 0;
         if (active != prevActive) {
             prevActive = active;
@@ -57,8 +57,8 @@ public class TileEntitySPSCasing extends TileEntityMultiblock<SPSMultiblockData>
     }
 
     @Override
-    protected void structureChanged(SPSMultiblockData multiblock) {
-        super.structureChanged(multiblock);
+    protected void structureChanged(ServerLevel level, SPSMultiblockData multiblock) {
+        super.structureChanged(level, multiblock);
         //Transition the orbit effects over to the new multiblock
         if (multiblock.isFormed()) {
             for (SPSOrbitEffect orbitEffect : orbitEffects) {
@@ -73,8 +73,8 @@ public class TileEntitySPSCasing extends TileEntityMultiblock<SPSMultiblockData>
     }
 
     @Override
-    public MultiblockManager<SPSMultiblockData> getManager() {
-        return Mekanism.spsManager;
+    public MultiblockType<SPSMultiblockData> getMultiblockType() {
+        return MekanismMultiblocks.SPS;
     }
 
     @Override
@@ -83,18 +83,16 @@ public class TileEntitySPSCasing extends TileEntityMultiblock<SPSMultiblockData>
         return multiblock.isFormed() && handleSound;
     }
 
-    @NotNull
     @Override
-    public CompoundTag getReducedUpdateTag(@NotNull HolderLookup.Provider provider) {
-        CompoundTag updateTag = super.getReducedUpdateTag(provider);
+    public void writeReducedUpdatedTag(ValueOutput output) {
+        super.writeReducedUpdatedTag(output);
         SPSMultiblockData multiblock = getMultiblock();
-        updateTag.putBoolean(SerializationConstants.HANDLE_SOUND, multiblock.isFormed() && multiblock.handlesSound(this) && multiblock.lastProcessed > 0);
-        return updateTag;
+        output.putBoolean(SerializationConstants.HANDLE_SOUND, multiblock.isFormed() && multiblock.handlesSound(this) && multiblock.lastProcessed > 0);
     }
 
     @Override
-    public void handleUpdateTag(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider provider) {
-        super.handleUpdateTag(tag, provider);
-        NBTUtils.setBooleanIfPresent(tag, SerializationConstants.HANDLE_SOUND, value -> handleSound = value);
+    public void handleUpdateTag(ValueInput input) {
+        super.handleUpdateTag(input);
+        handleSound = input.getBooleanOr(SerializationConstants.HANDLE_SOUND, handleSound);
     }
 }

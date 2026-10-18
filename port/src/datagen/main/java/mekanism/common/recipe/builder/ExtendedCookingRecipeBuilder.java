@@ -1,9 +1,8 @@
 package mekanism.common.recipe.builder;
 
 import java.util.Objects;
-import mekanism.api.annotations.NothingNullByDefault;
 import net.minecraft.core.Holder;
-import net.minecraft.core.component.DataComponents;
+import net.minecraft.data.recipes.RecipeBuilder;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.crafting.AbstractCookingRecipe;
@@ -16,7 +15,6 @@ import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.SmeltingRecipe;
 import net.minecraft.world.item.crafting.SmokingRecipe;
 
-@NothingNullByDefault
 public class ExtendedCookingRecipeBuilder extends BaseRecipeBuilder<ExtendedCookingRecipeBuilder> {
 
     private final AbstractCookingRecipe.Factory<?> factory;
@@ -57,11 +55,12 @@ public class ExtendedCookingRecipeBuilder extends BaseRecipeBuilder<ExtendedCook
 
     public static ExtendedCookingRecipeBuilder smelting(Holder<Item> result, int count, Ingredient ingredient, int cookingTime) {
         CookingBookCategory bookCategory;
-        if (result.value().components().has(DataComponents.FOOD)) {
-            bookCategory = CookingBookCategory.FOOD;
-        } else {
+        //This isn't used anywhere where it could be food, and components are no longer available
+        //if (result.value().components().has(DataComponents.FOOD)) {
+        //    bookCategory = CookingBookCategory.FOOD;
+        //} else {
             bookCategory = result.value() instanceof BlockItem ? CookingBookCategory.BLOCKS : CookingBookCategory.MISC;
-        }
+        //}
         return new ExtendedCookingRecipeBuilder(result, count, ingredient, cookingTime, bookCategory, SmeltingRecipe::new);
     }
 
@@ -84,8 +83,8 @@ public class ExtendedCookingRecipeBuilder extends BaseRecipeBuilder<ExtendedCook
     @Override
     protected Recipe<?> asRecipe() {
         return factory.create(
-              Objects.requireNonNullElse(this.group, ""),
-              bookCategory,
+              RecipeBuilder.createCraftingCommonInfo(true),
+              new AbstractCookingRecipe.CookingBookInfo(this.bookCategory, Objects.requireNonNullElse(this.group, "")),
               this.ingredient,
               resultStack(),
               this.experience,

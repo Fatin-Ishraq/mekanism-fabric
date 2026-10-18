@@ -1,14 +1,12 @@
 package mekanism.common.recipe.builder;
 
-import java.util.Objects;
-import mekanism.api.annotations.NothingNullByDefault;
 import net.minecraft.core.Holder;
+import net.minecraft.data.recipes.RecipeBuilder;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.SingleItemRecipe;
 import net.minecraft.world.item.crafting.StonecutterRecipe;
 
-@NothingNullByDefault
 public class ExtendedSingleItemRecipeBuilder extends BaseRecipeBuilder<ExtendedSingleItemRecipeBuilder> {
 
     private final SingleItemRecipe.Factory<?> factory;
@@ -31,7 +29,7 @@ public class ExtendedSingleItemRecipeBuilder extends BaseRecipeBuilder<ExtendedS
     @Override
     protected SingleItemRecipe asRecipe() {
         return this.factory.create(
-              Objects.requireNonNullElse(this.group, ""),
+              RecipeBuilder.createCraftingCommonInfo(false),
               this.ingredient,
               resultStack()
         );

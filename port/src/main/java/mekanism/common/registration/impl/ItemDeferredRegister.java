@@ -2,34 +2,35 @@ package mekanism.common.registration.impl;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
-import mekanism.api.annotations.NothingNullByDefault;
+import java.util.function.UnaryOperator;
 import mekanism.api.text.EnumColor;
 import mekanism.api.text.TextComponentUtil;
-import mekanism.common.attachments.containers.ContainerType;
+import mekanism.common.component.containers.type.ContainerType;
+import mekanism.common.component.containers.type.IContainerType;
 import mekanism.common.content.gear.ModuleHelper;
 import mekanism.common.item.ItemModule;
 import mekanism.common.registration.MekanismDeferredHolder;
 import mekanism.common.registration.MekanismDeferredRegister;
+import net.minecraft.SharedConstants;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Item.Properties;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
+import net.minecraft.world.item.SpawnEggItem;
 import mekanism.neoshim.bus.api.EventPriority;
 import mekanism.neoshim.bus.api.IEventBus;
-import mekanism.neoshim.fml.loading.FMLEnvironment;
 import mekanism.neoshim.neoforge.capabilities.RegisterCapabilitiesEvent;
-import mekanism.neoshim.neoforge.common.DeferredSpawnEggItem;
 import mekanism.neoshim.neoforge.event.ModifyDefaultComponentsEvent;
 import mekanism.neoshim.neoforge.registries.RegisterEvent;
-import org.jetbrains.annotations.NotNull;
 
-@NothingNullByDefault
 public class ItemDeferredRegister extends MekanismDeferredRegister<Item> {
 
     public ItemDeferredRegister(String modid) {
@@ -37,7 +38,7 @@ public class ItemDeferredRegister extends MekanismDeferredRegister<Item> {
     }
 
     @Override
-    public void register(@NotNull IEventBus bus) {
+    public void register(IEventBus bus) {
         super.register(bus);
         bus.addListener(RegisterCapabilitiesEvent.class, event -> forEntries(registryObject -> registryObject.registerCapabilities(event)));
         //Listen at the lowest priority so that it happens after our elements have been registered
@@ -50,9 +51,9 @@ public class ItemDeferredRegister extends MekanismDeferredRegister<Item> {
 
         bus.addListener(EventPriority.LOWEST, ModifyDefaultComponentsEvent.class, event -> forEntries(registryObject -> {
             if (ContainerType.anySupports(registryObject)) {
-                event.modify(registryObject, builder -> {
-                    for (ContainerType<?, ?, ?> type : ContainerType.TYPES) {
-                        type.addDefault(registryObject, builder);
+                event.modify(registryObject, (components, _, item) -> {
+                    for (IContainerType<?, ?> type : ContainerType.TYPES) {
+                        type.addDefault(item, components);
                     }
                 });
             }
@@ -64,7 +65,7 @@ public class ItemDeferredRegister extends MekanismDeferredRegister<Item> {
             //Note: All entries should be of this type
             if (entry instanceof ItemRegistryObject<?> registryObject) {
                 consumer.accept(registryObject);
-            } else if (!FMLEnvironment.production) {
+            } else if (SharedConstants.IS_RUNNING_IN_IDE) {
                 throw new IllegalStateException("Expected entry to be an ItemRegistryObject");
             }
         }
@@ -74,8 +75,8 @@ public class ItemDeferredRegister extends MekanismDeferredRegister<Item> {
         return registerItem(name, Item::new);
     }
 
-    public ItemRegistryObject<Item> registerUnburnable(String name) {
-        return registerUnburnable(name, Item::new);
+    public ItemRegistryObject<Item> registerSimple(String name, UnaryOperator<Properties> propertyModifier) {
+        return registerItem(name, properties -> new Item(propertyModifier.apply(properties)));
     }
 
     public ItemRegistryObject<Item> register(String name, Rarity rarity) {
@@ -84,9 +85,8 @@ public class ItemDeferredRegister extends MekanismDeferredRegister<Item> {
 
     public ItemRegistryObject<Item> register(String name, EnumColor color) {
         return registerItem(name, properties -> new Item(properties) {
-            @NotNull
             @Override
-            public Component getName(@NotNull ItemStack stack) {
+            public Component getName(ItemStack stack) {
                 return TextComponentUtil.build(color, super.getName(stack));
             }
         });
@@ -96,35 +96,29 @@ public class ItemDeferredRegister extends MekanismDeferredRegister<Item> {
         return registerModule(moduleDataSupplier, Rarity.COMMON);
     }
 
-    public ItemRegistryObject<ItemModule> registerModule(ModuleRegistryObject<?> moduleDataSupplier, Rarity rarity) {
+    public ItemRegistryObject<ItemModule> registerModule(ModuleRegistryObject<?> moduleData, Rarity rarity) {
         //Note: We use the internal helper just in case we end up needing to know it is an ItemModule instead of just an Item somewhere
-        return register("module_" + moduleDataSupplier.getName(), () -> ModuleHelper.get().createModuleItem(() -> moduleDataSupplier, new Item.Properties().rarity(rarity)));
+        return registerItem("module_" + moduleData.getName(), properties -> ModuleHelper.get().createModuleItem(moduleData, properties.rarity(rarity)));
     }
 
     public <ITEM extends Item> ItemRegistryObject<ITEM> registerItem(String name, Function<Item.Properties, ITEM> sup) {
-        return register(name, () -> sup.apply(new Item.Properties()));
-    }
-
-    public <ITEM extends Item> ItemRegistryObject<ITEM> registerUnburnable(String name, Function<Item.Properties, ITEM> sup) {
-        return register(name, () -> sup.apply(new Item.Properties().fireResistant()));
+        return register(name, key -> sup.apply(new Item.Properties().setId(ResourceKey.create(getRegistryKey(), key))));
     }
 
     @Override
     @SuppressWarnings("unchecked")
-    public <ITEM extends Item> ItemRegistryObject<ITEM> register(String name, Supplier<? extends ITEM> sup) {
-        return (ItemRegistryObject<ITEM>) super.register(name, sup);
+    public <ITEM extends Item> ItemRegistryObject<ITEM> register(String name, Function<Identifier, ? extends ITEM> func) {
+        return (ItemRegistryObject<ITEM>) super.register(name, func);
     }
 
-    public ItemRegistryObject<DeferredSpawnEggItem> registerSpawnEgg(MekanismDeferredHolder<EntityType<?>, ? extends EntityType<? extends Mob>> entityTypeProvider,
-          int primaryColor, int secondaryColor) {
-        return registerItem(entityTypeProvider.getName() + "_spawn_egg", props -> new DeferredSpawnEggItem(entityTypeProvider, primaryColor, secondaryColor, props));
+    public ItemRegistryObject<SpawnEggItem> registerSpawnEgg(MekanismDeferredHolder<EntityType<?>, ? extends EntityType<? extends Mob>> entityTypeProvider) {
+        return registerItem(entityTypeProvider.getName() + "_spawn_egg", props -> new SpawnEggItem(props.spawnEgg(entityTypeProvider.get())));
     }
 
     public static class StrictProperties extends Item.Properties {
 
         private boolean durabilitySet, toolSet;
 
-        @NotNull
         @Override
         public Item.Properties durability(int maxDamage) {
             if (!durabilitySet) {
@@ -134,9 +128,8 @@ public class ItemDeferredRegister extends MekanismDeferredRegister<Item> {
             return this;
         }
 
-        @NotNull
         @Override
-        public <T> Item.Properties component(@NotNull DataComponentType<T> component, @NotNull T value) {
+        public <T> Item.Properties component(DataComponentType<T> component, T value) {
             if (component == net.minecraft.core.component.DataComponents.TOOL) {
                 if (toolSet) {
                     return this;

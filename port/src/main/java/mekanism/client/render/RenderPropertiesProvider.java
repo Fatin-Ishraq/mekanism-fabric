@@ -6,7 +6,6 @@ import mekanism.common.block.BlockBounding;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.ParticleEngine;
 import net.minecraft.client.particle.TerrainParticle;
-import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
@@ -17,8 +16,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.HitResult.Type;
 import mekanism.neoshim.neoforge.client.extensions.common.IClientBlockExtensions;
-import mekanism.neoshim.neoforge.client.extensions.common.IClientItemExtensions;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
 //This class is used to prevent class loading issues on the server without having to use OnlyIn hacks
 public class RenderPropertiesProvider {
@@ -29,8 +27,8 @@ public class RenderPropertiesProvider {
     public static IClientBlockExtensions boundingParticles() {
         return new IClientBlockExtensions() {
             @Override
-            public boolean addHitEffects(BlockState state, Level world, HitResult target, ParticleEngine manager) {
-                if (target.getType() == Type.BLOCK && target instanceof BlockHitResult blockTarget) {
+            public boolean addHitEffects(BlockState state, Level world, @Nullable HitResult target, ParticleEngine manager) {
+                if (target != null && target.getType() == Type.BLOCK && target instanceof BlockHitResult blockTarget) {
                     BlockPos pos = blockTarget.getBlockPos();
                     BlockPos mainPos = BlockBounding.getMainBlockPos(world, pos);
                     if (mainPos != null) {
@@ -38,9 +36,9 @@ public class RenderPropertiesProvider {
                         if (!mainState.isAir()) {
                             //Copy of ParticleManager#addBlockHitEffects except using the block state for the main position
                             AABB axisalignedbb = state.getShape(world, pos).bounds();
-                            double x = pos.getX() + world.random.nextDouble() * (axisalignedbb.maxX - axisalignedbb.minX - 0.2) + 0.1 + axisalignedbb.minX;
-                            double y = pos.getY() + world.random.nextDouble() * (axisalignedbb.maxY - axisalignedbb.minY - 0.2) + 0.1 + axisalignedbb.minY;
-                            double z = pos.getZ() + world.random.nextDouble() * (axisalignedbb.maxZ - axisalignedbb.minZ - 0.2) + 0.1 + axisalignedbb.minZ;
+                            double x = pos.getX() + world.getRandom().nextDouble() * (axisalignedbb.maxX - axisalignedbb.minX - 0.2) + 0.1 + axisalignedbb.minX;
+                            double y = pos.getY() + world.getRandom().nextDouble() * (axisalignedbb.maxY - axisalignedbb.minY - 0.2) + 0.1 + axisalignedbb.minY;
+                            double z = pos.getZ() + world.getRandom().nextDouble() * (axisalignedbb.maxZ - axisalignedbb.minZ - 0.2) + 0.1 + axisalignedbb.minZ;
                             Direction side = blockTarget.getDirection();
                             switch (side) {
                                 case DOWN -> y = pos.getY() + axisalignedbb.minY - 0.1;
@@ -61,22 +59,7 @@ public class RenderPropertiesProvider {
         };
     }
 
-    public record MekRenderProperties(BlockEntityWithoutLevelRenderer renderer) implements IClientItemExtensions {
-
-        @NotNull
-        @Override
-        public BlockEntityWithoutLevelRenderer getCustomRenderer() {
-            return renderer;
-        }
-    }
-
-    public record MekCustomArmorRenderProperties(BlockEntityWithoutLevelRenderer renderer, ICustomArmor gearModel) implements ISpecialGear {
-
-        @NotNull
-        @Override
-        public BlockEntityWithoutLevelRenderer getCustomRenderer() {
-            return renderer;
-        }
+    public record MekCustomArmorRenderProperties(ICustomArmor gearModel) implements ISpecialGear {
     }
 
     public static final IClientBlockExtensions PARTICLE_HANDLER = new IClientBlockExtensions() {

@@ -19,25 +19,22 @@ import mekanism.common.network.PacketUtils;
 import mekanism.common.network.to_server.PacketGuiInteract;
 import mekanism.common.network.to_server.PacketGuiInteract.GuiInteraction;
 import mekanism.common.tile.machine.TileEntityOredictionificator;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
 public class GuiOredictionificator extends GuiConfigurableTile<TileEntityOredictionificator, MekanismTileContainer<TileEntityOredictionificator>> {
 
-    /**
-     * The number of filters that can be displayed
-     */
+    /// The number of filters that can be displayed
     private static final int FILTER_COUNT = 3;
 
+    @Nullable
     private GuiScrollBar scrollBar;
 
     public GuiOredictionificator(MekanismTileContainer<TileEntityOredictionificator> container, Inventory inv, Component title) {
-        super(container, inv, title);
-        imageHeight += 64;
+        super(container, inv, title, DEFAULT_IMAGE_WIDTH + 60, DEFAULT_IMAGE_HEIGHT + 64);
         inventoryLabelY = imageHeight - 94;
-        imageWidth += 60;
         inventoryLabelX += 30;
         dynamicSlots = true;
     }
@@ -52,7 +49,7 @@ public class GuiOredictionificator extends GuiConfigurableTile<TileEntityOredict
         FilterManager<OredictionificatorItemFilter> filterManager = tile.getFilterManager();
         scrollBar = addRenderableWidget(new GuiScrollBar(this, 213, 17, 90, filterManager::count, () -> FILTER_COUNT));
         addRenderableWidget(new GuiProgress(() -> tile.didProcess, ProgressType.LARGE_RIGHT, this, 94, 119));
-        addRenderableWidget(new TranslationButton(this, 10, 86, 202, 20, MekanismLang.BUTTON_NEW_FILTER, (element, mouseX, mouseY) -> {
+        addRenderableWidget(new TranslationButton(this, 10, 86, 202, 20, MekanismLang.BUTTON_NEW_FILTER, (element, _, _) -> {
             GuiOredictionificator gui = (GuiOredictionificator) element.gui();
             gui.addWindow(GuiOredictionificatorFilter.create(gui, gui.tile));
             return true;
@@ -62,7 +59,7 @@ public class GuiOredictionificator extends GuiConfigurableTile<TileEntityOredict
             addRenderableWidget(new FilterButton(this, 10, 18 + i * 22, 202, 22, i, scrollBar::getCurrentSelection, filterManager, this::onClick,
                   index -> PacketUtils.sendToServer(new PacketGuiInteract(GuiInteraction.TOGGLE_FILTER_STATE, tile, index)), filter -> {
                 if (filter instanceof OredictionificatorItemFilter oredictionificatorFilter) {
-                    return Collections.singletonList(oredictionificatorFilter.getResult());
+                    return Collections.singletonList(oredictionificatorFilter.getResult().toStack());
                 }
                 return Collections.emptyList();
             })).warning(WarningType.INVALID_OREDICTIONIFICATOR_FILTER, filter -> filter != null && filter.isEnabled() && !filter.hasFilter());
@@ -75,14 +72,14 @@ public class GuiOredictionificator extends GuiConfigurableTile<TileEntityOredict
         trackWarning(WarningType.INVALID_OREDICTIONIFICATOR_FILTER, () -> filterManager.anyEnabledMatch(filter -> !filter.hasFilter()));
     }
 
-    protected void onClick(IFilter<?> filter, int index) {
+    protected void onClick(@Nullable IFilter<?> filter, int index) {
         if (filter instanceof OredictionificatorItemFilter oredictionificatorFilter) {
             addWindow(GuiOredictionificatorFilter.edit(this, tile, oredictionificatorFilter));
         }
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         renderTitleText(guiGraphics);
         renderInventoryText(guiGraphics);
         super.drawForegroundText(guiGraphics, mouseX, mouseY);
@@ -90,6 +87,6 @@ public class GuiOredictionificator extends GuiConfigurableTile<TileEntityOredict
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double xDelta, double yDelta) {
-        return super.mouseScrolled(mouseX, mouseY, xDelta, yDelta) || scrollBar.adjustScroll(yDelta);
+        return super.mouseScrolled(mouseX, mouseY, xDelta, yDelta) || scrollBar != null && scrollBar.adjustScroll(yDelta);
     }
 }

@@ -10,16 +10,15 @@ import mekanism.api.recipes.MekanismRecipe;
 import mekanism.api.recipes.ingredients.InputIngredient;
 import mekanism.common.recipe.MekanismRecipeType;
 import mekanism.common.recipe.lookup.cache.type.IInputCache;
+import net.minecraft.core.TypedInstance;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 import mekanism.neoshim.neoforge.common.util.TriPredicate;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Basic implementation for {@link IInputRecipeCache} for handling recipes with a single input.
- */
-public abstract class SingleInputRecipeCache<INPUT, INGREDIENT extends InputIngredient<INPUT>, RECIPE extends MekanismRecipe<?> & Predicate<INPUT>,
-      CACHE extends IInputCache<INPUT, INGREDIENT, RECIPE>> extends AbstractInputRecipeCache<RECIPE> {
+/// Basic implementation for [IInputRecipeCache] for handling recipes with a single input.
+public abstract class SingleInputRecipeCache<TYPE, STACK extends TypedInstance<TYPE>, INGREDIENT extends InputIngredient<TYPE, STACK>, RECIPE extends MekanismRecipe<?> & Predicate<STACK>,
+      CACHE extends IInputCache<TYPE, STACK, INGREDIENT, RECIPE>> extends AbstractInputRecipeCache<RECIPE> {
 
     private final Set<RECIPE> complexRecipes = new HashSet<>();
     private final Function<RECIPE, INGREDIENT> inputExtractor;
@@ -38,28 +37,24 @@ public abstract class SingleInputRecipeCache<INPUT, INGREDIENT extends InputIngr
         complexRecipes.clear();
     }
 
-    /**
-     * Checks if there is a matching recipe that has the given input.
-     *
-     * @param world World.
-     * @param input Recipe input.
-     *
-     * @return {@code true} if there is a match, {@code false} if there isn't.
-     */
-    public boolean containsInput(@Nullable Level world, INPUT input) {
+    /// Checks if there is a matching recipe that has the given input.
+    ///
+    /// @param world World.
+    /// @param input Recipe input.
+    ///
+    /// @return `true` if there is a match, `false` if there isn't.
+    public boolean containsInput(@Nullable Level world, TypedInstance<TYPE> input) {
         return containsInput(world, input, inputExtractor, cache, complexRecipes);
     }
 
-    /**
-     * Finds the first recipe that matches the given input.
-     *
-     * @param world World.
-     * @param input Recipe input.
-     *
-     * @return Recipe matching the given input, or {@code null} if no recipe matches.
-     */
+    /// Finds the first recipe that matches the given input.
+    ///
+    /// @param world World.
+    /// @param input Recipe input.
+    ///
+    /// @return Recipe matching the given input, or `null` if no recipe matches.
     @Nullable
-    public RECIPE findFirstRecipe(@Nullable Level world, INPUT input) {
+    public RECIPE findFirstRecipe(@Nullable Level world, STACK input) {
         if (cache.isEmpty(input)) {
             //Don't allow empty inputs
             return null;
@@ -70,7 +65,7 @@ public abstract class SingleInputRecipeCache<INPUT, INGREDIENT extends InputIngr
     }
 
     @Nullable
-    private RECIPE findFirstRecipe(INPUT input, Iterable<RECIPE> recipes) {
+    private RECIPE findFirstRecipe(STACK input, Iterable<RECIPE> recipes) {
         for (RECIPE recipe : recipes) {
             if (recipe.test(input)) {
                 return recipe;
@@ -79,16 +74,14 @@ public abstract class SingleInputRecipeCache<INPUT, INGREDIENT extends InputIngr
         return null;
     }
 
-    /**
-     * Finds the first recipe that matches the given input type ignoring the size requirement.
-     *
-     * @param world World.
-     * @param input Recipe input.
-     *
-     * @return Recipe matching the given input, or {@code null} if no recipe matches.
-     */
+    /// Finds the first recipe that matches the given input type ignoring the size requirement.
+    ///
+    /// @param world World.
+    /// @param input Recipe input.
+    ///
+    /// @return Recipe matching the given input, or `null` if no recipe matches.
     @Nullable
-    public RECIPE findTypeBasedRecipe(@Nullable Level world, INPUT input) {
+    public RECIPE findTypeBasedRecipe(@Nullable Level world, TypedInstance<TYPE> input) {
         if (cache.isEmpty(input)) {
             //Don't allow empty inputs
             return null;
@@ -105,17 +98,15 @@ public abstract class SingleInputRecipeCache<INPUT, INGREDIENT extends InputIngr
         return recipe;
     }
 
-    /**
-     * Finds the first recipe that matches the given input type ignoring the size requirement and also matches the given recipe predicate.
-     *
-     * @param world         World.
-     * @param input         Recipe input.
-     * @param matchCriteria Extra validation criteria to check.
-     *
-     * @return Recipe matching the given input, or {@code null} if no recipe matches.
-     */
+    /// Finds the first recipe that matches the given input type ignoring the size requirement and also matches the given recipe predicate.
+    ///
+    /// @param world         World.
+    /// @param input         Recipe input.
+    /// @param matchCriteria Extra validation criteria to check.
+    ///
+    /// @return Recipe matching the given input, or `null` if no recipe matches.
     @Nullable
-    public <DATA> RECIPE findTypeBasedRecipe(@Nullable Level world, INPUT input, DATA data, TriPredicate<RECIPE, INPUT, DATA> matchCriteria) {
+    public <INPUT extends TypedInstance<TYPE>, DATA> RECIPE findTypeBasedRecipe(@Nullable Level world, INPUT input, DATA data, TriPredicate<RECIPE, INPUT, DATA> matchCriteria) {
         if (cache.isEmpty(input)) {
             //Don't allow empty inputs
             return null;
@@ -134,17 +125,16 @@ public abstract class SingleInputRecipeCache<INPUT, INGREDIENT extends InputIngr
         return null;
     }
 
-    /**
-     * Finds the first recipe that matches the given input type ignoring the size requirement and also matches the given recipe predicate.
-     *
-     * @param world         World.
-     * @param input         Recipe input.
-     * @param matchCriteria Extra validation criteria to check.
-     *
-     * @return Recipe matching the given input, or {@code null} if no recipe matches.
-     */
+    /// Finds the first recipe that matches the given input type ignoring the size requirement and also matches the given recipe predicate.
+    ///
+    /// @param world         World.
+    /// @param input         Recipe input.
+    /// @param matchCriteria Extra validation criteria to check.
+    ///
+    /// @return Recipe matching the given input, or `null` if no recipe matches.
     @Nullable
-    public <DATA_1, DATA_2> RECIPE findTypeBasedRecipe(@Nullable Level world, INPUT input, DATA_1 data1, DATA_2 data2, CheckRecipeType<INPUT, RECIPE, DATA_1, DATA_2> matchCriteria) {
+    public <INPUT extends TypedInstance<TYPE>, DATA_1, DATA_2> RECIPE findTypeBasedRecipe(@Nullable Level world, INPUT input, DATA_1 data1, DATA_2 data2,
+          CheckRecipeType<TYPE, INPUT, RECIPE, DATA_1, DATA_2> matchCriteria) {
         if (cache.isEmpty(input)) {
             //Don't allow empty inputs
             return null;
@@ -174,7 +164,7 @@ public abstract class SingleInputRecipeCache<INPUT, INGREDIENT extends InputIngr
     }
 
     @FunctionalInterface
-    public interface CheckRecipeType<INPUT, RECIPE extends MekanismRecipe<?> & Predicate<INPUT>, DATA_1, DATA_2> {
+    public interface CheckRecipeType<TYPE, INPUT extends TypedInstance<TYPE>, RECIPE extends MekanismRecipe<?> & Predicate<? extends TypedInstance<TYPE>>, DATA_1, DATA_2> {
 
         boolean testType(RECIPE recipe, INPUT input, DATA_1 data1, DATA_2 data2);
     }

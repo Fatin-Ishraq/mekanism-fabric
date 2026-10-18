@@ -10,7 +10,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.NotNull;
 
 public class TileEntityLogisticalTransporter extends TileEntityLogisticalTransporterBase {
 
@@ -39,9 +38,8 @@ public class TileEntityLogisticalTransporter extends TileEntityLogisticalTranspo
         modelData.setHasColor(getTransmitter().getColor() != null);
     }
 
-    @NotNull
     @Override
-    protected BlockState upgradeResult(@NotNull BlockState current, @NotNull BaseTier tier) {
+    protected BlockState upgradeResult(BlockState current, BaseTier tier) {
         return BlockStateHelper.copyStateData(current, switch (tier) {
             case BASIC -> MekanismBlocks.BASIC_LOGISTICAL_TRANSPORTER;
             case ADVANCED -> MekanismBlocks.ADVANCED_LOGISTICAL_TRANSPORTER;
@@ -50,4 +48,5 @@ public class TileEntityLogisticalTransporter extends TileEntityLogisticalTranspo
             default -> null;
         });
     }
+
 }

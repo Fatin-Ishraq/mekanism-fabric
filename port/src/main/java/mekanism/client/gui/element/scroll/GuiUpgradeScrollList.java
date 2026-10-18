@@ -14,23 +14,23 @@ import mekanism.common.tile.component.TileComponentUpgrade;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
 import mekanism.common.util.UpgradeUtils;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class GuiUpgradeScrollList extends GuiInstallableScrollList<Upgrade> {
 
-    private static final ResourceLocation UPGRADE_SELECTION = MekanismUtils.getResource(ResourceType.GUI, "upgrade_selection.png");
+    private static final Identifier UPGRADE_SELECTION = MekanismUtils.getResource(ResourceType.GUI, "upgrade_selection.png");
 
     private final Map<Upgrade, Tooltip> tooltips = new EnumMap<>(Upgrade.class);
     private final TileComponentUpgrade component;
     private final Runnable onSelectionChange;
 
     public GuiUpgradeScrollList(IGuiWrapper gui, int x, int y, int height, TileComponentUpgrade component, Runnable onSelectionChange) {
-        super(gui, x, y, height, GuiElementHolder.HOLDER, GuiElementHolder.HOLDER_SIZE, UPGRADE_SELECTION, 100, 36);
+        super(gui, x, y, height, GuiElementHolder.HOLDER, UPGRADE_SELECTION, 100, 36);
         this.component = component;
         this.onSelectionChange = onSelectionChange;
     }
@@ -41,7 +41,7 @@ public class GuiUpgradeScrollList extends GuiInstallableScrollList<Upgrade> {
     }
 
     @Override
-    protected void setSelected(Upgrade newSelection) {
+    protected void setSelected(@Nullable Upgrade newSelection) {
         if (selectedType != newSelection) {
             selectedType = newSelection;
             onSelectionChange.run();
@@ -54,7 +54,7 @@ public class GuiUpgradeScrollList extends GuiInstallableScrollList<Upgrade> {
     }
 
     @Override
-    protected void drawName(GuiGraphics guiGraphics, Upgrade upgrade, int y) {
+    protected void drawName(GuiGraphicsExtractor guiGraphics, Upgrade upgrade, int y) {
         drawNameText(guiGraphics, y, upgrade.getTranslatedName(), titleTextColor(), 1F);
     }
 
@@ -93,9 +93,10 @@ public class GuiUpgradeScrollList extends GuiInstallableScrollList<Upgrade> {
     }
 
     @Override
-    public void renderElements(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void renderElements(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         //Draw elements
-        if (hasSelection() && component.getUpgrades(getSelection()) == 0) {
+        Upgrade selection = getSelection();
+        if (selection != null && component.getUpgrades(selection) == 0) {
             clearSelection();
         }
         super.renderElements(guiGraphics, mouseX, mouseY, partialTicks);

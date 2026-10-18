@@ -35,8 +35,8 @@ import net.minecraft.core.RegistrySetBuilder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.worldgen.placement.PlacementUtils;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
@@ -45,7 +45,7 @@ import net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.feature.configurations.OreConfiguration;
 import net.minecraft.world.level.levelgen.feature.configurations.OreConfiguration.TargetBlockState;
-import net.minecraft.world.level.levelgen.feature.stateproviders.RuleBasedBlockStateProvider;
+import net.minecraft.world.level.levelgen.feature.stateproviders.RuleBasedStateProvider;
 import net.minecraft.world.level.levelgen.placement.BiomeFilter;
 import net.minecraft.world.level.levelgen.placement.BlockPredicateFilter;
 import net.minecraft.world.level.levelgen.placement.CountPlacement;
@@ -88,13 +88,13 @@ public class MekanismDatapackRegistryProvider extends BaseDatapackRegistryProvid
                   int features = type.getBaseConfigs().size();
                   for (int vein = 0; vein < features; vein++) {
                       OreVeinType oreVeinType = new OreVeinType(type, vein);
-                      ResourceLocation name = Mekanism.rl(oreVeinType.name());
+                      Identifier name = Mekanism.rl(oreVeinType.name());
                       context.register(configuredFeature(name), configureOreFeature(oreVeinType, MekanismFeatures.ORE));
                       context.register(configuredFeature(name.withSuffix("_retrogen")), configureOreFeature(oreVeinType, MekanismFeatures.ORE_RETROGEN));
                   }
               }
               context.register(configuredFeature(Mekanism.rl("salt")), new ConfiguredFeature<>(MekanismFeatures.DISK.get(), new ResizableDiskConfig(
-                    RuleBasedBlockStateProvider.simple(MekanismBlocks.SALT_BLOCK.value()),
+                    RuleBasedStateProvider.simple(MekanismBlocks.SALT_BLOCK.value()),
                     BlockPredicate.matchesBlocks(Blocks.DIRT, Blocks.CLAY),
                     ConfigurableUniformInt.SALT
               )));
@@ -105,7 +105,7 @@ public class MekanismDatapackRegistryProvider extends BaseDatapackRegistryProvid
                   for (int vein = 0; vein < features; vein++) {
                       OreVeinType oreVeinType = new OreVeinType(type, vein);
                       OreVeinConfig oreVeinConfig = MekanismConfig.world.getVeinConfig(oreVeinType);
-                      ResourceLocation name = Mekanism.rl(oreVeinType.name());
+                      Identifier name = Mekanism.rl(oreVeinType.name());
                       registerPlacedFeature(context, name, name.withSuffix("_retrogen"), retrogen -> List.of(
                             new DisableableFeaturePlacement(oreVeinType, oreVeinConfig.shouldGenerate(), retrogen),
                             CountPlacement.of(new ConfigurableConstantInt(oreVeinType, oreVeinConfig.perChunk())),
@@ -132,7 +132,7 @@ public class MekanismDatapackRegistryProvider extends BaseDatapackRegistryProvid
                   List<Reference<PlacedFeature>> placedVeins = new ArrayList<>(features);
                   for (int vein = 0; vein < features; vein++) {
                       OreVeinType oreVeinType = new OreVeinType(type, vein);
-                      ResourceLocation name = Mekanism.rl(oreVeinType.name());
+                      Identifier name = Mekanism.rl(oreVeinType.name());
                       placedVeins.add(placedFeatures.getOrThrow(placedFeature(name)));
                   }
                   context.register(biomeModifier(Mekanism.rl(type.getSerializedName())), new AddFeaturesBiomeModifier(isOverworldTag, HolderSet.direct(placedVeins),
@@ -148,23 +148,23 @@ public class MekanismDatapackRegistryProvider extends BaseDatapackRegistryProvid
               }
           })
           .add(MekanismAPI.ROBIT_SKIN_REGISTRY_NAME, context -> {
-              context.register(MekanismRobitSkins.BASE, makeRobitSkin(Mekanism.rl("robit"), 2));
+              context.register(MekanismRobitSkins.BASE, makeRobitSkin(MekanismRobitSkins.BASE_SKIN_TEXTURE, 2));
               context.register(MekanismRobitSkins.ALLAY, new AdvancementBasedRobitSkin(
                     List.of(
                           Mekanism.rl("allay"),
                           Mekanism.rl("allay2")
                     ),
-                    Mekanism.rl("item/robit_allay"),
-                    ResourceLocation.withDefaultNamespace("husbandry/allay_deliver_item_to_player")
+                    Mekanism.rl("robit/robit_allay"),
+                    Identifier.withDefaultNamespace("husbandry/allay_deliver_item_to_player")
               ));
               for (Map.Entry<RobitPrideSkinData, ResourceKey<RobitSkin>> entry : MekanismRobitSkins.PRIDE_SKINS.entrySet()) {
                   ResourceKey<RobitSkin> key = entry.getValue();
-                  context.register(key, makeRobitSkin(key.location(), entry.getKey().getColor().length));
+                  context.register(key, makeRobitSkin(key.identifier(), entry.getKey().getColor().length));
               }
           });
 
-    private static RobitSkin makeRobitSkin(ResourceLocation name, int variants) {
-        List<ResourceLocation> textures = new ArrayList<>(variants);
+    private static RobitSkin makeRobitSkin(Identifier name, int variants) {
+        List<Identifier> textures = new ArrayList<>(variants);
         for (int variant = 0; variant < variants; variant++) {
             if (variant == 0) {
                 textures.add(name);

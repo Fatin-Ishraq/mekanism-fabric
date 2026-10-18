@@ -12,8 +12,8 @@ import mekanism.common.tile.factory.TileEntityFactory;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
 import mekanism.common.util.text.BooleanStateDisplay.OnOff;
-import net.minecraft.client.gui.GuiGraphics;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.MouseButtonEvent;
 
 public class GuiSortingTab extends GuiInsetElement<TileEntityFactory<?>> {
 
@@ -23,18 +23,18 @@ public class GuiSortingTab extends GuiInsetElement<TileEntityFactory<?>> {
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
         drawScrollingString(guiGraphics, OnOff.of(dataSource.isSorting()).getTextComponent(), 0, 24, TextAlignment.CENTER, titleTextColor(), 3, false);
     }
 
     @Override
-    protected void colorTab(GuiGraphics guiGraphics) {
-        MekanismRenderer.color(guiGraphics, SpecialColors.TAB_FACTORY_SORT);
+    protected int getTabColor(GuiGraphicsExtractor guiGraphics) {
+        return MekanismRenderer.color(SpecialColors.TAB_FACTORY_SORT);
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY, int button) {
+    public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
         PacketUtils.sendToServer(new PacketGuiInteract(GuiInteraction.AUTO_SORT_BUTTON, dataSource));
     }
 }

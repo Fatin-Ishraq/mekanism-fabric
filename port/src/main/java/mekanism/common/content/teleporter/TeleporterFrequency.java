@@ -11,13 +11,16 @@ import mekanism.api.SerializationConstants;
 import mekanism.api.security.SecurityMode;
 import mekanism.api.text.EnumColor;
 import mekanism.common.lib.frequency.Frequency;
-import mekanism.common.lib.frequency.FrequencyType;
+import mekanism.common.lib.frequency.FrequencyTypes;
 import mekanism.common.lib.frequency.IColorableFrequency;
 import mekanism.common.tile.interfaces.ITileWrapper;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class TeleporterFrequency extends Frequency implements IColorableFrequency {
 
@@ -41,15 +44,13 @@ public class TeleporterFrequency extends Frequency implements IColorableFrequenc
     private final Set<GlobalPos> activeCoords = new ObjectOpenHashSet<>();
     private EnumColor color = EnumColor.PURPLE;
 
-    /**
-     * @param uuid Should only be null if we have incomplete data that we are loading
-     */
+    /// @param uuid Should only be null if we have incomplete data that we are loading
     public TeleporterFrequency(String n, @Nullable UUID uuid, SecurityMode securityMode) {
-        super(FrequencyType.TELEPORTER, n, uuid, securityMode);
+        super(FrequencyTypes.TELEPORTER, n, uuid, securityMode);
     }
 
     private TeleporterFrequency(String name, @Nullable UUID owner, String ownerName, SecurityMode securityMode) {
-        super(FrequencyType.TELEPORTER, name, owner, ownerName, securityMode);
+        super(FrequencyTypes.TELEPORTER, name, owner, ownerName, securityMode);
     }
 
     public Set<GlobalPos> getActiveCoords() {
@@ -77,31 +78,41 @@ public class TeleporterFrequency extends Frequency implements IColorableFrequenc
     }
 
     @Override
-    public boolean update(BlockEntity tile) {
-        boolean changedData = super.update(tile);
-        activeCoords.add(getCoord(tile));
+    public boolean update(Level level, BlockEntity tile) {
+        boolean changedData = super.update(level, tile);
+        activeCoords.add(getCoord(level, tile));
         return changedData;
     }
 
     @Override
-    public boolean onDeactivate(BlockEntity tile) {
-        boolean changedData = super.onDeactivate(tile);
-        activeCoords.remove(getCoord(tile));
+    public boolean onDeactivate(Level level, BlockEntity tile) {
+        boolean changedData = super.onDeactivate(level, tile);
+        activeCoords.remove(getCoord(level, tile));
         return changedData;
     }
 
-    private GlobalPos getCoord(BlockEntity tile) {
+    private GlobalPos getCoord(Level level, BlockEntity tile) {
         if (tile instanceof ITileWrapper tileWrapper) {
             //Note: This should be the case the majority of the time, and allows us to use the cached coord4d object
             return tileWrapper.getTileGlobalPos();
         }
-        return GlobalPos.of(tile.getLevel().dimension(), tile.getBlockPos());
+        return GlobalPos.of(level.dimension(), tile.getBlockPos());
     }
 
+    @Nullable
     public GlobalPos getClosestCoords(GlobalPos pos) {
+        return getClosestCoords(pos.dimension(), pos.pos());
+    }
+
+    private static boolean areEqual(GlobalPos pos, ResourceKey<Level> checkDim, BlockPos checkPos) {
+        return pos.dimension() == checkDim && pos.pos().equals(checkPos);
+    }
+
+    @Nullable
+    public GlobalPos getClosestCoords(ResourceKey<Level> dimension, BlockPos pos) {
         GlobalPos closest = null;
         for (GlobalPos iterCoord : activeCoords) {
-            if (iterCoord.equals(pos)) {
+            if (areEqual(iterCoord, dimension, pos)) {
                 continue;
             }
             if (closest == null) {
@@ -109,10 +120,10 @@ public class TeleporterFrequency extends Frequency implements IColorableFrequenc
                 continue;
             }
 
-            if (pos.dimension() != closest.dimension() && pos.dimension() == iterCoord.dimension()) {
+            if (dimension != closest.dimension() && dimension == iterCoord.dimension()) {
                 closest = iterCoord;
-            } else if (pos.dimension() != closest.dimension() || pos.dimension() == iterCoord.dimension()) {
-                if (pos.pos().distSqr(closest.pos()) > pos.pos().distSqr(iterCoord.pos())) {
+            } else if (dimension != closest.dimension() || dimension == iterCoord.dimension()) {
+                if (pos.distSqr(closest.pos()) > pos.distSqr(iterCoord.pos())) {
                     closest = iterCoord;
                 }
             }

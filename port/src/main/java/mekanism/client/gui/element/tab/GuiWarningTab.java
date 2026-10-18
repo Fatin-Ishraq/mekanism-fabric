@@ -11,17 +11,17 @@ import mekanism.common.MekanismLang;
 import mekanism.common.inventory.warning.IWarningTracker;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
 public class GuiWarningTab extends GuiTexturedElement {
 
-    private static final ResourceLocation WARNING_LEFT = MekanismUtils.getResource(ResourceType.GUI_TAB, "warning_info_left.png");
-    private static final ResourceLocation WARNING_RIGHT = MekanismUtils.getResource(ResourceType.GUI_TAB, "warning_info_right.png");
+    private static final Identifier WARNING_LEFT = MekanismUtils.getResource(ResourceType.GUI_TAB, "warning_info_left.png");
+    private static final Identifier WARNING_RIGHT = MekanismUtils.getResource(ResourceType.GUI_TAB, "warning_info_right.png");
 
     private final IWarningTracker warningTracker;
     private List<Component> lastInfo = Collections.emptyList();
@@ -46,9 +46,9 @@ public class GuiWarningTab extends GuiTexturedElement {
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
-        guiGraphics.blit(getResource(), relativeX, relativeY, 0, 0, width, height, width, height);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, getResource(), relativeX, relativeY, 0, 0, width, height, width, height);
     }
 
     @Override

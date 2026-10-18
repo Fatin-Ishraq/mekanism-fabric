@@ -4,9 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import mekanism.api.MekanismAPI;
-import mekanism.api.MekanismAPITags;
-import mekanism.api.chemical.Chemical;
-import mekanism.api.chemical.ChemicalStack;
+import mekanism.api.chemical.ChemicalResource;
 import mekanism.api.datamaps.IMekanismDataMapTypes;
 import mekanism.api.datamaps.chemical.ChemicalSolidTag;
 import mekanism.api.recipes.ChemicalCrystallizerRecipe;
@@ -18,13 +16,10 @@ import mekanism.client.gui.element.slot.SlotType;
 import mekanism.common.MekanismLang;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet.Named;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class GuiQIOCrystallizerScreen extends GuiInnerScreen {
 
@@ -34,8 +29,7 @@ public class GuiQIOCrystallizerScreen extends GuiInnerScreen {
     private final IOreInfo oreInfo;
     private final GuiSlot slot;
 
-    @NotNull
-    private Holder<Chemical> prevSlurry = MekanismAPI.EMPTY_CHEMICAL_HOLDER;
+    private ChemicalResource prevSlurry = ChemicalResource.EMPTY;
 
     public GuiQIOCrystallizerScreen(IGuiWrapper gui, int x, int y, int width, int height, IOreInfo oreInfo) {
         super(gui, x, y, width, height);
@@ -69,10 +63,10 @@ public class GuiQIOCrystallizerScreen extends GuiInnerScreen {
 
     private void updateSlotContents() {
         if (oreInfo.usesSequencedDisplay() && slotDisplay != null) {//Note: If we use the sequenced display, slotDisplay should never be null
-            ChemicalStack chemical = oreInfo.getInputChemical();
+            ChemicalResource chemical = oreInfo.getInputChemical();
             if (!chemical.isEmpty()) {
-                if (!chemical.is(prevSlurry)) {
-                    prevSlurry = chemical.getChemicalHolder();
+                if (!chemical.equals(prevSlurry)) {
+                    prevSlurry = chemical;
                     iterStacks.clear();
                     if (!prevSlurry.is(MekanismAPI.EMPTY_CHEMICAL_KEY)) {
                         ChemicalSolidTag tag = chemical.getData(IMekanismDataMapTypes.INSTANCE.chemicalSolidTag());
@@ -84,20 +78,11 @@ public class GuiQIOCrystallizerScreen extends GuiInnerScreen {
                                 }
                             }
                         }
-                        //TODO - 1.22: Remove this legacy branch
-                        else if (!prevSlurry.is(MekanismAPITags.Chemicals.DIRTY)) {
-                            @SuppressWarnings("removal") TagKey<Item> oreTag = prevSlurry.value().getOreTag();
-                            if (oreTag != null) {
-                                for (Holder<Item> ore : BuiltInRegistries.ITEM.getTagOrEmpty(oreTag)) {
-                                    iterStacks.add(new ItemStack(ore));
-                                }
-                            }
-                        }
                     }
                     slotDisplay.updateStackList();
                 }
-            } else if (!prevSlurry.is(MekanismAPI.EMPTY_CHEMICAL_KEY)) {
-                prevSlurry = MekanismAPI.EMPTY_CHEMICAL_HOLDER;
+            } else if (!prevSlurry.isEmpty()) {
+                prevSlurry = ChemicalResource.EMPTY;
                 iterStacks.clear();
                 slotDisplay.updateStackList();
             }
@@ -106,7 +91,7 @@ public class GuiQIOCrystallizerScreen extends GuiInnerScreen {
 
     @Override
     protected List<Component> getRenderStrings() {
-        ChemicalStack chemical = oreInfo.getInputChemical();
+        ChemicalResource chemical = oreInfo.getInputChemical();
         if (!chemical.isEmpty()) {
             Component recipeComponent;
             //Note: If we use the sequenced display, slotDisplay should never be null
@@ -136,13 +121,11 @@ public class GuiQIOCrystallizerScreen extends GuiInnerScreen {
 
     public interface IOreInfo {
 
-        @NotNull
-        ChemicalStack getInputChemical();
+        ChemicalResource getInputChemical();
 
         @Nullable
         ChemicalCrystallizerRecipe getRecipe();
 
-        @NotNull
         default ItemStack getRenderStack() {
             return ItemStack.EMPTY;
         }

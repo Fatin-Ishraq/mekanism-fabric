@@ -6,12 +6,13 @@ import java.util.Objects;
 import java.util.function.Predicate;
 import mekanism.common.lib.Color;
 import mekanism.common.lib.math.Quaternion;
-import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.Direction;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
+import org.jspecify.annotations.Nullable;
 
 public interface QuadTransformation {
 
@@ -25,7 +26,7 @@ public interface QuadTransformation {
 
     QuadTransformation identity = q -> false;
 
-    QuadTransformation fullbright = packedLight(LightTexture.FULL_BRIGHT);
+    QuadTransformation fullbright = packedLight(LightCoordsUtil.FULL_BRIGHT);
     QuadTransformation filtered_fullbright = TextureFilteredTransformation.of(fullbright, rl -> rl.getPath().contains("led"));
 
     static QuadTransformation color(Color color) {
@@ -37,7 +38,7 @@ public interface QuadTransformation {
     }
 
     static QuadTransformation packedLight(int light) {
-        return new LightTransformation(LightTexture.block(light), LightTexture.sky(light));
+        return new LightTransformation(LightCoordsUtil.block(light), LightCoordsUtil.sky(light));
     }
 
     static QuadTransformation ambientShade(boolean ambientOcclusion, boolean shade) {
@@ -95,13 +96,11 @@ public interface QuadTransformation {
         return TransformationList.of(transforms);
     }
 
-    /**
-     * Transforms the given quad.
-     *
-     * @param quad Quad to transform.
-     *
-     * @return {@code true} if the quad was changed.
-     */
+    /// Transforms the given quad.
+    ///
+    /// @param quad Quad to transform.
+    ///
+    /// @return `true` if the quad was changed.
     boolean transform(Quad quad);
 
     default QuadTransformation and(QuadTransformation other) {
@@ -129,7 +128,7 @@ public interface QuadTransformation {
         }
 
         @Override
-        public boolean equals(Object o) {
+        public boolean equals(@Nullable Object o) {
             if (o == this) {
                 return true;
             }
@@ -159,7 +158,7 @@ public interface QuadTransformation {
         }
 
         @Override
-        public boolean equals(Object o) {
+        public boolean equals(@Nullable Object o) {
             if (o == this) {
                 return true;
             }
@@ -191,7 +190,7 @@ public interface QuadTransformation {
         }
 
         @Override
-        public boolean equals(Object o) {
+        public boolean equals(@Nullable Object o) {
             if (o == this) {
                 return true;
             }
@@ -224,7 +223,7 @@ public interface QuadTransformation {
         }
 
         @Override
-        public boolean equals(Object o) {
+        public boolean equals(@Nullable Object o) {
             if (o == this) {
                 return true;
             }
@@ -262,7 +261,7 @@ public interface QuadTransformation {
         }
 
         @Override
-        public boolean equals(Object o) {
+        public boolean equals(@Nullable Object o) {
             if (o == this) {
                 return true;
             }
@@ -292,7 +291,7 @@ public interface QuadTransformation {
         }
 
         @Override
-        public boolean equals(Object o) {
+        public boolean equals(@Nullable Object o) {
             if (o == this) {
                 return true;
             }
@@ -331,7 +330,7 @@ public interface QuadTransformation {
         }
 
         @Override
-        public boolean equals(Object o) {
+        public boolean equals(@Nullable Object o) {
             if (o == this) {
                 return true;
             }
@@ -365,7 +364,7 @@ public interface QuadTransformation {
         }
 
         @Override
-        public boolean equals(Object o) {
+        public boolean equals(@Nullable Object o) {
             if (o == this) {
                 return true;
             }
@@ -381,14 +380,14 @@ public interface QuadTransformation {
     class TextureFilteredTransformation implements QuadTransformation {
 
         private final QuadTransformation original;
-        private final Predicate<ResourceLocation> verifier;
+        private final Predicate<Identifier> verifier;
 
-        protected TextureFilteredTransformation(QuadTransformation original, Predicate<ResourceLocation> verifier) {
+        protected TextureFilteredTransformation(QuadTransformation original, Predicate<Identifier> verifier) {
             this.original = original;
             this.verifier = verifier;
         }
 
-        public static TextureFilteredTransformation of(QuadTransformation original, Predicate<ResourceLocation> verifier) {
+        public static TextureFilteredTransformation of(QuadTransformation original, Predicate<Identifier> verifier) {
             return new TextureFilteredTransformation(original, verifier);
         }
 
@@ -398,7 +397,7 @@ public interface QuadTransformation {
         }
 
         @Override
-        public boolean equals(Object o) {
+        public boolean equals(@Nullable Object o) {
             if (o == this) {
                 return true;
             }
@@ -444,7 +443,7 @@ public interface QuadTransformation {
         }
 
         @Override
-        public boolean equals(Object o) {
+        public boolean equals(@Nullable Object o) {
             if (o == this) {
                 return true;
             }

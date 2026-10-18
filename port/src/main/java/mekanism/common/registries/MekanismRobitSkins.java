@@ -2,6 +2,7 @@ package mekanism.common.registries;
 
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import mekanism.api.MekanismAPI;
@@ -13,12 +14,15 @@ import mekanism.common.entity.RobitPrideSkinData;
 import mekanism.common.registration.DatapackDeferredRegister;
 import mekanism.common.registration.DeferredMapCodecHolder;
 import mekanism.common.util.EnumUtils;
-import net.minecraft.Util;
+import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Util;
 import mekanism.neoshim.bus.api.IEventBus;
+import mekanism.neoshim.neoforge.registries.DeferredHolder;
+import org.jspecify.annotations.Nullable;
 
 public class MekanismRobitSkins {
 
@@ -31,7 +35,10 @@ public class MekanismRobitSkins {
     public static final DeferredMapCodecHolder<RobitSkin, AdvancementBasedRobitSkin> ADVANCEMENT_BASED_SERIALIZER = ROBIT_SKINS.registerCodec("advancement_based", () -> RobitSkinSerializationHelper.ADVANCEMENT_BASED_ROBIT_SKIN_CODEC);
 
     public static final ResourceKey<RobitSkin> BASE = ROBIT_SKINS.dataKey("robit");
+    public static final Identifier BASE_SKIN_TEXTURE = Mekanism.rl("robit");
     public static final ResourceKey<RobitSkin> ALLAY = ROBIT_SKINS.dataKey("allay");
+
+    public static final Holder<RobitSkin> BASE_HOLDER = DeferredHolder.create(BASE);
 
     public static final Map<RobitPrideSkinData, ResourceKey<RobitSkin>> PRIDE_SKINS = Util.make(() -> {
         Map<RobitPrideSkinData, ResourceKey<RobitSkin>> internal = new EnumMap<>(RobitPrideSkinData.class);
@@ -47,8 +54,8 @@ public class MekanismRobitSkins {
     }
 
     public static SkinLookup lookup(RegistryAccess registryAccess, ResourceKey<RobitSkin> key) {
-        Registry<RobitSkin> robitSkins = registryAccess.registryOrThrow(MekanismAPI.ROBIT_SKIN_REGISTRY_NAME);
-        Optional<RobitSkin> skin = robitSkins.getOptional(key);
+        Registry<RobitSkin> robitSkins = getSkinRegistry(registryAccess);
+        Optional<Holder.Reference<RobitSkin>> skin = robitSkins.get(key);
         //noinspection OptionalIsPresent - Capturing lambda
         if (skin.isEmpty()) {
             return new SkinLookup(BASE, robitSkins.getOrThrow(BASE));
@@ -56,10 +63,34 @@ public class MekanismRobitSkins {
         return new SkinLookup(key, skin.get());
     }
 
-    public record SkinLookup(ResourceKey<RobitSkin> name, RobitSkin skin) {
+    private static Registry<RobitSkin> getSkinRegistry(RegistryAccess registryAccess) {
+        return registryAccess.lookupOrThrow(MekanismAPI.ROBIT_SKIN_REGISTRY_NAME);
+    }
 
-        public ResourceLocation location() {
-            return name.location();
+    public static RobitSkin get(RegistryAccess registryAccess, ResourceKey<RobitSkin> key) {
+        Registry<RobitSkin> skinRegistry = getSkinRegistry(registryAccess);
+        RobitSkin value = skinRegistry.getValue(key);
+        return value == null ? BASE_HOLDER.value() : value;
+    }
+
+    public record SkinLookup(ResourceKey<RobitSkin> name, Holder.Reference<RobitSkin> skinHolder) {
+
+        public Identifier identifier() {
+            return name.identifier();
+        }
+
+        //TODO - 26.1: Re-evaluate exposing this method
+        public RobitSkin skin() {
+            return skinHolder.value();
+        }
+
+        @Nullable
+        public Identifier customModel() {
+            return skin().customModel();
+        }
+
+        public List<Identifier> textures() {
+            return skin().textures();
         }
     }
 }

@@ -2,44 +2,62 @@ package mekanism.client.render.item.gear;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import com.mojang.serialization.MapCodec;
+import java.util.function.Consumer;
 import mekanism.client.model.ModelArmoredFreeRunners;
 import mekanism.client.model.ModelFreeRunners;
-import mekanism.client.render.item.MekanismISTER;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
+import mekanism.client.model.ModelFreeRunners.FreeRunnerRenderState;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.special.NoDataSpecialModelRenderer;
+import net.minecraft.client.renderer.special.SpecialModelRenderer;
+import org.joml.Vector3fc;
 
-public class RenderFreeRunners extends MekanismISTER {
+public class RenderFreeRunners implements NoDataSpecialModelRenderer {
 
-    public static final RenderFreeRunners RENDERER = new RenderFreeRunners(false);
-    public static final RenderFreeRunners ARMORED_RENDERER = new RenderFreeRunners(true);
+    public static final Unbaked REGULAR = new Unbaked(GearArmorType.UNARMORED);
+    public static final Unbaked ARMORED = new Unbaked(GearArmorType.ARMORED);
 
-    private final boolean armored;
-    private ModelFreeRunners freeRunners;
+    private final ModelFreeRunners freeRunners;
 
-    private RenderFreeRunners(boolean armored) {
-        this.armored = armored;
+    private RenderFreeRunners(ModelFreeRunners freeRunners) {
+        this.freeRunners = freeRunners;
     }
 
     @Override
-    public void onResourceManagerReload(@NotNull ResourceManager resourceManager) {
-        if (armored) {
-            freeRunners = new ModelArmoredFreeRunners(getEntityModels());
-        } else {
-            freeRunners = new ModelFreeRunners(getEntityModels());
+    public void submit(PoseStack poseStack, SubmitNodeCollector nodeCollector, int lightCoords, int overlayCoords, boolean hasFoil, int outlineColor) {
+        poseStack.pushPose();
+        poseStack.translate(0.5, 0.5, 0.5);
+        poseStack.mulPose(Axis.ZP.rotationDegrees(180));
+        poseStack.translate(0, -1, 0);
+        this.freeRunners.collect(FreeRunnerRenderState.BOTH, poseStack, nodeCollector, lightCoords, overlayCoords, hasFoil);
+        poseStack.popPose();
+    }
+
+    @Override
+    public void getExtents(Consumer<Vector3fc> output) {
+        PoseStack poseStack = new PoseStack();
+        this.freeRunners.setupAnim(FreeRunnerRenderState.BOTH);
+        this.freeRunners.root().getExtentsForGui(poseStack, output);
+    }
+
+    public record Unbaked(GearArmorType armorType) implements NoDataSpecialModelRenderer.Unbaked {
+
+        public static final MapCodec<Unbaked> MAP_CODEC = GearArmorType.CODEC
+              .xmap(Unbaked::new, Unbaked::armorType)
+              .fieldOf("armor_type");
+
+        @Override
+        public SpecialModelRenderer<Void> bake(BakingContext context) {
+            ModelFreeRunners model = switch (armorType) {
+                case UNARMORED -> new ModelFreeRunners(context.entityModelSet());
+                case ARMORED -> new ModelArmoredFreeRunners(context.entityModelSet());
+            };
+            return new RenderFreeRunners(model);
         }
-    }
 
-    @Override
-    public void renderByItem(@NotNull ItemStack stack, @NotNull ItemDisplayContext displayContext, @NotNull PoseStack matrix, @NotNull MultiBufferSource renderer,
-          int light, int overlayLight) {
-        matrix.pushPose();
-        matrix.translate(0.5, 0.5, 0.5);
-        matrix.mulPose(Axis.ZP.rotationDegrees(180));
-        matrix.translate(0, -1, 0);
-        freeRunners.render(matrix, renderer, light, overlayLight, stack.hasFoil());
-        matrix.popPose();
+        @Override
+        public MapCodec<? extends NoDataSpecialModelRenderer.Unbaked> type() {
+            return MAP_CODEC;
+        }
     }
 }

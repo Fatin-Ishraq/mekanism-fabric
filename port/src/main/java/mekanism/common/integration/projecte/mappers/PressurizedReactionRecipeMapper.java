@@ -1,8 +1,7 @@
 package mekanism.common.integration.projecte.mappers;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import mekanism.api.chemical.ChemicalStack;
-import mekanism.api.functions.ConstantPredicates;
+import mekanism.api.chemical.ChemicalStackTemplate;
 import mekanism.api.recipes.PressurizedReactionRecipe;
 import mekanism.api.recipes.PressurizedReactionRecipe.PressurizedReactionRecipeOutput;
 import mekanism.api.recipes.basic.BasicPressurizedReactionRecipe;
@@ -13,7 +12,8 @@ import moze_intel.projecte.api.mapper.collector.IMappingCollector;
 import moze_intel.projecte.api.mapper.recipe.RecipeTypeMapper;
 import moze_intel.projecte.api.nss.NSSItem;
 import moze_intel.projecte.api.nss.NormalizedSimpleStack;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.util.context.ContextMap;
+import net.minecraft.world.item.ItemStackTemplate;
 
 @RecipeTypeMapper
 public class PressurizedReactionRecipeMapper extends TypedMekanismRecipeMapper<PressurizedReactionRecipe> {
@@ -28,23 +28,22 @@ public class PressurizedReactionRecipeMapper extends TypedMekanismRecipeMapper<P
     }
 
     @Override
-    protected boolean handleRecipe(IMappingCollector<NormalizedSimpleStack, Long> mapper, PressurizedReactionRecipe recipe, MekFakeGroupHelper fakeGroupHelper) {
+    protected boolean handleRecipe(IMappingCollector<NormalizedSimpleStack, Long> mapper, PressurizedReactionRecipe recipe, MekFakeGroupHelper fakeGroupHelper, ContextMap contextMap) {
         if (OPTIMIZE_BASIC && recipe instanceof BasicPressurizedReactionRecipe basicRecipe) {
             //This will be the case for the majority of our recipes
-            ItemStack outputItem = basicRecipe.getOutputItem();
-            ChemicalStack outputChemical = basicRecipe.getOutputChemical();
-            if (outputItem.isEmpty() && outputChemical.isEmpty()) {
+            ItemStackTemplate outputItem = basicRecipe.getOutputItem();
+            ChemicalStackTemplate outputChemical = basicRecipe.getOutputChemical();
+            if (outputItem == null && outputChemical == null) {
                 return false;
             }
             return addConversions(mapper, new PressurizedReactionRecipeOutput(outputItem, outputChemical), fakeGroupHelper.forIngredients(
-                  recipe.getInputSolid(),
+                  contextMap, recipe.getInputSolid(),
                   recipe.getInputFluid(),
                   recipe.getInputChemical()
             ));
         }
-        return addConversions(mapper, recipe.getInputSolid(), recipe.getInputFluid(), recipe.getInputChemical(), recipe::getOutput,
-              ConstantPredicates.alwaysFalse(), fakeGroupHelper::forItems, fakeGroupHelper::forFluids, fakeGroupHelper::forChemicals, null,
-              PressurizedReactionRecipeMapper::addConversions);
+        return addConversions(mapper, recipe.getInputSolid(), recipe.getInputFluid(), recipe.getInputChemical(), recipe::getOutput, fakeGroupHelper::forItems,
+              fakeGroupHelper::forFluids, fakeGroupHelper::forChemicals, PressurizedReactionRecipeMapper::addConversions, contextMap);
     }
 
     private static boolean addConversions(IMappingCollector<NormalizedSimpleStack, Long> mapper, PressurizedReactionRecipeOutput output,
@@ -52,22 +51,20 @@ public class PressurizedReactionRecipeMapper extends TypedMekanismRecipeMapper<P
         if (inputs.isEmpty()) {
             return false;
         }
-        ItemStack outputItem = output.item();
-        ChemicalStack outputChemical = output.chemical();
-        if (outputItem.isEmpty()) {
+        ItemStackTemplate outputItem = output.item();
+        ChemicalStackTemplate outputChemical = output.chemical();
+        if (outputItem == null) {
             return addConversion(mapper, outputChemical, inputs);
-        } else if (outputChemical.isEmpty()) {
+        } else if (outputChemical == null) {
             return addConversion(mapper, outputItem, inputs);
-        } else if (outputChemical.getAmount() > Integer.MAX_VALUE) {
-            return false;
         }
         //Use bitwise or as we want to try and add both of them
         return addConversion(mapper, outputItem, forIngredients(
               inputs,
-              NSSChemical.createChemical(outputChemical), (int) -outputChemical.getAmount()
+              NSSChemical.createChemical(outputChemical), -outputChemical.amount()
         )) | addConversion(mapper, outputChemical, forIngredients(
               inputs,
-              NSSItem.createItem(outputItem), -outputItem.getCount()
+              NSSItem.createItem(outputItem.item(), outputItem.components()), -outputItem.count()
         ));
     }
 }

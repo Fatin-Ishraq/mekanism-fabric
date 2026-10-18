@@ -1,37 +1,38 @@
 package mekanism.common.item.interfaces;
 
 import java.util.List;
-import mekanism.api.inventory.IInventorySlot;
-import mekanism.common.attachments.containers.ContainerType;
-import net.minecraft.world.item.ItemStack;
+import mekanism.api.resource.LargeResourceStack;
+import mekanism.common.component.containers.type.ContainerType;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
 
 @FunctionalInterface
 public interface IDroppableContents {
 
-    default boolean canContentsDrop(ItemStack stack) {
+    default boolean canContentsDrop(ItemResource itemType) {
         return true;
     }
 
-    default int getScalar(ItemStack stack) {
-        return stack.getCount();
+    default int getScalar(ItemAccess itemAccess) {
+        return itemAccess.getAmount();
     }
 
-    /**
-     * Helper to get the inventory slots that should have their contents dropped into the world
-     *
-     * @apiNote Server side only.
-     */
-    List<IInventorySlot> getDroppedSlots(ItemStack stack);
+    /// Helper to get the inventory slots that should have their contents dropped into the world
+    ///
+    /// @apiNote Server side only.
+    List<LargeResourceStack<ItemResource>> getDroppedSlots(ItemAccess itemAccess, TransactionContext transaction);
 
     @FunctionalInterface
     interface IDroppableAttachmentContents extends IDroppableContents {
 
         @Override
-        boolean canContentsDrop(ItemStack stack);
+        boolean canContentsDrop(ItemResource itemType);
 
         @Override
-        default List<IInventorySlot> getDroppedSlots(ItemStack stack) {
-            return ContainerType.ITEM.getAttachmentContainersIfPresent(stack);
+        default List<LargeResourceStack<ItemResource>> getDroppedSlots(ItemAccess itemAccess, TransactionContext transaction) {
+            //Note: Just directly interact with the attached contents as #getScalar will handle scaling the amounts
+            return ContainerType.ITEM.getAttachedContents(itemAccess.getResource());
         }
     }
 }

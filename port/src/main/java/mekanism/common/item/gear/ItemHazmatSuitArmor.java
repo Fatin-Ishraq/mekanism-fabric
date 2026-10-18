@@ -5,20 +5,24 @@ import mekanism.common.capabilities.ICapabilityAware;
 import mekanism.common.capabilities.radiation.item.RadiationShieldingHandler;
 import mekanism.common.registries.MekanismArmorMaterials;
 import net.minecraft.core.Holder;
-import net.minecraft.world.item.ArmorItem;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.equipment.ArmorType;
 import mekanism.neoshim.neoforge.capabilities.RegisterCapabilitiesEvent;
-import org.jetbrains.annotations.NotNull;
 
-public class ItemHazmatSuitArmor extends ArmorItem implements ICapabilityAware {
+public class ItemHazmatSuitArmor extends Item implements ICapabilityAware {
 
-    public ItemHazmatSuitArmor(Type armorType, Properties properties) {
-        super(MekanismArmorMaterials.HAZMAT, armorType, properties.rarity(Rarity.UNCOMMON).stacksTo(1));
+    private final ArmorType armorType;
+
+    public ItemHazmatSuitArmor(ArmorType armorType, Item.Properties properties) {
+        super(MekanismArmorMaterials.apply(properties, MekanismArmorMaterials.HAZMAT, armorType).rarity(Rarity.UNCOMMON).stacksTo(1));
+        this.armorType = armorType;
     }
 
-    public static double getShieldingByArmor(Type type) {
+    public static double getShieldingByArmor(ArmorType type) {
         return switch (type) {
             case HELMET -> 0.25;
             case CHESTPLATE -> 0.4;
@@ -30,26 +34,16 @@ public class ItemHazmatSuitArmor extends ArmorItem implements ICapabilityAware {
 
     @Override
     public void attachCapabilities(RegisterCapabilitiesEvent event) {
-        event.registerItem(Capabilities.RADIATION_SHIELDING, (stack, ctx) -> RadiationShieldingHandler.create(getShieldingByArmor(getType())), this);
+        event.registerItem(Capabilities.RADIATION_SHIELDING, (_, _) -> RadiationShieldingHandler.create(getShieldingByArmor(armorType)), this);
     }
 
     @Override
-    public boolean isEnchantable(@NotNull ItemStack stack) {
-        return material.value().enchantmentValue() > 0 && stack.getMaxStackSize() == 1;
+    public boolean isPrimaryItemFor(ItemStack stack, Holder<Enchantment> enchantment) {
+        return stack.has(DataComponents.ENCHANTABLE) && super.isPrimaryItemFor(stack, enchantment);
     }
 
     @Override
-    public boolean isBookEnchantable(@NotNull ItemStack stack, @NotNull ItemStack book) {
-        return isEnchantable(stack) && super.isBookEnchantable(stack, book);
-    }
-
-    @Override
-    public boolean isPrimaryItemFor(@NotNull ItemStack stack, @NotNull Holder<Enchantment> enchantment) {
-        return isEnchantable(stack) && super.isPrimaryItemFor(stack, enchantment);
-    }
-
-    @Override
-    public boolean supportsEnchantment(@NotNull ItemStack stack, @NotNull Holder<Enchantment> enchantment) {
-        return isEnchantable(stack) && super.supportsEnchantment(stack, enchantment);
+    public boolean supportsEnchantment(ItemStack stack, Holder<Enchantment> enchantment) {
+        return stack.has(DataComponents.ENCHANTABLE) && super.supportsEnchantment(stack, enchantment);
     }
 }

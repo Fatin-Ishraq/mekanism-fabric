@@ -1,86 +1,44 @@
 package mekanism.common.integration.lookingat;
 
-import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
-import mekanism.api.SerializationConstants;
-import mekanism.api.SerializerHelper;
-import mekanism.api.chemical.ChemicalStack;
-import mekanism.api.math.MathUtils;
+import mekanism.api.chemical.ChemicalResource;
+import mekanism.api.resource.LargeResourceStack;
 import mekanism.client.render.MekanismRenderer;
-import mekanism.common.MekanismLang;
-import mekanism.common.util.text.TextUtils;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
-public class ChemicalElement extends LookingAtElement {
+public non-sealed class ChemicalElement extends ResourceElement<ChemicalResource> {
 
-    public static final MapCodec<ChemicalElement> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
-          ChemicalStack.OPTIONAL_CODEC.fieldOf(SerializationConstants.CHEMICAL).forGetter(ChemicalElement::getStored),
-          SerializerHelper.POSITIVE_LONG_CODEC.fieldOf(SerializationConstants.MAX).forGetter(ChemicalElement::getCapacity)
-    ).apply(instance, ChemicalElement::new));
     public static final StreamCodec<RegistryFriendlyByteBuf, ChemicalElement> STREAM_CODEC = StreamCodec.composite(
-          ChemicalStack.OPTIONAL_STREAM_CODEC, ChemicalElement::getStored,
+          LargeResourceStack.CHEMICAL_HELPER.streamCodec(), ChemicalElement::getStored,
           ByteBufCodecs.VAR_LONG, ChemicalElement::getCapacity,
           ChemicalElement::new
     );
 
-    @NotNull
-    protected final ChemicalStack stored;
-    protected final long capacity;
-
-    public ChemicalElement(@NotNull ChemicalStack stored, long capacity) {
-        super(0xFF000000, 0xFFFFFF);
-        this.stored = stored;
-        this.capacity = capacity;
+    public ChemicalElement(ChemicalResource chemicalType, long stored, long capacity) {
+        this(LargeResourceStack.CHEMICAL_HELPER.createStack(chemicalType, stored), capacity);
     }
 
-    @Override
-    public int getScaledLevel(int level) {
-        if (capacity == 0 || stored.getAmount() == Long.MAX_VALUE) {
-            return level;
-        }
-        return MathUtils.clampToInt(level * MathUtils.divideToLevel(stored.getAmount(), capacity));
+    public ChemicalElement(LargeResourceStack<ChemicalResource> stored, long capacity) {
+        super(stored, capacity);
     }
 
-    @NotNull
-    public ChemicalStack getStored() {
-        return stored;
-    }
-
-    public long getCapacity() {
-        return capacity;
-    }
-
+    @Nullable
     @Override
     public TextureAtlasSprite getIcon() {
-        return stored.isEmpty() ? null : MekanismRenderer.getChemicalTexture(stored);
+        return stored.isEmpty() ? null : MekanismRenderer.getChemicalTexture(stored.resource());
     }
 
     @Override
-    public Component getText() {
-        long amount = stored.getAmount();
-        if (stored.isEmpty()) {
-            return MekanismLang.EMPTY.translate();
-        } else if (amount == Long.MAX_VALUE) {
-            return MekanismLang.GENERIC_STORED.translate(stored, MekanismLang.INFINITE);
-        }
-        return MekanismLang.GENERIC_STORED_MB.translate(stored, TextUtils.format(amount));
+    protected int getRenderColor() {
+        return MekanismRenderer.color(stored.resource());
     }
 
     @Override
-    protected boolean applyRenderColor(GuiGraphics guiGraphics) {
-        MekanismRenderer.color(guiGraphics, stored);
-        return true;
-    }
-
-    @Override
-    public ResourceLocation getID() {
+    public Identifier getID() {
         return LookingAtUtils.CHEMICAL;
     }
 }

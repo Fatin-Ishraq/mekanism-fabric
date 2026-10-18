@@ -10,16 +10,16 @@ import mekanism.common.inventory.container.MekanismContainer;
 import mekanism.common.tile.interfaces.ITileFilterHolder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
 public class TileEntityQIOFilterHandler extends TileEntityQIOComponent implements ITileFilterHolder<QIOFilter<?>> {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private final SortableFilterManager<QIOFilter<?>> filterManager = new SortableFilterManager<QIOFilter<?>>((Class) QIOFilter.class, this::markForSave);
+    private final SortableFilterManager<QIOFilter<?>> filterManager = new SortableFilterManager<QIOFilter<?>>((Class) QIOFilter.class, this::markForSave, this::getLevel);
+    //TODO - 26.1: Do we want to up this to Item.ABSOLUTE_MAX_STACK_SIZE? Even if not, should we switch this to Item.DEFAULT_MAX_STACK_SIZE?
     private int maxTransitCount = 64;
     private int maxTransitTypes = 1;
 
@@ -36,7 +36,7 @@ public class TileEntityQIOFilterHandler extends TileEntityQIOComponent implement
     public void recalculateUpgrades(Upgrade upgrade) {
         super.recalculateUpgrades(upgrade);
         if (upgrade == Upgrade.SPEED) {
-            int speedUpgrades = upgradeComponent.getUpgrades(Upgrade.SPEED);
+            int speedUpgrades = getUpgrades(Upgrade.SPEED);
             // 64 to 320 items
             maxTransitCount = 64 + 32 * speedUpgrades;
             // 1 to 5 types
@@ -45,15 +45,15 @@ public class TileEntityQIOFilterHandler extends TileEntityQIOComponent implement
     }
 
     @Override
-    public void writeSustainedData(HolderLookup.Provider provider, CompoundTag dataMap) {
-        super.writeSustainedData(provider, dataMap);
-        filterManager.writeToNBT(provider, dataMap);
+    public void writeSustainedData(ValueOutput output) {
+        super.writeSustainedData(output);
+        filterManager.serialize(output);
     }
 
     @Override
-    public void readSustainedData(HolderLookup.Provider provider, @NotNull CompoundTag dataMap) {
-        super.readSustainedData(provider, dataMap);
-        filterManager.readFromNBT(provider, dataMap);
+    public void readSustainedData(ValueInput input) {
+        super.readSustainedData(input);
+        filterManager.deserialize(input);
     }
 
     @Override

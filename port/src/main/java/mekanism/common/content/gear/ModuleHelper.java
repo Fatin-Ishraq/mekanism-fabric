@@ -9,15 +9,12 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 import mekanism.api.MekanismIMC;
 import mekanism.api.MekanismIMC.ModuleContainerTarget;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.gear.IHUDElement;
 import mekanism.api.gear.IHUDElement.HUDColor;
 import mekanism.api.gear.IModuleHelper;
 import mekanism.api.gear.ModuleData;
-import mekanism.api.providers.IModuleDataProvider;
 import mekanism.client.model.MekanismModelCache;
 import mekanism.client.render.armor.MekaSuitArmor;
 import mekanism.common.Mekanism;
@@ -28,23 +25,21 @@ import mekanism.common.util.text.BooleanStateDisplay.OnOff;
 import mekanism.common.util.text.TextUtils;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Item.Properties;
-import net.minecraft.world.item.ItemStack;
 import mekanism.neoshim.fml.event.lifecycle.InterModProcessEvent;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-/**
- * @apiNote Do not instantiate this class directly as it will be done via the service loader. Instead, access instances of this via {@link IModuleHelper#INSTANCE}
- */
-@NothingNullByDefault
-public class ModuleHelper implements IModuleHelper {//TODO - 1.22: Evaluate moving at least some of this stuff to being defined via datamaps or at least datapack
+/// @apiNote Do not instantiate this class directly as it will be done via the service loader. Instead, access instances of this via [IModuleHelper#INSTANCE]
+public class ModuleHelper implements IModuleHelper {//TODO - 26.1: Evaluate moving at least some of this stuff to being defined via datamaps or at least datapack
 
     public static ModuleHelper get() {
         return (ModuleHelper) INSTANCE;
@@ -89,7 +84,6 @@ public class ModuleHelper implements IModuleHelper {//TODO - 1.22: Evaluate movi
         return moduleContainers;
     }
 
-    @SuppressWarnings("removal")
     private void mapSupportedModules(InterModProcessEvent event, String imcMethod, Item moduleContainer,
           Map<ModuleData<?>, ImmutableSet.Builder<Item>> supportedContainersBuilderMap) {
         ImmutableSet.Builder<ModuleData<?>> supportedModulesBuilder = ImmutableSet.builder();
@@ -114,18 +108,6 @@ public class ModuleHelper implements IModuleHelper {//TODO - 1.22: Evaluate movi
                         break;
                     }
                 }
-            }
-            //TODO - 1.22: Remove these two deprecated branches
-            else if (body instanceof IModuleDataProvider<?> moduleDataProvider) {
-                ModuleData<?> moduleData = moduleDataProvider.getModuleData();
-                supportedModulesBuilder.add(moduleData);
-                logDebugReceivedIMC(imcMethod, message.senderModId(), moduleData);
-            } else if (body instanceof IModuleDataProvider<?>[] providers) {
-                for (IModuleDataProvider<?> moduleDataProvider : providers) {
-                    ModuleData<?> moduleData = moduleDataProvider.getModuleData();
-                    supportedModulesBuilder.add(moduleData);
-                    logDebugReceivedIMC(imcMethod, message.senderModId(), moduleData);
-                }
             } else {
                 Mekanism.logger.warn("Received IMC message for '{}' from mod '{}' with an invalid body.", imcMethod, message.senderModId());
             }
@@ -144,7 +126,7 @@ public class ModuleHelper implements IModuleHelper {//TODO - 1.22: Evaluate movi
     }
 
     @Override
-    public ItemModule createModuleItem(Supplier<Holder<ModuleData<?>>> moduleDataSupplier, Properties properties) {
+    public ItemModule createModuleItem(Holder<ModuleData<?>> moduleDataSupplier, Properties properties) {
         return new ItemModule(moduleDataSupplier, properties);
     }
 
@@ -189,8 +171,12 @@ public class ModuleHelper implements IModuleHelper {//TODO - 1.22: Evaluate movi
 
     @Override
     @Nullable
-    public ModuleContainer getModuleContainer(ItemStack stack) {
-        return isModuleContainer(stack) ? stack.getOrDefault(MekanismDataComponents.MODULE_CONTAINER, ModuleContainer.EMPTY) : null;
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter> ModuleContainer getModuleContainer(ITEM instance) {
+        return isModuleContainer(instance) ? getModuleContainerUnsafe(instance) : null;
+    }
+
+    public ModuleContainer getModuleContainerUnsafe(DataComponentGetter dataComponentGetter) {
+        return dataComponentGetter.getOrDefault(MekanismDataComponents.MODULE_CONTAINER, ModuleContainer.EMPTY);
     }
 
     @Override
@@ -199,22 +185,22 @@ public class ModuleHelper implements IModuleHelper {//TODO - 1.22: Evaluate movi
     }
 
     @Override
-    public IHUDElement hudElementEnabled(ResourceLocation icon, boolean enabled) {
+    public IHUDElement hudElementEnabled(Identifier icon, boolean enabled) {
         return hudElement(icon, OnOff.caps(enabled, false).getTextComponent(), enabled ? HUDColor.REGULAR : HUDColor.FADED);
     }
 
     @Override
-    public IHUDElement hudElementPercent(ResourceLocation icon, double ratio) {
+    public IHUDElement hudElementPercent(Identifier icon, double ratio) {
         return hudElement(icon, TextUtils.getPercent(ratio), ratio > 0.2 ? HUDColor.REGULAR : (ratio > 0.1 ? HUDColor.WARNING : HUDColor.DANGER));
     }
 
     @Override
-    public IHUDElement hudElement(ResourceLocation icon, Component text, HUDColor color) {
+    public IHUDElement hudElement(Identifier icon, Component text, HUDColor color) {
         return HUDElement.of(icon, text, HUDElement.HUDColor.from(color));
     }
 
     @Override
-    public synchronized void addMekaSuitModuleModels(ResourceLocation location) {
+    public synchronized void addMekaSuitModuleModels(Identifier location) {
         MekanismModelCache.INSTANCE.registerMekaSuitModuleModel(location);
     }
 

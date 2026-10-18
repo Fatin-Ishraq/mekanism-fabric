@@ -2,7 +2,6 @@
 package mekanism.common.tests.recipe;
 
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import mekanism.api.recipes.ItemStackToItemStackRecipe;
 import mekanism.api.recipes.basic.BasicItemStackToItemStackRecipe;
 import mekanism.common.recipe.MekanismRecipeType;
@@ -10,22 +9,20 @@ import mekanism.common.tags.MekanismTags;
 import mekanism.common.tests.helpers.RecipeTestHelper;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.data.tags.ItemTagsProvider;
-import net.minecraft.data.tags.TagsProvider.TagLookup;
-import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.crafting.RecipeHolder;
+import mekanism.neoshim.neoforge.common.data.ItemTagsProvider;
 import mekanism.neoshim.neoforge.registries.datamaps.builtin.NeoForgeDataMaps;
 import mekanism.neoshim.testframework.DynamicTest;
 import mekanism.neoshim.testframework.annotation.ForEachTest;
 import mekanism.neoshim.testframework.annotation.TestHolder;
 import mekanism.neoshim.testframework.gametest.EmptyTemplate;
+import mekanism.neoshim.testframework.gametest.GameTest;
 import mekanism.neoshim.testframework.registration.RegistrationHelper;
-import org.jetbrains.annotations.NotNull;
 
 @ForEachTest(groups = "recipe.bio_fuel")
 public class MissingBioFuelRecipeTest {
@@ -34,16 +31,15 @@ public class MissingBioFuelRecipeTest {
     @EmptyTemplate
     @TestHolder(description = "Tests to make sure that there are no unknown composter recipes missing corresponding bio fuel recipes.")
     public static void testMissingComposterRecipes(final DynamicTest test, final RegistrationHelper reg) {
-        final TagKey<Item> KNOWN_MISSING = ItemTags.create(ResourceLocation.fromNamespaceAndPath(reg.modId(), "known_missing"));
-        final TagKey<Item> VALID_OUTPUT = ItemTags.create(ResourceLocation.fromNamespaceAndPath(reg.modId(), "valid_output"));
+        final TagKey<Item> KNOWN_MISSING = ItemTags.create(Identifier.fromNamespaceAndPath(reg.modId(), "known_missing"));
+        final TagKey<Item> VALID_OUTPUT = ItemTags.create(Identifier.fromNamespaceAndPath(reg.modId(), "valid_output"));
 
         //TODO: Decide if we want to have things like the biome mods load during game tests as well for purposes of checking if we want to add
         // compat with any of their organic items for making bio-fuel
-        reg.addProvider(event -> new ItemTagsProvider(event.getGenerator().getPackOutput(), event.getLookupProvider(),
-              CompletableFuture.completedFuture(TagLookup.empty()), reg.modId(), event.getExistingFileHelper()) {
+        reg.addClientProvider(event -> new ItemTagsProvider(event.getGenerator().getPackOutput(), event.getLookupProvider(), reg.modId()) {
             @Override
             @SuppressWarnings("unchecked")
-            protected void addTags(@NotNull HolderLookup.Provider provider) {
+            protected void addTags(HolderLookup.Provider provider) {
                 tag(VALID_OUTPUT).addTags(
                       MekanismTags.Items.FUELS_BIO,
                       MekanismTags.Items.FUELS_BLOCK_BIO

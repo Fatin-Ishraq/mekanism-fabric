@@ -10,8 +10,7 @@ import mekanism.common.util.MekanismUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import mekanism.neoshim.fml.util.thread.EffectiveSide;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class OwnerDisplay implements IHasTextComponent {
 
@@ -34,23 +33,22 @@ public class OwnerDisplay implements IHasTextComponent {
         return of(null, ownerUUID);
     }
 
-    public static OwnerDisplay of(Player player, UUID ownerUUID) {
+    public static OwnerDisplay of(@Nullable Player player, @Nullable UUID ownerUUID) {
         return of(player, ownerUUID, null);
     }
 
-    public static OwnerDisplay of(UUID ownerUUID, String ownerName) {
+    public static OwnerDisplay of(@Nullable UUID ownerUUID, @Nullable String ownerName) {
         return of(null, ownerUUID, ownerName);
     }
 
-    public static OwnerDisplay of(Player player, UUID ownerUUID, String ownerName) {
+    public static OwnerDisplay of(@Nullable Player player, @Nullable UUID ownerUUID, @Nullable String ownerName) {
         return of(player, ownerUUID, ownerName, true);
     }
 
-    public static OwnerDisplay of(Player player, UUID ownerUUID, String ownerName, boolean colorBase) {
+    public static OwnerDisplay of(@Nullable Player player, @Nullable UUID ownerUUID, @Nullable String ownerName, boolean colorBase) {
         return new OwnerDisplay(player, ownerUUID, ownerName, colorBase);
     }
 
-    @NotNull
     @Override
     public Component getTextComponent() {
         if (ownerUUID == null) {
@@ -70,11 +68,11 @@ public class OwnerDisplay implements IHasTextComponent {
     }
 
     @Nullable
-    public static String getOwnerName(@Nullable Player player, @NotNull UUID ownerUUID, @Nullable String ownerName) {
+    public static String getOwnerName(@Nullable Player player, UUID ownerUUID, @Nullable String ownerName) {
         //Allows for the name to be overridden by a passed value
         if (ownerName != null) {
             return ownerName;
-        } else if (player != null && !player.level().isClientSide || player == null && EffectiveSide.get().isServer()) {
+        } else if (player != null && !player.level().isClientSide() || player == null && EffectiveSide.get().isServer()) {
             return MekanismUtils.getLastKnownUsername(ownerUUID);
         }
         String name = MekanismClient.clientUUIDMap.get(ownerUUID);
@@ -82,7 +80,7 @@ public class OwnerDisplay implements IHasTextComponent {
             //If the name is still null, see if the uuid is the same as the client uuid
             if (player.getUUID().equals(ownerUUID)) {
                 //If it is set the name to the name of the player
-                name = player.getGameProfile().getName();
+                name = player.nameAndId().name();
                 //And cache the name
                 MekanismClient.clientUUIDMap.put(ownerUUID, name);
             } else {
@@ -93,7 +91,7 @@ public class OwnerDisplay implements IHasTextComponent {
                     name = "<" + ownerUUID + ">";
                 } else {
                     //If there is display the player's name
-                    name = owner.getGameProfile().getName();
+                    name = owner.nameAndId().name();
                     // and cache the name so that it continues to display if the player disconnects
                     MekanismClient.clientUUIDMap.put(ownerUUID, name);
                 }

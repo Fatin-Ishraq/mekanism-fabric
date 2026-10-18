@@ -25,24 +25,27 @@ import mekanism.common.tile.component.config.ConfigInfo;
 import mekanism.common.tile.component.config.DataType;
 import mekanism.common.tile.component.config.slot.InventorySlotInfo;
 import mekanism.common.tile.interfaces.ISideConfiguration;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class GuiSlot extends GuiTexturedElement implements IRecipeViewerGhostTarget, ISupportsWarning<GuiSlot> {
 
     private static final int INVALID_SLOT_COLOR = MekanismRenderer.getColorARGB(EnumColor.DARK_RED, 0.8F);
     public static final int DEFAULT_HOVER_COLOR = 0x80FFFFFF;
     private final SlotType slotType;
+    @Nullable
     private Supplier<ItemStack> validityCheck;
+    @Nullable
     private Supplier<ItemStack> storedStackSupplier;
-    private Supplier<SlotOverlay> overlaySupplier;
+    @Nullable
+    private Supplier<@Nullable SlotOverlay> overlaySupplier;
     @Nullable
     private BooleanSupplier warningSupplier;
     @Nullable
@@ -76,14 +79,12 @@ public class GuiSlot extends GuiTexturedElement implements IRecipeViewerGhostTar
     }
 
     @Override
-    public GuiSlot warning(@NotNull WarningType type, @NotNull BooleanSupplier warningSupplier) {
+    public GuiSlot warning(WarningType type, BooleanSupplier warningSupplier) {
         this.warningSupplier = ISupportsWarning.compound(this.warningSupplier, gui().trackWarning(type, warningSupplier));
         return this;
     }
 
-    /**
-     * @apiNote For use when there is no validity check and this is a "fake" slot in that the container screen doesn't render the item by default.
-     */
+    /// @apiNote For use when there is no validity check and this is a "fake" slot in that the container screen doesn't render the item by default.
     public GuiSlot stored(Supplier<ItemStack> storedStackSupplier) {
         this.storedStackSupplier = storedStackSupplier;
         return this;
@@ -111,12 +112,12 @@ public class GuiSlot extends GuiTexturedElement implements IRecipeViewerGhostTar
         return this;
     }
 
-    public GuiSlot overlayColor(IntSupplier colorSupplier) {
+    public GuiSlot overlayColor(@Nullable IntSupplier colorSupplier) {
         overlayColorSupplier = colorSupplier;
         return this;
     }
 
-    public GuiSlot with(Supplier<SlotOverlay> overlaySupplier) {
+    public GuiSlot with(Supplier<@Nullable SlotOverlay> overlaySupplier) {
         this.overlaySupplier = overlaySupplier;
         return this;
     }
@@ -137,37 +138,37 @@ public class GuiSlot extends GuiTexturedElement implements IRecipeViewerGhostTar
     }
 
     @Override
-    public void renderWidget(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void renderWidget(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         if (!renderAboveSlots) {
             draw(guiGraphics);
         }
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         if (renderAboveSlots) {
             draw(guiGraphics);
         }
     }
 
-    private void draw(@NotNull GuiGraphics guiGraphics) {
-        ResourceLocation texture;
+    private void draw(GuiGraphicsExtractor guiGraphics) {
+        Identifier texture;
         if (warningSupplier != null && warningSupplier.getAsBoolean()) {
             texture = slotType.getWarningTexture();
         } else {
             texture = getResource();
         }
-        guiGraphics.blit(texture, relativeX, relativeY, 0, 0, width, height, width, height);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, texture, relativeX, relativeY, 0, 0, width, height, width, height);
         if (overlaySupplier != null) {
             overlay = overlaySupplier.get();
         }
         if (overlay != null) {
-            guiGraphics.blit(overlay.getTexture(), relativeX, relativeY, 0, 0, overlay.getWidth(), overlay.getHeight(), overlay.getWidth(), overlay.getHeight());
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, overlay.getTexture(), relativeX, relativeY, 0, 0, overlay.getWidth(), overlay.getHeight(), overlay.getWidth(), overlay.getHeight());
         }
         drawContents(guiGraphics);
     }
 
-    protected void drawContents(@NotNull GuiGraphics guiGraphics) {
+    protected void drawContents(GuiGraphicsExtractor guiGraphics) {
         if (validityCheck != null) {
             ItemStack invalid = validityCheck.get();
             if (!invalid.isEmpty()) {
@@ -185,17 +186,17 @@ public class GuiSlot extends GuiTexturedElement implements IRecipeViewerGhostTar
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         boolean hovered = checkWindows(mouseX, mouseY, isHovered());
         if (renderHover && hovered) {
             int xPos = relativeX + 1;
             int yPos = relativeY + 1;
-            guiGraphics.fill(RenderType.guiOverlay(), xPos, yPos, xPos + 16, yPos + 16, DEFAULT_HOVER_COLOR);
+            guiGraphics.fill(xPos, yPos, xPos + 16, yPos + 16, DEFAULT_HOVER_COLOR);
         }
         if (overlayColorSupplier != null) {
             int xPos = relativeX + 1;
             int yPos = relativeY + 1;
-            guiGraphics.fill(RenderType.guiOverlay(), xPos, yPos, xPos + 16, yPos + 16, overlayColorSupplier.getAsInt());
+            guiGraphics.fill(xPos, yPos, xPos + 16, yPos + 16, overlayColorSupplier.getAsInt());
         }
         if (hovered) {
             //TODO: Should it pass it the proper mouseX and mouseY. Probably, though buttons may have to be redone slightly then
@@ -211,7 +212,7 @@ public class GuiSlot extends GuiTexturedElement implements IRecipeViewerGhostTar
             list = onHover.apply(this);
         }
         if (list.isEmpty() && !stack.isEmpty() && stack.getItem() instanceof ItemConfigurator && gui() instanceof GuiMekanismTile<?, ?> gui &&
-            gui.getTileEntity() instanceof ISideConfiguration config && gui.getSlotUnderMouse() instanceof InventoryContainerSlot slot) {
+            gui.getTileEntity() instanceof ISideConfiguration config && gui.getHoveredSlot() instanceof InventoryContainerSlot slot) {
             ConfigInfo info = config.getConfig().getConfig(TransmissionType.ITEM);
             if (info != null) {
                 IInventorySlot inventorySlot = slot.getInventorySlot();
@@ -232,17 +233,17 @@ public class GuiSlot extends GuiTexturedElement implements IRecipeViewerGhostTar
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (onClick != null && isValidClickButton(button)) {
-            if (mouseX >= getX() + borderSize() && mouseY >= getY() + borderSize() && mouseX < getRight() - borderSize() && mouseY < getBottom() - borderSize()) {
-                if (onClick.onClick(this, mouseX, mouseY)) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean isDoubleClick) {
+        if (onClick != null && isValidClickButton(event.buttonInfo())) {
+            if (event.x() >= getX() + borderSize() && event.y() >= getY() + borderSize() && event.x() < getRight() - borderSize() && event.y() < getBottom() - borderSize()) {
+                if (onClick.onClick(this, event, isDoubleClick)) {
                     playDownSound(minecraft.getSoundManager());
                     return true;
                 }
                 //If clicking the slot fails check super as maybe it has children that can handle clicks
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, isDoubleClick);
     }
 
     @Nullable

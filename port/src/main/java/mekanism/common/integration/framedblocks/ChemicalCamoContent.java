@@ -1,15 +1,18 @@
 package mekanism.common.integration.framedblocks;
 
-import mekanism.api.chemical.Chemical;
+import io.github.xfacthd.framedblocks.api.camo.CamoContent;
+import io.github.xfacthd.framedblocks.api.camo.CamoContentClientHandler;
+import io.github.xfacthd.framedblocks.api.camo.resource.ResourceCamoContent;
+import mekanism.api.chemical.ChemicalResource;
 import mekanism.api.text.TextComponentUtil;
 import mekanism.common.registration.impl.FluidDeferredRegister;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.Holder;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.util.TriState;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.BlockAndLightGetter;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.LevelReader;
@@ -18,27 +21,19 @@ import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.MapColor;
-import mekanism.neoshim.neoforge.common.util.TriState;
-import org.jetbrains.annotations.Nullable;
-import xfacthd.framedblocks.api.camo.CamoClientHandler;
-import xfacthd.framedblocks.api.camo.CamoContent;
+import org.jspecify.annotations.Nullable;
 
-final class ChemicalCamoContent extends CamoContent<ChemicalCamoContent> {
+final class ChemicalCamoContent extends ResourceCamoContent<ChemicalResource, ChemicalCamoContent> {
 
-    private final Holder<Chemical> chemicalHolder;
     private final MapColor mapColor;
 
-    ChemicalCamoContent(Holder<Chemical> chemicalHolder) {
-        this.chemicalHolder = chemicalHolder;
-        this.mapColor = FluidDeferredRegister.getClosestColor(this.chemicalHolder.value().getColorRepresentation());
-    }
-
-    Holder<Chemical> getChemicalHolder() {
-        return chemicalHolder;
+    ChemicalCamoContent(ChemicalResource chemicalType) {
+        super(chemicalType);
+        this.mapColor = FluidDeferredRegister.getClosestColor(resource.getChemicalColorRepresentation());
     }
 
     @Override
-    public boolean propagatesSkylightDown(BlockGetter level, BlockPos pos) {
+    public boolean propagatesSkylightDown() {
         return true;
     }
 
@@ -68,6 +63,11 @@ final class ChemicalCamoContent extends CamoContent<ChemicalCamoContent> {
     }
 
     @Override
+    public boolean isIgnitedByLava(BlockGetter blockGetter, BlockPos blockPos, Direction direction) {
+        return false;
+    }
+
+    @Override
     public int getLightEmission() {
         // TODO: light level is currently not forwarded from ChemicalConstants to the registered Chemical
         return 0;
@@ -84,7 +84,7 @@ final class ChemicalCamoContent extends CamoContent<ChemicalCamoContent> {
     }
 
     @Override
-    public boolean shouldDisplayFluidOverlay(BlockAndTintGetter level, BlockPos pos, FluidState fluidState) {
+    public boolean shouldDisplayFluidOverlay(BlockAndLightGetter level, BlockPos pos, FluidState fluidState) {
         return true;
     }
 
@@ -104,23 +104,17 @@ final class ChemicalCamoContent extends CamoContent<ChemicalCamoContent> {
     }
 
     @Override
-    @Nullable
     public MapColor getMapColor(BlockGetter level, BlockPos pos) {
         return mapColor;
     }
 
     @Override
-    public int getTintColor(BlockAndTintGetter blockAndTintGetter, BlockPos pos, int tintIdx) {
-        return chemicalHolder.value().getTint();
-    }
-
-    @Override
     public Integer getBeaconColorMultiplier(LevelReader levelReader, BlockPos pos, BlockPos beaconPos) {
-        return chemicalHolder.value().getColorRepresentation();
+        return getResource().getChemicalColorRepresentation();
     }
 
     @Override
-    public boolean isSolid(BlockGetter level, BlockPos pos) {
+    public boolean isSolid() {
         return false;
     }
 
@@ -140,50 +134,50 @@ final class ChemicalCamoContent extends CamoContent<ChemicalCamoContent> {
     }
 
     @Override
-    public boolean isOccludedBy(BlockState adjState, BlockGetter level, BlockPos pos, BlockPos adjPos) {
-        return adjState.isSolidRender(level, pos);
+    public boolean isOccludedBy(BlockState adjState, BlockGetter level, BlockPos pos, BlockPos adjPos, Direction direction) {
+        return adjState.isSolidRender();
     }
 
     @Override
-    public boolean isOccludedBy(CamoContent<?> adjCamo, BlockGetter level, BlockPos pos, BlockPos adjPos) {
-        return adjCamo.isSolid(level, pos) || equals(adjCamo);
+    public boolean isOccludedBy(CamoContent<?> adjCamo, BlockGetter level, BlockPos pos, BlockPos adjPos, Direction direction) {
+        return adjCamo.isSolid() || equals(adjCamo);
     }
 
     @Override
-    public boolean occludes(BlockState adjState, BlockGetter level, BlockPos pos, BlockPos adjPos) {
+    public boolean occludes(BlockState adjState, BlockGetter level, BlockPos pos, BlockPos adjPos, Direction direction) {
         return false;
     }
 
     @Override
     public ParticleOptions makeRunningLandingParticles(BlockPos pos) {
-        return new ChemicalParticleOptions(chemicalHolder);
+        return new ChemicalParticleOptions(resource);
     }
 
     @Override
     public String getCamoId() {
-        return chemicalHolder.getRegisteredName();
+        return resource.typeHolder().getRegisteredName();
     }
 
     @Override
     public MutableComponent getCamoName() {
-        return TextComponentUtil.build(chemicalHolder);
+        return TextComponentUtil.build(resource);
     }
 
     @Override
-    public CamoClientHandler<ChemicalCamoContent> getClientHandler() {
+    public CamoContentClientHandler<ChemicalCamoContent> getClientHandler() {
         return ChemicalCamoClientHandler.INSTANCE;
     }
 
     @Override
     public int hashCode() {
-        return chemicalHolder.hashCode();
+        return resource.hashCode();
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(@Nullable Object obj) {
         if (obj == this) return true;
         if (obj == null || obj.getClass() != ChemicalCamoContent.class) return false;
-        return chemicalHolder.is(((ChemicalCamoContent) obj).chemicalHolder);
+        return resource.equals(((ChemicalCamoContent) obj).resource);
     }
 
     @Override

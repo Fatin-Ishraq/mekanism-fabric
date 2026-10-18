@@ -3,6 +3,7 @@ package mekanism.common.base.holiday;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
@@ -19,7 +20,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.player.Player;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public final class HolidayManager {
 
@@ -32,45 +33,47 @@ public final class HolidayManager {
         return t;
     });
 
-    private static final Set<Holiday> holidays = Set.of(
-          Christmas.INSTANCE,
-          NewYear.INSTANCE,
-          May4.INSTANCE,
-          AprilFools.INSTANCE,
-          Pride.INSTANCE
-    );
+    /// Map of sounds which _might_ return a different value than the original holder
     private static final Map<Holder<SoundEvent>, Supplier<SoundEvent>> filterableSounds = new HashMap<>();
 
     private static boolean holidaysNotified = false;
     @Nullable
-    private static IRobitSkinRandomizerHoliday robitSkinHoliday;
+    private static Holiday robitSkinHoliday;
     @Nullable
-    private static IFilterableSoundHoliday soundHoliday;
+    private static Holiday soundHoliday;
 
     public static boolean areHolidaysEnabled() {
         return MekanismConfig.common.holidays.get();
     }
 
     public static void init() {
+        //Figure out what sounds we need to wrap because they might be filterable
+        Set<Holder<SoundEvent>> allFilterableSounds = new HashSet<>();
+        for (Holiday holiday : Holiday.VALUES) {
+            allFilterableSounds.addAll(holiday.getFilterableSounds().keySet());
+        }
+        //now we've gathered possible items, generate the suppliers which make them dynamic and config-responsive
+        for (Holder<SoundEvent> filterable : allFilterableSounds) {
+            filterableSounds.put(filterable, getSoundEventSupplier(filterable));
+        }
+
+        //schedule the holiday updater, and run it the first time
         timer.scheduleAtFixedRate(HolidayManager::updateToday,
               LocalTime.now().until(LocalTime.MIDNIGHT, ChronoUnit.MILLIS),
               TimeUnit.DAYS.toMillis(1),
               TimeUnit.MILLISECONDS);
         updateToday();
-        //Figure out what sounds we need to wrap because they might be filterable
-        for (Holiday holiday : holidays) {
-            if (holiday instanceof IFilterableSoundHoliday filterableSoundHoliday) {
-                for (Holder<SoundEvent> soundEvent : filterableSoundHoliday.getFilterableSounds().keySet()) {
-                    filterableSounds.computeIfAbsent(soundEvent, sound -> () -> {
-                        if (areHolidaysEnabled() && soundHoliday != null) {
-                            return soundHoliday.getFilterableSounds().getOrDefault(sound, sound).value();
-                        }
-                        return sound.value();
-                    });
-                }
-            }
-        }
+
         Mekanism.logger.info("Initialized HolidayManager.");
+    }
+
+    private static Supplier<SoundEvent> getSoundEventSupplier(Holder<SoundEvent> filterable) {
+        return () -> {
+            if (areHolidaysEnabled() && soundHoliday != null) {
+                return soundHoliday.getFilterableSounds().getOrDefault(filterable, filterable).value();
+            }
+            return filterable.value();
+        };
     }
 
     private static void updateToday() {
@@ -79,27 +82,25 @@ public final class HolidayManager {
         robitSkinHoliday = null;
         soundHoliday = null;
         YearlyDate date = YearlyDate.now();
-        for (Holiday holiday : holidays) {
+        for (Holiday holiday : Holiday.VALUES) {
             if (holiday.updateIsToday(date)) {
-                if (robitSkinHoliday == null && holiday instanceof IRobitSkinRandomizerHoliday randomizerHoliday) {
-                    robitSkinHoliday = randomizerHoliday;
+                if (robitSkinHoliday == null && holiday.isRobitSkinRandomizer()) {
+                    robitSkinHoliday = holiday;
                 }
-                if (soundHoliday == null && holiday instanceof IFilterableSoundHoliday filterableSoundHoliday) {
-                    soundHoliday = filterableSoundHoliday;
+                if (soundHoliday == null && !holiday.getFilterableSounds().isEmpty()) {
+                    soundHoliday = holiday;
                 }
             }
         }
     }
 
-    /**
-     * @apiNote Only call on the client side
-     */
+    /// @apiNote Only call on the client side
     public static void notify(Player player) {
         if (!holidaysNotified) {
             //Mark as notified even if messages are configured to off, so that we don't have to try notifying for the rest of the day
             holidaysNotified = true;
             if (areHolidaysEnabled()) {
-                for (Holiday holiday : holidays) {
+                for (Holiday holiday : Holiday.VALUES) {
                     if (holiday.isToday() && !holiday.hasNotified()) {
                         holiday.notify(player);
                     }
@@ -123,13 +124,4 @@ public final class HolidayManager {
         return areHolidaysEnabled() && robitSkinHoliday != null;
     }
 
-    interface IFilterableSoundHoliday {
-
-        Map<Holder<SoundEvent>, Holder<SoundEvent>> getFilterableSounds();
-    }
-
-    interface IRobitSkinRandomizerHoliday {
-
-        ResourceKey<RobitSkin> randomBaseSkin(RandomSource random);
-    }
 }

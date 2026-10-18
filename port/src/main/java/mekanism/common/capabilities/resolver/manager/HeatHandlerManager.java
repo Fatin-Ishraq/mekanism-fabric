@@ -2,19 +2,15 @@ package mekanism.common.capabilities.resolver.manager;
 
 import mekanism.api.heat.IHeatCapacitor;
 import mekanism.api.heat.IHeatHandler;
-import mekanism.api.heat.ISidedHeatHandler;
 import mekanism.common.capabilities.Capabilities;
-import mekanism.common.capabilities.holder.heat.IHeatCapacitorHolder;
+import mekanism.common.capabilities.holder.single.ISingleContainerHolder;
 import mekanism.common.capabilities.proxy.ProxyHeatHandler;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.common.capabilities.resolver.BasicSingleContainerHandlerManager;
 
-/**
- * Helper class to make reading instead of having as messy generics
- */
-public class HeatHandlerManager extends CapabilityHandlerManager<IHeatCapacitorHolder, IHeatCapacitor, IHeatHandler, ISidedHeatHandler> {
+/// Helper class to make reading instead of having as messy generics
+public class HeatHandlerManager extends BasicSingleContainerHandlerManager<IHeatCapacitor, IHeatHandler> {
 
-    public HeatHandlerManager(@Nullable IHeatCapacitorHolder holder, @NotNull ISidedHeatHandler baseHandler) {
-        super(holder, baseHandler, Capabilities.HEAT, ProxyHeatHandler::new, IHeatCapacitorHolder::getHeatCapacitors);
+    public HeatHandlerManager(ISingleContainerHolder<IHeatCapacitor> holder) {
+        super(holder, Capabilities.HEAT, ProxyHeatHandler::new);
     }
 }

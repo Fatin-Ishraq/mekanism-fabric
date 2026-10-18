@@ -1,16 +1,16 @@
 package mekanism.common.tile;
 
-import com.mojang.authlib.GameProfile;
 import java.util.Optional;
 import java.util.UUID;
 import mekanism.api.IContentsListener;
+import mekanism.api.inventory.IInventorySlot;
 import mekanism.api.security.ISecurityUtils;
 import mekanism.api.security.SecurityMode;
-import mekanism.common.capabilities.holder.slot.IInventorySlotHolder;
-import mekanism.common.capabilities.holder.slot.InventorySlotHelper;
+import mekanism.common.capabilities.holder.container.IContainerHolder;
+import mekanism.common.capabilities.holder.container.MekContainerHelper;
 import mekanism.common.inventory.container.ISecurityContainer;
 import mekanism.common.inventory.slot.SecurityInventorySlot;
-import mekanism.common.lib.frequency.FrequencyType;
+import mekanism.common.lib.frequency.FrequencyTypes;
 import mekanism.common.lib.security.SecurityFrequency;
 import mekanism.common.network.to_client.security.PacketSyncSecurity;
 import mekanism.common.registries.MekanismBlocks;
@@ -18,47 +18,48 @@ import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.tile.interfaces.IBoundingBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.players.GameProfileCache;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.UserNameToIdResolver;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.state.BlockState;
 import mekanism.neoshim.neoforge.network.PacketDistributor;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.UnknownNullability;
+import org.jspecify.annotations.Nullable;
 
 public class TileEntitySecurityDesk extends TileEntityMekanism implements IBoundingBlock {
 
+    @UnknownNullability//Initialized via getInitialInventory
     private SecurityInventorySlot unlockSlot;
+    @UnknownNullability//Initialized via getInitialInventory
     private SecurityInventorySlot lockSlot;
 
     public TileEntitySecurityDesk(BlockPos pos, BlockState state) {
         super(MekanismBlocks.SECURITY_DESK, pos, state);
     }
 
-    @NotNull
     @Override
-    protected IInventorySlotHolder getInitialInventory(IContentsListener listener) {
-        InventorySlotHelper builder = InventorySlotHelper.forSide(facingSupplier);
-        builder.addSlot(unlockSlot = SecurityInventorySlot.unlock(this::getOwnerUUID, listener, 146, 18));
-        builder.addSlot(lockSlot = SecurityInventorySlot.lock(listener, 146, 97));
+    protected IContainerHolder<IInventorySlot> getInitialInventory(IContentsListener listener) {
+        MekContainerHelper<IInventorySlot> builder = MekContainerHelper.forSide(facingSupplier);
+        builder.addContainer(unlockSlot = SecurityInventorySlot.unlock(this::getOwnerUUID, listener, 146, 18));
+        builder.addContainer(lockSlot = SecurityInventorySlot.lock(listener, 146, 97));
         return builder.build();
     }
 
     @Override
-    protected boolean onUpdateServer() {
-        boolean sendUpdatePacket = super.onUpdateServer();
+    protected boolean onUpdateServer(ServerLevel level) {
+        boolean sendUpdatePacket = super.onUpdateServer(level);
         SecurityFrequency frequency = getFreq();
         UUID ownerUUID = getOwnerUUID();
         if (ownerUUID != null && frequency != null) {
-            unlockSlot.unlock(ownerUUID);
-            lockSlot.lock(ownerUUID, frequency);
+            unlockSlot.unlock(ownerUUID, null);
+            lockSlot.lock(ownerUUID, frequency, null);
         }
         return sendUpdatePacket;
     }
 
-    /**
-     * Only call on the server side
-     */
+    /// Only call on the server side
     public void toggleOverride() {
         SecurityFrequency frequency = getFreq();
         if (frequency != null) {
@@ -70,12 +71,10 @@ public class TileEntitySecurityDesk extends TileEntityMekanism implements IBound
         }
     }
 
-    /**
-     * Validates access for anyone who might be accessing a GUI that changed security modes
-     */
+    /// Validates access for anyone who might be accessing a GUI that changed security modes
     private void validateAccess() {
-        if (hasLevel()) {
-            MinecraftServer server = getWorldNN().getServer();
+        if (level != null) {
+            MinecraftServer server = level.getServer();
             if (server != null) {
                 for (ServerPlayer player : server.getPlayerList().getPlayers()) {
                     closeIfNoAccess(player);
@@ -89,8 +88,8 @@ public class TileEntitySecurityDesk extends TileEntityMekanism implements IBound
         if (frequency != null) {
             UUID removed = frequency.removeTrusted(index);
             markForSave();
-            if (removed != null && hasLevel()) {
-                MinecraftServer server = getWorldNN().getServer();
+            if (removed != null && level != null) {
+                MinecraftServer server = level.getServer();
                 if (server != null) {
                     closeIfNoAccess(server.getPlayerList().getPlayer(removed));
                 }
@@ -126,23 +125,22 @@ public class TileEntitySecurityDesk extends TileEntityMekanism implements IBound
         if (level != null) {
             MinecraftServer server = level.getServer();
             if (server != null) {
-                GameProfileCache profileCache = server.getProfileCache();
-                if (profileCache != null) {
-                    SecurityFrequency frequency = getFreq();
-                    if (frequency != null) {
-                        Optional<GameProfile> gameProfile = profileCache.get(name);
-                        //noinspection OptionalIsPresent - Capturing lambda
-                        if (gameProfile.isPresent()) {
-                            GameProfile profile = gameProfile.get();
-                            frequency.addTrusted(profile.getId(), profile.getName());
-                        }
+                UserNameToIdResolver nameToIdCache = server.services().nameToIdCache();
+                SecurityFrequency frequency = getFreq();
+                if (frequency != null) {
+                    Optional<NameAndId> gameProfile = nameToIdCache.get(name);
+                    //noinspection OptionalIsPresent - Capturing lambda
+                    if (gameProfile.isPresent()) {
+                        NameAndId profile = gameProfile.get();
+                        frequency.addTrusted(profile.id(), profile.name());
                     }
                 }
             }
         }
     }
 
+    @Nullable
     public SecurityFrequency getFreq() {
-        return getFrequency(FrequencyType.SECURITY);
+        return getFrequency(FrequencyTypes.SECURITY);
     }
 }

@@ -7,10 +7,9 @@ import net.minecraft.core.Holder;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.TagKey;
-import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.equipment.ArmorType;
 import net.minecraft.world.level.block.Block;
-import org.jetbrains.annotations.NotNull;
 
 public class BronzeMaterialDefaults implements BaseMekanismMaterial {
 
@@ -30,7 +29,7 @@ public class BronzeMaterialDefaults implements BaseMekanismMaterial {
     }
 
     @Override
-    public int getUses() {
+    public int getDurability() {
         return 375;
     }
 
@@ -55,7 +54,7 @@ public class BronzeMaterialDefaults implements BaseMekanismMaterial {
     }
 
     @Override
-    public int getDurabilityForType(@NotNull ArmorItem.Type armorType) {
+    public int getDurabilityForType(ArmorType armorType) {
         return switch (armorType) {
             case BOOTS -> 234;
             case LEGGINGS -> 270;
@@ -65,7 +64,7 @@ public class BronzeMaterialDefaults implements BaseMekanismMaterial {
     }
 
     @Override
-    public int getDefense(@NotNull ArmorItem.Type armorType) {
+    public int getDefense(ArmorType armorType) {
         return switch (armorType) {
             case BOOTS -> 2;
             case LEGGINGS -> 6;
@@ -75,28 +74,24 @@ public class BronzeMaterialDefaults implements BaseMekanismMaterial {
         };
     }
 
-    @NotNull
     @Override
     public String getRegistryPrefix() {
         return "bronze";
     }
 
-    @NotNull
     @Override
-    public TagKey<Block> getIncorrectBlocksForDrops() {
+    public TagKey<Block> incorrectBlocksForDrops() {
         return ToolsTags.Blocks.INCORRECT_FOR_BRONZE_TOOL;
     }
 
-    @NotNull
     @Override
     public Holder<SoundEvent> equipSound() {
         return SoundEvents.ARMOR_EQUIP_IRON;
     }
 
-    @NotNull
     @Override
-    public Ingredient getRepairIngredient() {
-        return Ingredient.of(MekanismTags.Items.INGOTS_BRONZE);
+    public TagKey<Item> getRepairItems() {
+        return MekanismTags.Items.INGOTS_BRONZE;
     }
 
     @Override

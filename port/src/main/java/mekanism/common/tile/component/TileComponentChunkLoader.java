@@ -1,13 +1,15 @@
 package mekanism.common.tile.component;
 
 import com.mojang.logging.LogUtils;
+import com.mojang.serialization.Codec;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.longs.LongSets;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.LongStream;
 import mekanism.api.MekanismAPI;
 import mekanism.api.SerializationConstants;
 import mekanism.api.Upgrade;
@@ -16,19 +18,18 @@ import mekanism.common.config.MekanismConfig;
 import mekanism.common.lib.chunkloading.IChunkLoader;
 import mekanism.common.tile.base.TileEntityMekanism;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import mekanism.neoshim.neoforge.common.world.chunk.LoadingValidationCallback;
 import mekanism.neoshim.neoforge.common.world.chunk.TicketController;
 import mekanism.neoshim.neoforge.common.world.chunk.TicketHelper;
 import mekanism.neoshim.neoforge.common.world.chunk.TicketSet;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 public class TileComponentChunkLoader<T extends TileEntityMekanism & IChunkLoader> implements ITileComponent {
@@ -36,9 +37,7 @@ public class TileComponentChunkLoader<T extends TileEntityMekanism & IChunkLoade
     private static final Logger LOGGER = LogUtils.getLogger();
     public static final TicketController TICKET_CONTROLLER = new TicketController(Mekanism.rl("chunk_loader"), ChunkValidationCallback.INSTANCE);
 
-    /**
-     * TileEntity implementing this component.
-     */
+    /// TileEntity implementing this component.
     private final T tile;
     private final LongSet chunkSet = new LongOpenHashSet();
     private final boolean forceTicks;
@@ -59,12 +58,12 @@ public class TileComponentChunkLoader<T extends TileEntityMekanism & IChunkLoade
     }
 
     public boolean canOperate() {
-        return MekanismConfig.general.allowChunkloading.get() && tile.supportsUpgrades() && tile.getComponent().isUpgradeInstalled(Upgrade.ANCHOR);
+        return MekanismConfig.general.allowChunkloading.get() && tile.supportsUpgrades() && tile.getUpgrades(Upgrade.ANCHOR) > 0;
     }
 
-    private void releaseChunkTickets(@NotNull ServerLevel world, @NotNull BlockPos pos) {
+    private void releaseChunkTickets(ServerLevel world, BlockPos pos) {
         int tickets = chunkSet.size();
-        LOGGER.debug("Attempting to remove {} chunk tickets. Pos: {} World: {}", tickets, pos, world.dimension().location());
+        LOGGER.debug("Attempting to remove {} chunk tickets. Pos: {} World: {}", tickets, pos, world.dimension().identifier());
         if (tickets > 0) {
             for (long chunkPos : chunkSet) {
                 boolean success = TICKET_CONTROLLER.forceChunk(world, pos, ChunkPos.getX(chunkPos), ChunkPos.getZ(chunkPos), false, forceTicks);
@@ -79,16 +78,16 @@ public class TileComponentChunkLoader<T extends TileEntityMekanism & IChunkLoade
         prevWorld = null;
     }
 
-    private void registerChunkTickets(@NotNull ServerLevel world) {
+    private void registerChunkTickets(ServerLevel world) {
         prevPos = tile.getBlockPos();
         prevWorld = world;
         Set<ChunkPos> chunks = tile.getChunkSet();
         int tickets = chunks.size();
-        LOGGER.debug("Attempting to add {} chunk tickets. Pos: {} World: {}", tickets, prevPos, world.dimension().location());
+        LOGGER.debug("Attempting to add {} chunk tickets. Pos: {} World: {}", tickets, prevPos, world.dimension().identifier());
         if (tickets > 0) {
             for (ChunkPos chunkPos : chunks) {
-                boolean success = TICKET_CONTROLLER.forceChunk(world, prevPos, chunkPos.x, chunkPos.z, true, forceTicks);
-                chunkSet.add(chunkPos.toLong());
+                boolean success = TICKET_CONTROLLER.forceChunk(world, prevPos, chunkPos.x(), chunkPos.z(), true, forceTicks);
+                chunkSet.add(chunkPos.pack());
                 if (!success) {
                     LOGGER.error("Failed to force chunk during registration {}", chunkPos);
                 }
@@ -98,21 +97,22 @@ public class TileComponentChunkLoader<T extends TileEntityMekanism & IChunkLoade
         hasRegistered = true;
     }
 
-    /**
-     * Release and re-register tickets, call when chunk set changes
-     */
+    /// Release and re-register tickets, call when chunk set changes
     public void refreshChunkTickets() {
-        if (!tile.isRemote()) {
-            refreshChunkTickets((ServerLevel) Objects.requireNonNull(tile.getLevel()), tile.getBlockPos(), true);
+        refreshChunkTickets(tile.getLevel(), tile.getBlockPos());
+    }
+
+    /// Release and re-register tickets, call when chunk set changes
+    public void refreshChunkTickets(@Nullable Level level, BlockPos pos) {
+        if (level != null && !level.isClientSide()) {
+            refreshChunkTickets((ServerLevel) level, pos, true);
         }
     }
 
-    /**
-     * @param ticketsChanged {@code true} if the chunk set of our tile changed, and we need to force adjusting our registered tickets.
-     *
-     * @apiNote Only call server side
-     */
-    private void refreshChunkTickets(@NotNull ServerLevel world, @NotNull BlockPos pos, boolean ticketsChanged) {
+    /// @param ticketsChanged`true` if the chunk set of our tile changed, and we need to force adjusting our registered tickets.
+    ///
+    /// @apiNote Only call server side
+    private void refreshChunkTickets(ServerLevel world, BlockPos pos, boolean ticketsChanged) {
         boolean canOperate = canOperate();
         if (MekanismAPI.debug) {
             LOGGER.debug("refreshChunkTickets called for {}. Can operate = {}", pos, canOperate);
@@ -180,10 +180,10 @@ public class TileComponentChunkLoader<T extends TileEntityMekanism & IChunkLoade
                             markDirty();
                         }
                         LOGGER.debug("refreshChunkTickets(): Removed {} no longer valid chunk tickets, and added {} newly valid chunk tickets. Pos: {} World: {}", removed, added, pos,
-                              world.dimension().location());
+                              world.dimension().identifier());
                         if (MekanismAPI.debug) {
                             LOGGER.debug("Current set: {}", chunkSet);
-                            LOGGER.debug("Tile chunk: {}", ChunkPos.asLong(tile.getBlockPos()));
+                            LOGGER.debug("Tile chunk: {}", ChunkPos.pack(tile.getBlockPos()));
                             LOGGER.debug("Tile requested: {}", newChunks);
                         }
                     }
@@ -210,19 +210,18 @@ public class TileComponentChunkLoader<T extends TileEntityMekanism & IChunkLoade
     }
 
     @Override
-    public void deserialize(CompoundTag componentTag, HolderLookup.Provider provider) {
+    public void deserialize(ValueInput chunkLoaderInput) {
     }
 
     @Override
-    public CompoundTag serialize(HolderLookup.Provider provider) {
-        return new CompoundTag();
+    public void serialize(ValueOutput chunkLoaderOutput) {
     }
 
     @Override
-    public void read(CompoundTag nbtTags, HolderLookup.Provider provider) {
+    public void read(ValueInput input) {
         if (!chunkSet.isEmpty()) {
             //If we currently have any chunks loaded, remove their tickets and clear them
-            if (tile.hasLevel() && !tile.isRemote() && hasRegistered && prevWorld != null && prevPos != null) {
+            if (tile.getLevel() != null && !tile.getLevel().isClientSide() && hasRegistered && prevWorld != null && prevPos != null) {
                 //If we had any chunks registered remove them. When hasRegistered is true
                 // prevWorld and prevPos should both be nonnull, but validate them just in case
                 releaseChunkTickets(prevWorld, prevPos);
@@ -231,15 +230,17 @@ public class TileComponentChunkLoader<T extends TileEntityMekanism & IChunkLoade
                 chunkSet.clear();
             }
         }
-        for (long chunk : nbtTags.getLongArray(SerializationConstants.CHUNK_SET)) {
-            chunkSet.add(chunk);
+        Optional<LongStream> chunks = input.read(SerializationConstants.CHUNK_SET, Codec.LONG_STREAM);
+        //noinspection OptionalIsPresent - Capturing lambda
+        if (chunks.isPresent()) {
+            chunks.get().forEach(chunkSet::add);
         }
     }
 
     @Override
-    public void write(CompoundTag nbtTags, HolderLookup.Provider provider) {
+    public void write(ValueOutput output) {
         if (!chunkSet.isEmpty()) {
-            nbtTags.putLongArray(SerializationConstants.CHUNK_SET, chunkSet.toLongArray());
+            output.store(SerializationConstants.CHUNK_SET, Codec.LONG_STREAM, chunkSet.longStream());
         }
     }
 
@@ -264,7 +265,7 @@ public class TileComponentChunkLoader<T extends TileEntityMekanism & IChunkLoade
         }
         LongSet chunksAsLongs = new LongOpenHashSet(chunks.size());
         for (ChunkPos chunkPos : chunks) {
-            chunksAsLongs.add(chunkPos.toLong());
+            chunksAsLongs.add(chunkPos.pack());
         }
         return chunksAsLongs;
     }
@@ -277,23 +278,23 @@ public class TileComponentChunkLoader<T extends TileEntityMekanism & IChunkLoade
         }
 
         @Override
-        public void validateTickets(@NotNull ServerLevel world, @NotNull TicketHelper ticketHelper) {
-            ResourceLocation worldName = world.dimension().location();
+        public void validateTickets(ServerLevel world, TicketHelper ticketHelper) {
+            Identifier worldName = world.dimension().identifier();
             LOGGER.debug("Validating tickets for: {}. Blocks: {}, Entities: {}", worldName, ticketHelper.getBlockTickets().size(),
                   ticketHelper.getEntityTickets().size());
             for (Map.Entry<BlockPos, TicketSet> entry : ticketHelper.getBlockTickets().entrySet()) {
                 //Only bother looking at non ticking chunks as we don't register any "fully" ticking chunks
                 BlockPos pos = entry.getKey();
-                LongSet forcedChunks = entry.getValue().nonTicking();
-                LongSet tickingForcedChunks = entry.getValue().ticking();
-                LOGGER.debug("Validating tickets for: {}, BlockPos: {}, Forced chunks: {}, Ticking forced chunks: {}", worldName, pos, forcedChunks.size(),
-                      tickingForcedChunks.size());
+                LongSet forcedChunks = entry.getValue().normal();
+                LongSet naturalSpawningChunks = entry.getValue().naturalSpawning();
+                LOGGER.debug("Validating tickets for: {}, BlockPos: {}, Forced chunks: {}, Natural spawning forced chunks: {}", worldName, pos, forcedChunks.size(),
+                      naturalSpawningChunks.size());
                 validateTickets(world, worldName, pos, ticketHelper, forcedChunks, false);
-                validateTickets(world, worldName, pos, ticketHelper, tickingForcedChunks, true);
+                validateTickets(world, worldName, pos, ticketHelper, naturalSpawningChunks, true);
             }
         }
 
-        private void validateTickets(ServerLevel world, ResourceLocation worldName, BlockPos pos, TicketHelper ticketHelper, LongSet forcedChunks, boolean ticking) {
+        private void validateTickets(ServerLevel world, Identifier worldName, BlockPos pos, TicketHelper ticketHelper, LongSet forcedChunks, boolean ticking) {
             int ticketCount = forcedChunks.size();
             if (ticketCount > 0) {
                 //We expect this always be the case but just in case it is empty don't bother looking up the tile

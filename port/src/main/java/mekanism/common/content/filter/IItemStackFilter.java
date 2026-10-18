@@ -2,25 +2,23 @@ package mekanism.common.content.filter;
 
 import mekanism.common.integration.computer.annotation.ComputerMethod;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
 
 public interface IItemStackFilter<FILTER extends IItemStackFilter<FILTER>> extends IFilter<FILTER> {
 
-    @NotNull
     @ComputerMethod(threadSafe = true)
-    ItemStack getItemStack();
+    ItemResource getItemType();
 
     @ComputerMethod(threadSafe = true)
-    void setItemStack(@NotNull ItemStack stack);
+    void setItemType(ItemResource itemType);
 
     @Override
     default boolean hasFilter() {
-        return !getItemStack().isEmpty();
+        return !getItemType().isEmpty();
     }
 
     @ComputerMethod
-    default void setItem(@NotNull Item item) {
-        setItemStack(new ItemStack(item));
+    default void setItem(Item item) {
+        setItemType(ItemResource.of(item));
     }
 }

@@ -7,29 +7,27 @@ import mekanism.api.recipes.ingredients.creator.IChemicalIngredientCreator;
 import mekanism.api.recipes.ingredients.creator.IChemicalStackIngredientCreator;
 import mekanism.api.recipes.ingredients.creator.IFluidStackIngredientCreator;
 import mekanism.api.recipes.ingredients.creator.IItemStackIngredientCreator;
+import mekanism.client.recipe_viewer.jei.MekanismJEIHelper;
 import mekanism.common.Mekanism;
 import mekanism.common.recipe.ingredients.ChemicalIngredientCreator;
 import mekanism.common.recipe.ingredients.creator.ChemicalStackIngredientCreator;
 import mekanism.common.recipe.ingredients.creator.FluidStackIngredientCreator;
 import mekanism.common.recipe.ingredients.creator.ItemStackIngredientCreator;
 
-/**
- * @apiNote Do not instantiate this class directly as it will be done via the service loader. Instead, access instances of this via {@link IMekanismAccess#INSTANCE}
- */
+/// @apiNote Do not instantiate this class directly as it will be done via the service loader. Instead, access instances of this via [IMekanismAccess#INSTANCE]
 public class MekanismAccess implements IMekanismAccess {
 
     @Override
     public IMekanismJEIHelper jeiHelper() {
         Mekanism.hooks.jei.assertLoaded();
-        //FABRIC: JEI plugin not ported yet (phase 9)
-        throw new UnsupportedOperationException("JEI integration is not available in the Fabric port yet");
+        return MekanismJEIHelper.INSTANCE;
     }
 
     @Override
-    public IMekanismEmiHelper emiHelper() {
-        Mekanism.hooks.emi.assertLoaded();
-        //FABRIC: EMI plugin not ported yet (phase 9)
-        throw new UnsupportedOperationException("EMI integration is not available in the Fabric port yet");
+    public IMekanismEmiHelper emiHelper() {// TODO - 26.1: EMI
+        throw new IllegalStateException("EMI not included");
+        /*Mekanism.hooks.emi.assertLoaded();
+        return MekanismEmiHelper.INSTANCE;*/
     }
 
     @Override

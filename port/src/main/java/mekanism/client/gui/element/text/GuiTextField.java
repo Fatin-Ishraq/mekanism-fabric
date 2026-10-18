@@ -1,11 +1,11 @@
 package mekanism.client.gui.element.text;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.function.Consumer;
+import java.util.function.IntPredicate;
 import java.util.function.IntSupplier;
+import java.util.function.IntUnaryOperator;
 import java.util.function.UnaryOperator;
-import mekanism.api.functions.CharPredicate;
-import mekanism.api.functions.CharUnaryOperator;
 import mekanism.client.SpecialColors;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.GuiElement;
@@ -13,44 +13,52 @@ import mekanism.client.gui.element.button.MekanismImageButton;
 import mekanism.common.lib.Color;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.ContainerEventHandler;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.CommonColors;
 import net.minecraft.util.Mth;
 import net.minecraft.util.StringUtil;
-import org.jetbrains.annotations.NotNull;
-import org.lwjgl.glfw.GLFW;
+import org.joml.Matrix3x2fStack;
+import org.jspecify.annotations.Nullable;
 
-/**
- * GuiElement wrapper of TextFieldWidget for more control
- *
- * @author aidancbrady
- */
+/// GuiElement wrapper of TextFieldWidget for more control
 public class GuiTextField extends GuiElement {
 
-    public static final int DEFAULT_BORDER_COLOR = 0xFFA0A0A0;
-    public static final int DEFAULT_BACKGROUND_COLOR = 0xFF000000;
+    public static final int DEFAULT_BORDER_COLOR = CommonColors.LIGHT_GRAY;
+    public static final int DEFAULT_BACKGROUND_COLOR = CommonColors.BLACK;
     public static final IntSupplier SCREEN_COLOR = SpecialColors.TEXT_SCREEN::argb;
     public static final IntSupplier DARK_SCREEN_COLOR = () -> Color.argb(SCREEN_COLOR.getAsInt()).darken(0.4).argb();
 
     private final ClearingEditBox textField;
     private ContainerEventHandler parent;
 
-    private Runnable enterHandler;
-    private CharPredicate inputValidator;
-    private CharUnaryOperator inputTransformer;
+    @Nullable
+    private Consumer<GuiTextField> enterHandler;
+    @Nullable
+    private IntPredicate inputValidator;
+    @Nullable
+    private IntUnaryOperator inputTransformer;
+    @Nullable
     private UnaryOperator<String> pasteTransformer;
+    @Nullable
     private Consumer<String> responder;
 
     private BackgroundType backgroundType = BackgroundType.DEFAULT;
+    @Nullable
     private IconType iconType;
 
     private int textOffsetX, textOffsetY;
     private float textScale = 1.0F;
 
+    @Nullable
     private MekanismImageButton checkmarkButton;
 
     public GuiTextField(IGuiWrapper gui, int x, int y, int width, int height) {
@@ -102,7 +110,7 @@ public class GuiTextField extends GuiElement {
         return this;
     }
 
-    public GuiTextField configureDigitalInput(Runnable enterHandler) {
+    public GuiTextField configureDigitalInput(Consumer<GuiTextField> enterHandler) {
         setBackground(BackgroundType.NONE);
         setIcon(IconType.DIGITAL);
         setTextColor(screenTextColor());
@@ -112,7 +120,7 @@ public class GuiTextField extends GuiElement {
         return this;
     }
 
-    public GuiTextField configureDigitalBorderInput(Runnable enterHandler) {
+    public GuiTextField configureDigitalBorderInput(Consumer<GuiTextField> enterHandler) {
         setBackground(BackgroundType.DIGITAL);
         setTextColor(screenTextColor());
         setEnterHandler(enterHandler);
@@ -121,22 +129,22 @@ public class GuiTextField extends GuiElement {
         return this;
     }
 
-    public GuiTextField setEnterHandler(Runnable enterHandler) {
+    public GuiTextField setEnterHandler(@Nullable Consumer<GuiTextField> enterHandler) {
         this.enterHandler = enterHandler;
         return this;
     }
 
-    public GuiTextField setInputValidator(CharPredicate inputValidator) {
+    public GuiTextField setInputValidator(@Nullable IntPredicate inputValidator) {
         this.inputValidator = inputValidator;
         return this;
     }
 
-    public GuiTextField setInputTransformer(CharUnaryOperator inputTransformer) {
+    public GuiTextField setInputTransformer(@Nullable IntUnaryOperator inputTransformer) {
         this.inputTransformer = inputTransformer;
         return this;
     }
 
-    public GuiTextField setPasteTransformer(UnaryOperator<String> pasteTransformer) {
+    public GuiTextField setPasteTransformer(@Nullable UnaryOperator<String> pasteTransformer) {
         this.pasteTransformer = pasteTransformer;
         return this;
     }
@@ -153,13 +161,14 @@ public class GuiTextField extends GuiElement {
         return this;
     }
 
-    public GuiTextField addCheckmarkButton(Runnable callback) {
+    public GuiTextField addCheckmarkButton(Consumer<GuiTextField> callback) {
         return addCheckmarkButton(ButtonType.NORMAL, callback);
     }
 
-    public GuiTextField addCheckmarkButton(ButtonType type, Runnable callback) {
-        checkmarkButton = addChild(type.getButton(this, (element, mouseX, mouseY) -> {
-            callback.run();
+    public GuiTextField addCheckmarkButton(ButtonType type, Consumer<GuiTextField> callback) {
+        checkmarkButton = addChild(type.getButton(this, (_, _, _) -> {
+            //TODO: Instead of capturing this can we just use the passed element?
+            callback.accept(this);
             parent.setFocused(this);
             return true;
         }));
@@ -186,44 +195,45 @@ public class GuiTextField extends GuiElement {
     }
 
     @Override
-    protected boolean isValidClickButton(int button) {
-        return super.isValidClickButton(button) || textField.isValidClickButton(button);
+    public boolean isValidClickButton(MouseButtonInfo buttonInfo) {
+        return super.isValidClickButton(buttonInfo) || textField.isValidClickButton(buttonInfo);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        double scaledX = mouseX;
+    public boolean mouseClicked(MouseButtonEvent event, boolean isDoubleClick) {
+        double scaledX = event.x();
         // figure out the proper mouse placement based on text scaling
         if (textScale != 1.0F && scaledX > textField.getX()) {
             scaledX = textField.getX() + (scaledX - textField.getX()) / textScale;
         }
-        if (textField.mouseClicked(scaledX, mouseY, button)) {
+        //TODO - 26.1: Validate this is fine for how to scale and pass on the mouse button event
+        if (textField.mouseClicked(new MouseButtonEvent(scaledX, event.y(), event.buttonInfo()), isDoubleClick)) {
             return true;
         }
-        return super.isValidClickButton(button) && super.mouseClicked(mouseX, mouseY, button);
+        return super.isValidClickButton(event.buttonInfo()) && super.mouseClicked(event, isDoubleClick);
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
         backgroundType.render(this, guiGraphics);
-        PoseStack pose = guiGraphics.pose();
-        pose.pushPose();
+        Matrix3x2fStack matrix = guiGraphics.pose();
+        matrix.pushMatrix();
         //Translate to the top left before attempting to render the text field as vanilla renders widgets from the top left
-        pose.translate(-getGuiLeft(), -getGuiTop(), 0);
+        matrix.translate(-getGuiLeft(), -getGuiTop());
         if (textScale == 1F) {
-            textField.render(guiGraphics, mouseX, mouseY, partialTicks);
+            textField.extractRenderState(guiGraphics, mouseX, mouseY, partialTicks);
         } else {
             // hacky. we should write our own renderer at some point.
             float reverse = (1 - textScale) / textScale;
-            pose.scale(textScale, textScale, textScale);
+            matrix.scale(textScale, textScale);
             //Note: We use 4 instead of half line height (4.5) as text fields use 8 for calculating text positioning
-            pose.translate(textField.getX() * reverse, (textField.getY() + 4) * reverse, 0);
-            textField.render(guiGraphics, mouseX, mouseY, partialTicks);
+            matrix.translate(textField.getX() * reverse, (textField.getY() + 4) * reverse);
+            textField.extractRenderState(guiGraphics, mouseX, mouseY, partialTicks);
         }
-        pose.popPose();
+        matrix.popMatrix();
         if (iconType != null) {
-            guiGraphics.blit(iconType.getIcon(), relativeX + 2, relativeY + (height / 2) - Mth.ceil(iconType.getHeight() / 2F), 0, 0, iconType.getWidth(), iconType.getHeight(), iconType.getWidth(), iconType.getHeight());
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, iconType.getIcon(), relativeX + 2, relativeY + (height / 2) - Mth.ceil(iconType.getHeight() / 2F), 0, 0, iconType.getWidth(), iconType.getHeight(), iconType.getWidth(), iconType.getHeight());
         }
     }
 
@@ -244,97 +254,110 @@ public class GuiTextField extends GuiElement {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyEvent event) {
         if (canWrite()) {
-            if (keyCode == GLFW.GLFW_KEY_ESCAPE || keyCode == GLFW.GLFW_KEY_TAB) {
+            if (event.isEscape() || event.isCycleFocus()) {
                 //Manually handle hitting escape to make the whole interface go away
                 // and allow using tab to switch focus
                 return false;
-            } else if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+            } else if (event.isConfirmation()) {
                 //Handle processing both the enter key and the numpad enter key
                 if (enterHandler != null) {
-                    enterHandler.run();
+                    enterHandler.accept(this);
                 }
                 return true;
-            } else if (Screen.isPaste(keyCode)) {
+            } else if (event.isPaste()) {
                 //Manual handling of textField#keyPressed for pasting so that we can filter things as needed
                 String text = Minecraft.getInstance().keyboardHandler.getClipboard();
                 if (pasteTransformer != null) {
                     text = pasteTransformer.apply(text);
                 }
                 if (inputTransformer != null || inputValidator != null) {
-                    boolean transformed = false;
-                    char[] charArray = text.toCharArray();
-                    for (int i = 0; i < charArray.length; i++) {
-                        char c = charArray[i];
+                    boolean wasTransformed = false;
+                    int strLen = text.length();
+                    StringBuilder transformed = new StringBuilder(strLen);
+                    for (int i = 0; i < strLen; i++) {
+                        int codepoint = text.codePointAt(i);
                         if (inputTransformer != null) {
-                            c = inputTransformer.applyAsChar(c);
-                            charArray[i] = c;
-                            transformed = true;
+                            codepoint = inputTransformer.applyAsInt(codepoint);
+                            transformed.appendCodePoint(codepoint);
+                            wasTransformed = true;
                         }
-                        if (inputValidator != null && !inputValidator.test(c)) {
+                        if (inputValidator != null && !inputValidator.test(codepoint)) {
                             //Contains an invalid character fail
                             return false;
                         }
                     }
-                    if (transformed) {
-                        text = String.copyValueOf(charArray);
+                    if (wasTransformed) {
+                        text = transformed.toString();
                     }
                 }
                 textField.insertText(text);
             } else {
-                textField.keyPressed(keyCode, scanCode, modifiers);
+                textField.keyPressed(event);
             }
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(event);
     }
 
     @Override
-    public boolean charTyped(char c, int keyCode) {
+    public boolean charTyped(CharacterEvent event) {
         if (canWrite()) {
+            int initialCodepoint = event.codepoint();
+            int codepointUsed = initialCodepoint;
             if (inputTransformer != null) {
-                c = inputTransformer.applyAsChar(c);
+                codepointUsed = inputTransformer.applyAsInt(initialCodepoint);
             }
-            if (inputValidator == null || inputValidator.test(c)) {
-                return textField.charTyped(c, keyCode);
+            if (inputValidator == null || inputValidator.test(codepointUsed)) {
+                if (codepointUsed != initialCodepoint) {
+                    event = new CharacterEvent(codepointUsed);
+                }
+                return textField.charTyped(event);
             }
             return false;
         }
-        return super.charTyped(c, keyCode);
+        return super.charTyped(event);
     }
 
     public String getText() {
         return textField.getValue();
     }
 
-    public void setVisible(boolean visible) {
+    public GuiTextField setVisible(boolean visible) {
         textField.setVisible(visible);
+        return this;
     }
 
-    public void setMaxLength(int length) {
+    public GuiTextField setMaxLength(int length) {
         textField.setMaxLength(length);
+        return this;
     }
 
-    public void setTextColor(int color) {
+    public GuiTextField setTextColor(int color) {
         textField.setTextColor(color);
+        return this;
     }
 
-    public void setTextColorUneditable(int color) {
+    public GuiTextField setTextColorUneditable(int color) {
         textField.setTextColorUneditable(color);
+        return this;
     }
 
-    public void setEditable(boolean enabled) {
+    public GuiTextField setEditable(boolean enabled) {
         textField.setEditable(enabled);
+        return this;
     }
 
-    public void setCanLoseFocus(boolean canLoseFocus) {
+    public GuiTextField setCanLoseFocus(boolean canLoseFocus) {
         //TODO: Improve handling of when this is set to false in regards to focus changing with tab or things
         textField.setCanLoseFocus(canLoseFocus);
+        return this;
     }
 
-    public void allowColoredText() {
+    public GuiTextField allowColoredText() {
         textField.allowColors = true;
+        return this;
     }
 
     @Override
@@ -353,8 +376,9 @@ public class GuiTextField extends GuiElement {
         textField.setValue(text);
     }
 
-    public void setResponder(Consumer<String> responder) {
+    public GuiTextField setResponder(Consumer<String> responder) {
         this.responder = responder;
+        return this;
     }
 
     private static class ClearingEditBox extends EditBox {
@@ -366,22 +390,22 @@ public class GuiTextField extends GuiElement {
         }
 
         @Override
-        public boolean isValidClickButton(int button) {
-            return super.isValidClickButton(button) || button == GLFW.GLFW_MOUSE_BUTTON_RIGHT;
+        public boolean isValidClickButton(MouseButtonInfo buttonInfo) {
+            return super.isValidClickButton(buttonInfo) || buttonInfo.button() == InputConstants.MOUSE_BUTTON_RIGHT;
         }
 
         @Override
-        public void onClick(double mouseX, double mouseY, int button) {
-            if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+        public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
+            if (event.button() == InputConstants.MOUSE_BUTTON_RIGHT) {
                 //Allow clearing on right click
                 setValue("");
             } else {
-                super.onClick(mouseX, mouseY, button);
+                super.onClick(event, isDoubleClick);
             }
         }
 
         @Override
-        public void insertText(@NotNull String text) {
+        public void insertText(String text) {
             if (allowColors) {
                 //Copy of super, but modified to call a custom filter text that allows the section symbol to be used
                 // so that the player can enter color codes

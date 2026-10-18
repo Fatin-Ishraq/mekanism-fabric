@@ -17,14 +17,14 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
+import org.jspecify.annotations.Nullable;
 
 public class BoltRenderer {
 
-    /** Amount of times per tick we refresh. 3 implies 60 Hz. */
+    /// Amount of times per tick we refresh. 3 implies 60 Hz.
     private static final float REFRESH_TIME = 3F;
-    /** We will keep track of an owner's render data for 5 seconds after there are no bolts remaining. */
+    /// We will keep track of an owner's render data for 5 seconds after there are no bolts remaining.
     private static final double MAX_OWNER_TRACK_TIME = 5 * SharedConstants.TICKS_PER_SECOND;
 
     private Timestamp refreshTimestamp = new Timestamp();
@@ -40,15 +40,15 @@ public class BoltRenderer {
         }
     }
 
-    public void render(float partialTicks, PoseStack matrixStack, MultiBufferSource bufferIn) {
-        render(partialTicks, matrixStack, bufferIn, null);
+    public void render(long gameTime, float partialTicks, PoseStack matrixStack, MultiBufferSource bufferIn) {
+        render(gameTime, partialTicks, matrixStack, bufferIn, null);
     }
 
-    public void render(float partialTicks, PoseStack matrixStack, MultiBufferSource bufferIn, @Nullable Vec3 cameraPos) {
+    public void render(long gameTime, float partialTicks, PoseStack matrixStack, MultiBufferSource bufferIn, @Nullable Vec3 cameraPos) {
         VertexConsumer buffer = bufferIn.getBuffer(MekanismRenderType.MEK_LIGHTNING);
         Matrix4f matrix = matrixStack.last().pose();
-        Timestamp timestamp = new Timestamp(minecraft.level.getGameTime(), partialTicks);
-        boolean refresh = timestamp.isPassed(refreshTimestamp, (1 / REFRESH_TIME));
+        Timestamp timestamp = new Timestamp(gameTime, partialTicks);
+        boolean refresh = timestamp.isPassed(refreshTimestamp, 1 / REFRESH_TIME);
         if (refresh) {
             refreshTimestamp = timestamp;
         }
@@ -84,14 +84,19 @@ public class BoltRenderer {
         }
     }
 
+    @Deprecated//TODO - 26.1: Try to replace all usages of this with one that gets the game time from a render state
     public void update(Object owner, BoltEffect newBoltData, float partialTicks) {
         if (minecraft.level == null) {
             return;
         }
+        update(owner, newBoltData, minecraft.level.getGameTime(), partialTicks);
+    }
+
+    public void update(Object owner, BoltEffect newBoltData, long gameTime, float partialTicks) {
         synchronized (boltOwners) {
             BoltOwnerData data = boltOwners.computeIfAbsent(owner, o -> new BoltOwnerData());
             data.lastBolt = newBoltData;
-            Timestamp timestamp = new Timestamp(minecraft.level.getGameTime(), partialTicks);
+            Timestamp timestamp = new Timestamp(gameTime, partialTicks);
             if ((!data.lastBolt.getSpawnFunction().isConsecutive() || data.bolts.isEmpty()) && timestamp.isPassed(data.lastBoltTimestamp, data.lastBoltDelay)) {
                 data.addBolt(new BoltInstance(newBoltData, timestamp), timestamp, random);
             }
@@ -102,6 +107,7 @@ public class BoltRenderer {
     public static class BoltOwnerData {
 
         private final Set<BoltInstance> bolts = new ObjectOpenHashSet<>();
+        @Nullable
         private BoltEffect lastBolt;
         private Timestamp lastBoltTimestamp = new Timestamp();
         private Timestamp lastUpdateTimestamp = new Timestamp();
@@ -133,7 +139,7 @@ public class BoltRenderer {
                 for (Vec3 v : renderQuads.get(i).getVecs()) {
                     Vec3 shiftedVertex = cameraPos == null ? v : v.subtract(cameraPos);
                     buffer.addVertex(matrix, (float) shiftedVertex.x, (float) shiftedVertex.y, (float) shiftedVertex.z)
-                          .setColor(bolt.getColor().r(), bolt.getColor().g(), bolt.getColor().b(), bolt.getColor().a());
+                          .setColor(bolt.getColor().argb());
                 }
             }
         }

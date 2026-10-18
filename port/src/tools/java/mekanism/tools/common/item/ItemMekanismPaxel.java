@@ -1,31 +1,27 @@
 package mekanism.tools.common.item;
 
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
-import java.util.List;
 import java.util.Set;
-import javax.annotation.ParametersAreNonnullByDefault;
+import java.util.function.Consumer;
 import mekanism.api.MekanismItemAbilities;
 import mekanism.tools.common.ToolsTags;
 import mekanism.tools.common.material.IPaxelMaterial;
-import mekanism.tools.common.material.MaterialCreator;
-import mekanism.tools.common.material.VanillaPaxelMaterialCreator;
 import mekanism.tools.common.util.ToolsUtils;
-import net.minecraft.Util;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Util;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.DiggerItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemInstance;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -34,53 +30,48 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import mekanism.neoshim.neoforge.common.ItemAbilities;
 import mekanism.neoshim.neoforge.common.ItemAbility;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-@ParametersAreNonnullByDefault
-public class ItemMekanismPaxel extends DiggerItem {
+public class ItemMekanismPaxel extends Item implements IsMekanismTool {
 
     private static final Set<ItemAbility> PAXEL_ACTIONS = Util.make(new ReferenceOpenHashSet<>(), actions -> {
         actions.add(MekanismItemAbilities.PAXEL_DIG);
-        actions.addAll(ItemAbilities.DEFAULT_PICKAXE_ACTIONS);
+        //actions.addAll(ItemAbilities.DEFAULT_PICKAXE_ACTIONS);
         actions.addAll(ItemAbilities.DEFAULT_SHOVEL_ACTIONS);
         actions.addAll(ItemAbilities.DEFAULT_AXE_ACTIONS);
     });
 
     private final IPaxelMaterial material;
 
-    public ItemMekanismPaxel(MaterialCreator material, Item.Properties properties) {
-        super(material, ToolsTags.Blocks.MINEABLE_WITH_PAXEL, properties
-              .durability(material.getPaxelDurability())
-              .attributes(createAttributes(material, material.getPaxelDamage(), material.getPaxelAtkSpeed())));
-        this.material = material;
-    }
-
-    public ItemMekanismPaxel(VanillaPaxelMaterialCreator material, Item.Properties properties) {
-        super(material.getVanillaTier(), ToolsTags.Blocks.MINEABLE_WITH_PAXEL, properties
-              .durability(material.getPaxelDurability())
-              .component(DataComponents.TOOL, material.createToolProperties())
-              .attributes(createAttributes(material.getVanillaTier(), material.getPaxelDamage(), material.getPaxelAtkSpeed())));
+    public ItemMekanismPaxel(IPaxelMaterial material, Item.Properties properties) {
+        super(properties
+              .tool(
+                    material.toToolMaterial(),
+                    ToolsTags.Blocks.MINEABLE_WITH_PAXEL,
+                    material.getPaxelDamage(),
+                    material.getPaxelAtkSpeed(),
+                    0
+              )
+              .durability(material.getPaxelDurability())//must go after Tool
+        );
         this.material = material;
     }
 
     @Override
-    public void appendHoverText(@NotNull ItemStack stack, @NotNull Item.TooltipContext context, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        super.appendHoverText(stack, context, tooltip, flag);
-        ToolsUtils.addDurability(tooltip, stack);
+    @Deprecated
+    public void appendHoverText(ItemStack stack, Item.TooltipContext context, TooltipDisplay tooltipDisplay, Consumer<Component> tooltipAdder, TooltipFlag flag) {
+        super.appendHoverText(stack, context, tooltipDisplay, tooltipAdder, flag);
+        ToolsUtils.addDurability(tooltipAdder, stack);
     }
 
     @Override
-    public boolean canPerformAction(ItemStack stack, ItemAbility action) {
+    public boolean canPerformAction(ItemInstance instance, ItemAbility action) {
         return PAXEL_ACTIONS.contains(action);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * Merged version of {@link net.minecraft.world.item.AxeItem#useOn(UseOnContext)} and {@link net.minecraft.world.item.ShovelItem#useOn(UseOnContext)}
-     */
-    @NotNull
+    /// {@inheritDoc}
+    ///
+    /// Merged version of [net.minecraft.world.item.AxeItem#useOn(UseOnContext)] and [net.minecraft.world.item.ShovelItem#useOn(UseOnContext)]
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Level world = context.getLevel();
@@ -101,7 +92,7 @@ public class ItemMekanismPaxel extends DiggerItem {
             } else {
                 resultToSet = blockstate.getToolModifiedState(context, ItemAbilities.SHOVEL_DOUSE, false);
                 //We can use the paxel as a shovel to extinguish a campfire
-                if (resultToSet != null && !world.isClientSide) {
+                if (resultToSet != null && !world.isClientSide()) {
                     world.levelEvent(null, LevelEvent.SOUND_EXTINGUISH_FIRE, blockpos, 0);
                 }
             }
@@ -109,7 +100,7 @@ public class ItemMekanismPaxel extends DiggerItem {
                 return InteractionResult.PASS;
             }
         }
-        if (!world.isClientSide) {
+        if (!world.isClientSide()) {
             ItemStack stack = context.getItemInHand();
             if (player instanceof ServerPlayer serverPlayer) {
                 CriteriaTriggers.ITEM_USED_ON_BLOCK.trigger(serverPlayer, blockpos, stack);
@@ -117,10 +108,10 @@ public class ItemMekanismPaxel extends DiggerItem {
             world.setBlock(blockpos, resultToSet, Block.UPDATE_ALL_IMMEDIATE);
             world.gameEvent(GameEvent.BLOCK_CHANGE, blockpos, GameEvent.Context.of(player, resultToSet));
             if (player != null) {
-                stack.hurtAndBreak(1, player, LivingEntity.getSlotForHand(context.getHand()));
+                stack.hurtAndBreak(1, player, context.getHand().asEquipmentSlot());
             }
         }
-        return InteractionResult.sidedSuccess(world.isClientSide);
+        return InteractionResult.SUCCESS;
     }
 
     @Nullable
@@ -146,10 +137,5 @@ public class ItemMekanismPaxel extends DiggerItem {
             return resultToSet;
         }
         return null;
-    }
-
-    @Override
-    public int getEnchantmentValue() {
-        return material.getPaxelEnchantability();
     }
 }

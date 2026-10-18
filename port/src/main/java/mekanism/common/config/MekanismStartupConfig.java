@@ -2,8 +2,8 @@ package mekanism.common.config;
 
 import mekanism.common.config.value.CachedFloatValue;
 import mekanism.common.config.value.CachedIntValue;
-import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.ArmorMaterials;
+import net.minecraft.world.item.equipment.ArmorMaterials;
+import net.minecraft.world.item.equipment.ArmorType;
 import net.neoforged.fml.config.ModConfig.Type;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
@@ -61,22 +61,22 @@ public class MekanismStartupConfig extends BaseMekanismConfig {
         MekanismConfigTranslations.GEAR_MEKA_SUIT.applyToBuilder(builder).push(GearConfig.MEKASUIT_CATEGORY);
         mekaSuitHelmetArmor = CachedIntValue.wrap(this, MekanismConfigTranslations.STARTUP_MEKA_SUIT_ARMOR_HELMET.applyToBuilder(builder)
               .gameRestart()
-              .defineInRange("helmetArmor", ArmorMaterials.NETHERITE.value().defense().get(ArmorItem.Type.HELMET), 0, Integer.MAX_VALUE));
+              .defineInRange("helmetArmor", ArmorMaterials.NETHERITE.defense().get(ArmorType.HELMET), 0, Integer.MAX_VALUE));
         mekaSuitBodyArmorArmor = CachedIntValue.wrap(this, MekanismConfigTranslations.STARTUP_MEKA_SUIT_ARMOR_CHESTPLATE.applyToBuilder(builder)
               .gameRestart()
-              .defineInRange("bodyArmorArmor", ArmorMaterials.NETHERITE.value().defense().get(ArmorItem.Type.CHESTPLATE), 0, Integer.MAX_VALUE));
+              .defineInRange("bodyArmorArmor", ArmorMaterials.NETHERITE.defense().get(ArmorType.CHESTPLATE), 0, Integer.MAX_VALUE));
         mekaSuitPantsArmor = CachedIntValue.wrap(this, MekanismConfigTranslations.STARTUP_MEKA_SUIT_ARMOR_LEGGINGS.applyToBuilder(builder)
               .gameRestart()
-              .defineInRange("pantsArmor", ArmorMaterials.NETHERITE.value().defense().get(ArmorItem.Type.LEGGINGS), 0, Integer.MAX_VALUE));
+              .defineInRange("pantsArmor", ArmorMaterials.NETHERITE.defense().get(ArmorType.LEGGINGS), 0, Integer.MAX_VALUE));
         mekaSuitBootsArmor = CachedIntValue.wrap(this, MekanismConfigTranslations.STARTUP_MEKA_SUIT_ARMOR_BOOTS.applyToBuilder(builder)
               .gameRestart()
-              .defineInRange("bootsArmor", ArmorMaterials.NETHERITE.value().defense().get(ArmorItem.Type.BOOTS), 0, Integer.MAX_VALUE));
+              .defineInRange("bootsArmor", ArmorMaterials.NETHERITE.defense().get(ArmorType.BOOTS), 0, Integer.MAX_VALUE));
         mekaSuitToughness = CachedFloatValue.wrap(this, MekanismConfigTranslations.STARTUP_MEKA_SUIT_TOUGHNESS.applyToBuilder(builder)
               .gameRestart()
-              .defineInRange("toughness", ArmorMaterials.NETHERITE.value().toughness(), 0, Float.MAX_VALUE));
+              .defineInRange("toughness", ArmorMaterials.NETHERITE.toughness(), 0, Float.MAX_VALUE));
         mekaSuitKnockbackResistance = CachedFloatValue.wrap(this, MekanismConfigTranslations.STARTUP_MEKA_SUIT_KNOCKBACK_RESISTANCE.applyToBuilder(builder)
               .gameRestart()
-              .defineInRange("knockbackResistance", ArmorMaterials.NETHERITE.value().knockbackResistance(), 0, Float.MAX_VALUE));
+              .defineInRange("knockbackResistance", ArmorMaterials.NETHERITE.knockbackResistance(), 0, Float.MAX_VALUE));
         builder.pop();//End mekasuit
 
         builder.pop();//End gear

@@ -22,8 +22,8 @@ import net.minecraft.data.CachedOutput;
 import net.minecraft.data.DataProvider;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.tags.TagsProvider;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.tags.ItemTags;
@@ -34,15 +34,12 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
 import mekanism.neoshim.neoforge.common.Tags;
-import mekanism.neoshim.neoforge.common.data.ExistingFileHelper;
 import mekanism.neoshim.neoforge.registries.DeferredHolder;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 public abstract class BaseTagProvider implements DataProvider {
 
-    protected static final TagKey<EntityType<?>> PVI_COMPAT = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath("per-viam-invenire", "replace_vanilla_navigator"));
-    private static final TagKey<Fluid> CREATE_NO_INFINITE_FLUID = FluidTags.create(ResourceLocation.fromNamespaceAndPath("create", "no_infinite_draining"));
+    protected static final TagKey<EntityType<?>> PVI_COMPAT = TagKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath("per-viam-invenire", "replace_vanilla_navigator"));
+    private static final TagKey<Fluid> CREATE_NO_INFINITE_FLUID = FluidTags.create(Identifier.fromNamespaceAndPath("create", "no_infinite_draining"));
     protected static final TagKey<Block> FRAMEABLE = BlockTags.create(Mekanism.hooks.framedBlocks.rl("frameable"));
     protected static final TagKey<Block> FB_BE_WHITELIST = BlockTags.create(Mekanism.hooks.framedBlocks.rl("blockentity_whitelisted"));
     protected static final TagKey<Block> PE_VEIN_SHOVEL = BlockTags.create(Mekanism.hooks.projecte.rl("vein/shovel"));
@@ -50,18 +47,15 @@ public abstract class BaseTagProvider implements DataProvider {
     private final Map<ResourceKey<? extends Registry<?>>, Map<TagKey<?>, TagBuilder>> supportedTagTypes = new Object2ObjectLinkedOpenHashMap<>();
     private final Set<Block> knownHarvestRequirements = new ReferenceOpenHashSet<>();
     private final CompletableFuture<HolderLookup.Provider> lookupProvider;
-    private final ExistingFileHelper existingFileHelper;
     private final PackOutput output;
     private final String modid;
 
-    protected BaseTagProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider, String modid, @Nullable ExistingFileHelper existingFileHelper) {
+    protected BaseTagProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider, String modid) {
         this.output = output;
         this.modid = modid;
         this.lookupProvider = lookupProvider;
-        this.existingFileHelper = existingFileHelper;
     }
 
-    @NotNull
     @Override
     public String getName() {
         return "Tags: " + modid;
@@ -73,9 +67,8 @@ public abstract class BaseTagProvider implements DataProvider {
         return Collections.emptyList();
     }
 
-    @NotNull
     @Override
-    public CompletableFuture<?> run(@NotNull CachedOutput cache) {
+    public CompletableFuture<?> run(CachedOutput cache) {
         return this.lookupProvider.thenApply(registries -> {
             supportedTagTypes.values().forEach(Map::clear);
             registerTags(registries);
@@ -101,9 +94,9 @@ public abstract class BaseTagProvider implements DataProvider {
 
     @SuppressWarnings("unchecked")
     private <TYPE> TagsProvider<TYPE> createDummyTagsProvider(ResourceKey<?> registry, Map<TagKey<?>, TagBuilder> tagTypeMap) {
-        return new TagsProvider<>(output, (ResourceKey<? extends Registry<TYPE>>) registry, lookupProvider, modid, existingFileHelper) {
+        return new TagsProvider<>(output, (ResourceKey<? extends Registry<TYPE>>) registry, lookupProvider, modid) {
             @Override
-            protected void addTags(@NotNull HolderLookup.Provider lookupProvider) {
+            protected void addTags(HolderLookup.Provider lookupProvider) {
                 //Add each tag builder to the wrapped provider's builder
                 for (Map.Entry<TagKey<?>, TagBuilder> e : tagTypeMap.entrySet()) {
                     builders.put(e.getKey().location(), e.getValue());
@@ -114,7 +107,7 @@ public abstract class BaseTagProvider implements DataProvider {
 
     protected <TYPE> MekanismTagBuilder<TYPE> getBuilder(TagKey<TYPE> tag) {
         Map<TagKey<?>, TagBuilder> tagTypeMap = supportedTagTypes.computeIfAbsent(tag.registry(), type -> new Object2ObjectLinkedOpenHashMap<>());
-        return new MekanismTagBuilder<>(tagTypeMap.computeIfAbsent(tag, ignored -> TagBuilder.create()));
+        return new MekanismTagBuilder<>(tagTypeMap.computeIfAbsent(tag, _ -> TagBuilder.create()));
     }
 
     @SafeVarargs
@@ -152,7 +145,7 @@ public abstract class BaseTagProvider implements DataProvider {
         getBuilder(CREATE_NO_INFINITE_FLUID).add(register.getFluidEntries());
         //Add bucket tags
         for (DeferredHolder<Item, ?> bucket : register.getBucketEntries()) {
-            ResourceLocation bucketTag = Tags.Items.BUCKETS.location().withSuffix("/" + bucket.getId().getPath().replaceAll("_bucket", ""));
+            Identifier bucketTag = Tags.Items.BUCKETS.location().withSuffix("/" + bucket.getId().getPath().replaceAll("_bucket", ""));
             getBuilder(ItemTags.create(bucketTag)).add(bucket);
         }
     }

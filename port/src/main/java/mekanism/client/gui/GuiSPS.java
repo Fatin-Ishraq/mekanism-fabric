@@ -16,25 +16,23 @@ import mekanism.common.lib.Color.ColorFunction;
 import mekanism.common.tile.multiblock.TileEntitySPSCasing;
 import mekanism.common.util.text.EnergyDisplay;
 import mekanism.common.util.text.TextUtils;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
 
 public class GuiSPS extends GuiMekanismTile<TileEntitySPSCasing, MekanismTileContainer<TileEntitySPSCasing>> {
 
     public GuiSPS(MekanismTileContainer<TileEntitySPSCasing> container, Inventory inv, Component title) {
-        super(container, inv, title);
+        super(container, inv, title, DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT + 16);
         dynamicSlots = true;
-        imageHeight += 16;
         inventoryLabelY = imageHeight - 92;
     }
 
     @Override
     protected void addGuiElements() {
         super.addGuiElements();
-        addRenderableWidget(new GuiChemicalGauge(() -> tile.getMultiblock().inputTank, () -> tile.getMultiblock().getChemicalTanks(null), GaugeType.STANDARD, this, 7, 17));
-        addRenderableWidget(new GuiChemicalGauge(() -> tile.getMultiblock().outputTank, () -> tile.getMultiblock().getChemicalTanks(null), GaugeType.STANDARD, this, 151, 17));
+        addRenderableWidget(new GuiChemicalGauge(() -> tile.getMultiblock().inputTank, () -> tile.getMultiblock().getChemicalTanks(), GaugeType.STANDARD, this, 7, 17));
+        addRenderableWidget(new GuiChemicalGauge(() -> tile.getMultiblock().outputTank, () -> tile.getMultiblock().getChemicalTanks(), GaugeType.STANDARD, this, 151, 17));
         addRenderableWidget(new GuiInnerScreen(this, 27, 17, 122, 60, () -> {
             List<Component> list = new ArrayList<>();
             SPSMultiblockData multiblock = tile.getMultiblock();
@@ -60,7 +58,7 @@ public class GuiSPS extends GuiMekanismTile<TileEntitySPSCasing, MekanismTileCon
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         renderTitleText(guiGraphics);
         renderInventoryText(guiGraphics);
         super.drawForegroundText(guiGraphics, mouseX, mouseY);

@@ -22,20 +22,20 @@ import mekanism.common.content.transporter.SorterFilter;
 import mekanism.common.content.transporter.SorterItemStackFilter;
 import mekanism.common.tile.machine.TileEntityOredictionificator;
 import mekanism.common.util.text.InputValidator;
+import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import mekanism.neoshim.neoforge.server.ServerLifecycleHooks;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public class SpecialConverters {
 
@@ -54,23 +54,23 @@ public class SpecialConverters {
         return null;
     }
 
-    private static ItemStack tryCreateFilterItem(@Nullable String rawName, @Nullable String rawComponents) throws ComputerException {
+    private static ItemResource tryCreateFilterItem(@Nullable String rawName, @Nullable String rawComponents) throws ComputerException {
         Item item = tryCreateItem(rawName);
         if (item == Items.AIR) {
-            return ItemStack.EMPTY;
+            return ItemResource.EMPTY;
         }
         if (rawComponents != null) {
             DataComponentPatch dataComponents = unwrapComponents(rawComponents);
-            return new ItemStack(item.builtInRegistryHolder(), 1, dataComponents);
+            return ItemResource.of(item.builtInRegistryHolder(), dataComponents);
         }
-        return new ItemStack(item);
+        return ItemResource.of(item);
     }
 
     private static Item tryCreateItem(@Nullable Object rawName) {
         if (rawName instanceof String name) {
-            ResourceLocation itemName = ResourceLocation.tryParse(name);
+            Identifier itemName = Identifier.tryParse(name);
             if (itemName != null) {
-                return BuiltInRegistries.ITEM.get(itemName);
+                return BuiltInRegistries.ITEM.get(itemName).map(Holder::value).orElse(Items.AIR);
             }
         }
         return Items.AIR;
@@ -106,8 +106,7 @@ public class SpecialConverters {
         return raw instanceof Number number ? number.intValue() : 0;
     }
 
-    @NotNull
-    public static <FILTER extends IFilter<FILTER>> FILTER convertMapToFilter(@NotNull Class<FILTER> expectedType, @NotNull Map<?, ?> map) throws ComputerException {
+    public static <FILTER extends IFilter<FILTER>> FILTER convertMapToFilter(Class<FILTER> expectedType, Map<?, ?> map) throws ComputerException {
         //We may want to try improving this at some point, or somehow making it slightly less hardcoded
         // but for now this will have to do
         Object type = map.get(SerializationConstants.TYPE);
@@ -146,12 +145,12 @@ public class SpecialConverters {
         return expectedType.cast(filter);
     }
 
-    private static void decodeOreDictFilter(@NotNull Map<?, ?> map, OredictionificatorFilter<?, ?, ?> oredictionificatorFilter) throws ComputerException {
+    private static void decodeOreDictFilter(Map<?, ?> map, OredictionificatorFilter<?, ?, ?> oredictionificatorFilter) throws ComputerException {
         Object rawTag = map.get(SerializationConstants.TARGET);
         if (!(rawTag instanceof String tag) || tag.isEmpty()) {
             throw new ComputerException("Missing '" + SerializationConstants.TARGET + "'");
         }
-        ResourceLocation rl = ResourceLocation.tryParse(tag);
+        Identifier rl = Identifier.tryParse(tag);
         if (rl == null || !TileEntityOredictionificator.isValidTarget(rl)) {
             throw new ComputerException("Invalid '" + SerializationConstants.TARGET + "'");
         }
@@ -164,13 +163,13 @@ public class SpecialConverters {
         }
     }
 
-    private static void decodeQioFilter(@NotNull Map<?, ?> map, QIOFilter<?> qioFilter) {
+    private static void decodeQioFilter(Map<?, ?> map, QIOFilter<?> qioFilter) {
         if (qioFilter instanceof QIOItemStackFilter qioItemFilter) {
             qioItemFilter.fuzzyMode = getBooleanFromRaw(map.get(SerializationConstants.FUZZY));
         }
     }
 
-    private static void decodeSorterFilter(@NotNull Map<?, ?> map, SorterFilter<?> sorterFilter) throws ComputerException {
+    private static void decodeSorterFilter(Map<?, ?> map, SorterFilter<?> sorterFilter) throws ComputerException {
         sorterFilter.allowDefault = getBooleanFromRaw(map.get(SerializationConstants.ALLOW_DEFAULT));
         Object rawColor = map.get(SerializationConstants.COLOR);
         if (rawColor instanceof String) {
@@ -188,12 +187,12 @@ public class SpecialConverters {
         }
     }
 
-    private static void decodeMinerFilter(@NotNull Map<?, ?> map, MinerFilter<?> minerFilter) {
+    private static void decodeMinerFilter(Map<?, ?> map, MinerFilter<?> minerFilter) {
         minerFilter.requiresReplacement = getBooleanFromRaw(map.get(SerializationConstants.REQUIRES_REPLACEMENT));
         minerFilter.replaceTarget = tryCreateItem(map.get(SerializationConstants.REPLACE_TARGET));
     }
 
-    private static void decodeTagFilter(@NotNull Map<?, ?> map, ITagFilter<?> tagFilter) throws ComputerException {
+    private static void decodeTagFilter(Map<?, ?> map, ITagFilter<?> tagFilter) throws ComputerException {
         String tag = tryGetFilterTag(map.get(SerializationConstants.TAG));
         if (tag == null) {
             throw new ComputerException("Invalid or missing tag specified for Tag filter");
@@ -201,7 +200,7 @@ public class SpecialConverters {
         tagFilter.setTagName(tag);
     }
 
-    private static void decodeModIdFilter(@NotNull Map<?, ?> map, IModIDFilter<?> modIDFilter) throws ComputerException {
+    private static void decodeModIdFilter(Map<?, ?> map, IModIDFilter<?> modIDFilter) throws ComputerException {
         String modId = tryGetFilterModId(map.get(SerializationConstants.MODID));
         if (modId == null) {
             throw new ComputerException("Invalid or missing modId specified for Mod Id filter");
@@ -209,15 +208,15 @@ public class SpecialConverters {
         modIDFilter.setModID(modId);
     }
 
-    private static void decodeItemStackFilter(@NotNull Map<?, ?> map, IItemStackFilter<?> itemFilter) throws ComputerException {
-        ItemStack stack = tryCreateFilterItem((String) map.get(SerializationConstants.ITEM), (String) map.get(SerializationConstants.COMPONENTS));
-        if (stack.isEmpty()) {
-            throw new ComputerException("Invalid or missing item specified for ItemStack filter");
+    private static void decodeItemStackFilter(Map<?, ?> map, IItemStackFilter<?> itemFilter) throws ComputerException {
+        ItemResource itemType = tryCreateFilterItem((String) map.get(SerializationConstants.ITEM), (String) map.get(SerializationConstants.COMPONENTS));
+        if (itemType.isEmpty()) {
+            throw new ComputerException("Invalid or missing item specified for ItemResource filter");
         }
-        itemFilter.setItemStack(stack);
+        itemFilter.setItemType(itemType);
     }
 
-    static Map<String, Object> wrapStack(String name, String sizeKey, int amount, @NotNull DataComponentPatch components) {
+    static Map<String, Object> wrapStack(String name, String sizeKey, int amount, DataComponentPatch components) {
         int elements = 2;
         boolean hasComponents = !components.isEmpty() && amount > 0;
         if (hasComponents) {
@@ -232,11 +231,24 @@ public class SpecialConverters {
         return wrapped;
     }
 
-    static String wrapComponents(@NotNull DataComponentPatch components) {
+    static Map<String, Object> wrapResource(String name, DataComponentPatch components) {
+        int elements = 1;
+        if (!components.isEmpty()) {
+            elements++;
+        }
+        Map<String, Object> wrapped = new HashMap<>(elements);
+        wrapped.put(SerializationConstants.NAME, name);
+        if (!components.isEmpty()) {
+            wrapped.put(SerializationConstants.COMPONENTS, wrapComponents(components));
+        }
+        return wrapped;
+    }
+
+    static String wrapComponents(DataComponentPatch components) {
         return NbtUtils.structureToSnbt((CompoundTag) DataComponentPatch.CODEC.encodeStart(getRegistryNbtOps(), components).getOrThrow());
     }
 
-    static DataComponentPatch unwrapComponents(@NotNull String rawComponents) throws ComputerException {
+    static DataComponentPatch unwrapComponents(String rawComponents) throws ComputerException {
         CompoundTag nbt;
         try {
             nbt = NbtUtils.snbtToStructure(rawComponents);

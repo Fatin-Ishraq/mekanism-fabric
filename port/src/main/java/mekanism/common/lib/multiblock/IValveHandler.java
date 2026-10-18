@@ -1,88 +1,127 @@
 package mekanism.common.lib.multiblock;
 
-import java.util.Collection;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import mekanism.api.SerializationConstants;
+import mekanism.api.fluid.IFluidTank;
+import mekanism.common.capabilities.fluid.ValveFluidTankWrapper;
 import mekanism.common.util.MekanismUtils;
-import mekanism.common.util.NBTUtils;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtUtils;
-import net.minecraft.nbt.Tag;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.ValueOutput.TypedOutputList;
+import mekanism.neoshim.neoforge.transfer.transaction.SnapshotJournal;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
 public interface IValveHandler {
 
-    default void writeValves(CompoundTag updateTag) {
-        ListTag valves = new ListTag();
-        for (ValveData valveData : getValveData()) {
+    default void writeValves(ValueOutput output) {
+        TypedOutputList<PositionedValve> valveList = output.list(SerializationConstants.VALVE, PositionedValve.CODEC);
+        for (Map.Entry<BlockPos, ValveData> entry : getValveData().entrySet()) {
+            ValveData valveData = entry.getValue();
             if (valveData.activeTicks > 0) {
-                CompoundTag valveNBT = new CompoundTag();
-                valveNBT.put(SerializationConstants.POSITION, NbtUtils.writeBlockPos(valveData.location));
-                NBTUtils.writeEnum(valveNBT, SerializationConstants.SIDE, valveData.side);
-                valves.add(valveNBT);
+                valveList.add(new PositionedValve(entry.getKey(), valveData));
             }
         }
-        updateTag.put(SerializationConstants.VALVE, valves);
-    }
-
-    default void readValves(CompoundTag updateTag) {
-        getValveData().clear();
-        if (updateTag.contains(SerializationConstants.VALVE, Tag.TAG_LIST)) {
-            ListTag valves = updateTag.getList(SerializationConstants.VALVE, Tag.TAG_COMPOUND);
-            for (int i = 0; i < valves.size(); i++) {
-                CompoundTag valveNBT = valves.getCompound(i);
-                NBTUtils.setBlockPosIfPresent(valveNBT, SerializationConstants.POSITION, pos -> {
-                    Direction side = Direction.from3DDataValue(valveNBT.getInt(SerializationConstants.SIDE));
-                    getValveData().add(new ValveData(pos, side));
-                });
-            }
+        if (valveList.isEmpty()) {
+            output.discard(SerializationConstants.VALVE);
         }
     }
 
-    default void triggerValveTransfer(IMultiblock<?> multiblock) {
-        if (multiblock.getMultiblock().isFormed()) {
-            BlockPos pos = multiblock.getBlockPos();
-            for (ValveData data : getValveData()) {
-                if (pos.equals(data.location)) {
-                    data.onTransfer();
-                    break;
-                }
-            }
+    default void readValves(ValueInput input) {
+        Map<BlockPos, ValveData> valveData = getValveData();
+        valveData.clear();
+        for (PositionedValve valve : input.listOrEmpty(SerializationConstants.VALVE, PositionedValve.CODEC)) {
+            valveData.put(valve.location(), valve.valve());
         }
     }
 
-    Collection<ValveData> getValveData();
+    Map<BlockPos, ValveData> getValveData();
 
-    class ValveData {
+    record PositionedValve(BlockPos location, ValveData valve) {
 
-        public final BlockPos location;
+        public static final Codec<PositionedValve> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+              BlockPos.CODEC.fieldOf(SerializationConstants.POSITION).forGetter(PositionedValve::location),
+              ValveData.CODEC.fieldOf(SerializationConstants.VALVE).forGetter(PositionedValve::valve)
+        ).apply(instance, PositionedValve::new));
+    }
+
+    class ValveData extends SnapshotJournal<Integer> {
+
+        public static final Codec<ValveData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+              Direction.CODEC.fieldOf(SerializationConstants.SIDE).forGetter(data -> data.side)
+        ).apply(instance, ValveData::new));
+
         public final Direction side;
 
-        public boolean prevActive;
-        public int activeTicks;
+        @Nullable
+        private List<IFluidTank> valveTanks;
+        private boolean prevActive;
+        private int activeTicks;
 
-        public ValveData(BlockPos location, Direction side) {
-            this.location = location;
+        public ValveData(Direction side) {
             this.side = side;
         }
 
-        public void onTransfer() {
+        public void resetTanks() {
+            //TODO: Can multiblocks be re-initialized? If not then this isn't necessary
+            valveTanks = null;
+        }
+
+        public void addTank(IFluidTank tank, boolean wrap) {
+            if (this.valveTanks == null) {
+                this.valveTanks = new ArrayList<>();
+            }
+            this.valveTanks.add(wrap ? new ValveFluidTankWrapper(tank, this) : tank);
+        }
+
+        public List<IFluidTank> getValveTanks() {
+            return valveTanks == null ? Collections.emptyList() : valveTanks;
+        }
+
+        public void onTransfer(TransactionContext transaction) {
+            //Note: This makes no assumptions about if the multiblock is formed or not, as the multiblock is responsible for using the values,
+            // and if it is not formed then they won't be used
+            updateSnapshots(transaction);
             activeTicks = SharedConstants.TICKS_PER_SECOND + MekanismUtils.TICKS_PER_HALF_SECOND;
+        }
+
+        public boolean tick() {
+            if (activeTicks > 0) {
+                activeTicks--;
+            }
+            if (activeTicks > 0 == prevActive) {
+                return false;
+            }
+            prevActive = !prevActive;
+            return true;
         }
 
         @Override
         public int hashCode() {
-            int code = 1;
-            code = 31 * code + side.ordinal();
-            code = 31 * code + location.hashCode();
-            return code;
+            return side.ordinal();
         }
 
         @Override
-        public boolean equals(Object obj) {
-            return obj instanceof ValveData other && other.side == side && other.location.equals(location);
+        public boolean equals(@Nullable Object obj) {
+            return obj instanceof ValveData other && other.side == side;
+        }
+
+        @Override
+        protected Integer createSnapshot() {
+            return activeTicks;
+        }
+
+        @Override
+        protected void revertToSnapshot(Integer snapshot) {
+            activeTicks = snapshot;
         }
     }
 }

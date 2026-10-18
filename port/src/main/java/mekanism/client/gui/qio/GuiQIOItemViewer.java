@@ -1,7 +1,6 @@
 package mekanism.client.gui.qio;
 
 import com.google.common.collect.Sets;
-import com.mojang.blaze3d.platform.InputConstants;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -31,13 +30,15 @@ import mekanism.common.inventory.container.QIOItemViewerContainer.ListSortType;
 import mekanism.common.inventory.container.QIOItemViewerContainer.SortDirection;
 import mekanism.common.lib.frequency.Frequency.FrequencyIdentity;
 import mekanism.common.util.text.TextUtils;
-import net.minecraft.Util;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
+import net.minecraft.util.CommonColors;
+import net.minecraft.util.Util;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
-import org.lwjgl.glfw.GLFW;
+import org.jetbrains.annotations.UnknownNullability;
+import org.jspecify.annotations.Nullable;
 
 public abstract class GuiQIOItemViewer<CONTAINER extends QIOItemViewerContainer> extends GuiMekanism<CONTAINER> implements ResizeController {
 
@@ -47,20 +48,29 @@ public abstract class GuiQIOItemViewer<CONTAINER extends QIOItemViewerContainer>
           allowsChars -> allowsChars.addAll(QueryType.getPrefixChars())
     );
 
+    private final int searchDropdownX;
     protected final Inventory inv;
+    @UnknownNullability//Initialized via addGuiElements
     private GuiTextField searchField;
+    @UnknownNullability//Initialized via addGuiElements
     private GuiCraftingWindowTab craftingWindowTab;
-    private GuiDropdown<?> searchDropdown;
     private boolean loadPinned = true;
 
     protected GuiQIOItemViewer(CONTAINER container, Inventory inv, Component title) {
-        super(container, inv, title);
+        super(container, inv, title, calcWidth(), calcHeight());
         this.inv = inv;
-        imageWidth = 16 + MekanismConfig.client.qioItemViewerSlotsX.get() * 18 + 18;
-        imageHeight = QIOItemViewerContainer.SLOTS_START_Y + MekanismConfig.client.qioItemViewerSlotsY.get() * 18 + 96;
         inventoryLabelY = imageHeight - 93;
         titleLabelY = 5;
         dynamicSlots = true;
+        searchDropdownX = imageWidth - 63;
+    }
+
+    private static int calcHeight() {
+        return QIOItemViewerContainer.SLOTS_START_Y + MekanismConfig.client.qioItemViewerSlotsY.get() * 18 + 96;
+    }
+
+    private static int calcWidth() {
+        return 16 + MekanismConfig.client.qioItemViewerSlotsX.get() * 18 + 18;
     }
 
     @Override
@@ -83,21 +93,21 @@ public abstract class GuiQIOItemViewer<CONTAINER extends QIOItemViewerContainer>
                         TextUtils.format(menu.getTypeCapacity()))
             );
         }));
-        searchField = addRenderableWidget(new GuiTextField(this, 50, 15 + 12 + 3, imageWidth - 50 - 10, 10));
-        searchField.setOffset(0, -1)
+        searchField = addRenderableWidget(new GuiTextField(this, 50, 15 + 12 + 3, imageWidth - 50 - 10, 10))
+              .setOffset(0, -1)
               .setInputValidator(this::isValidSearchChar)
               .setBackground(BackgroundType.ELEMENT_HOLDER)
               //Note: This responder will also be called when the menu is resized/repositioned and the text gets copied
-              .setResponder(text -> menu.updateSearch(menu.getLevel(), text, true));
-        searchField.setMaxLength(50);
-        searchField.setVisible(true);
-        searchField.setTextColor(0xFFFFFF);
+              .setResponder(text -> menu.updateSearch(menu.getLevel(), text, true))
+              .setMaxLength(50)
+              .setVisible(true)
+              .setTextColor(CommonColors.WHITE);
         if (MekanismConfig.client.qioAutoFocusSearchBar.get()) {
             setInitialFocus(searchField);
         }
         addRenderableWidget(new GuiSlotScroll(this, 7, QIOItemViewerContainer.SLOTS_START_Y, MekanismConfig.client.qioItemViewerSlotsX.get(), slotsY,
               menu::getQIOItemList, menu));
-        searchDropdown = addRenderableWidget(new GuiDropdown<>(this, imageWidth - 9 - 54, QIOItemViewerContainer.SLOTS_START_Y + slotsY * 18 + 1,
+        addRenderableWidget(new GuiDropdown<>(this, searchDropdownX, QIOItemViewerContainer.SLOTS_START_Y + slotsY * 18 + 1,
               41, ListSortType.class, menu::getSortType, menu::setSortType));
         addRenderableWidget(new GuiDigitalIconToggle<>(this, imageWidth - 9 - 12, QIOItemViewerContainer.SLOTS_START_Y + slotsY * 18 + 1,
               12, 12, SortDirection.class, menu::getSortDirection, menu::setSortDirection));
@@ -108,14 +118,14 @@ public abstract class GuiQIOItemViewer<CONTAINER extends QIOItemViewerContainer>
         addRenderableWidget(new GuiToggleClientConfigTab(this, 6, false, getButtonLocation("searchbar_autofocus_off"), getButtonLocation("searchbar_autofocus_on"),
               //Note: This is backwards as it describes what the button will be doing
               MekanismConfig.client.qioAutoFocusSearchBar, MekanismLang.QIO_SEARCH_MANUAL_FOCUS.translate(), MekanismLang.QIO_SEARCH_AUTO_FOCUS.translate()));
-        addRenderableWidget(new GuiResizeControls(this, (getMinecraft().getWindow().getGuiScaledHeight() / 2) - topPos));
+        addRenderableWidget(new GuiResizeControls(this, (minecraft.getWindow().getGuiScaledHeight() / 2) - topPos));
         craftingWindowTab = addRenderableWidget(new GuiCraftingWindowTab(this, () -> craftingWindowTab, menu));
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         renderTitleText(guiGraphics);
-        renderInventoryTextAndOther(guiGraphics, MekanismLang.LIST_SORT.translate(), imageWidth - searchDropdown.getRelativeX() - 5);
+        renderInventoryTextAndOther(guiGraphics, MekanismLang.LIST_SORT.translate(), imageWidth - searchDropdownX - 5);
         drawScrollingString(guiGraphics, MekanismLang.LIST_SEARCH.translate(), 4, 31, TextAlignment.RIGHT, titleTextColor(), searchField.getRelativeX() - 4, 3, false);
         super.drawForegroundText(guiGraphics, mouseX, mouseY);
     }
@@ -134,14 +144,16 @@ public abstract class GuiQIOItemViewer<CONTAINER extends QIOItemViewerContainer>
             recreateViewer();
         } else if (wasOnRecipeViewer) {
             //When switching back to the QIO Item Viewer from a recipe viewer, we want to ensure that we update the current pause state
-            menu.pauseSorting(hasShiftDown());
+            menu.pauseSorting(Minecraft.getInstance().hasShiftDown());
         }
     }
 
-    private boolean isValidSearchChar(char c) {
-        return ALLOWED_SPECIAL_CHARS.contains(c) || Character.isDigit(c) || Character.isAlphabetic(c);
+    //TODO - 26.1 review this - currently anything outside the BMP is not allowed
+    private boolean isValidSearchChar(int c) {
+        return (Character.isBmpCodePoint(c) && ALLOWED_SPECIAL_CHARS.contains((char) c)) || Character.isDigit(c) || Character.isAlphabetic(c);
     }
 
+    @Nullable
     public abstract FrequencyIdentity getFrequency();
 
     @Override
@@ -156,10 +168,10 @@ public abstract class GuiQIOItemViewer<CONTAINER extends QIOItemViewerContainer>
         }
         if (changeX != null || changeY != null) {
             if (changeX != null) {
-                MekanismConfig.client.qioItemViewerSlotsX.set(Mth.clamp(changeX.getAsInt(), QIOItemViewerContainer.SLOTS_X_MIN, QIOItemViewerContainer.SLOTS_X_MAX));
+                MekanismConfig.client.qioItemViewerSlotsX.set(Math.clamp(changeX.getAsInt(), QIOItemViewerContainer.SLOTS_X_MIN, QIOItemViewerContainer.SLOTS_X_MAX));
             }
             if (changeY != null) {
-                MekanismConfig.client.qioItemViewerSlotsY.set(Mth.clamp(changeY.getAsInt(), QIOItemViewerContainer.SLOTS_Y_MIN, QIOItemViewerContainer.getSlotsYMax()));
+                MekanismConfig.client.qioItemViewerSlotsY.set(Math.clamp(changeY.getAsInt(), QIOItemViewerContainer.SLOTS_Y_MIN, QIOItemViewerContainer.getSlotsYMax()));
             }
             // save the updated config info
             MekanismConfig.client.save();
@@ -175,9 +187,9 @@ public abstract class GuiQIOItemViewer<CONTAINER extends QIOItemViewerContainer>
         GuiQIOItemViewer<CONTAINER> s = recreate(c);
         //Skip loading pinned windows for now on the new viewer as we will transfer any open windows manually (pinned or not)
         s.loadPinned = false;
-        getMinecraft().screen = null;
-        getMinecraft().player.containerMenu = s.getMenu();
-        getMinecraft().setScreen(s);
+        minecraft.screen = null;
+        minecraft.player.containerMenu = s.getMenu();
+        minecraft.setScreen(s);
         s.searchField.setText(searchField.getText());
         //Transfer all the windows to the new GUI
         s.transferWindows(windows);
@@ -207,23 +219,18 @@ public abstract class GuiQIOItemViewer<CONTAINER extends QIOItemViewerContainer>
     public abstract GuiQIOItemViewer<CONTAINER> recreate(CONTAINER container);
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == GLFW.GLFW_KEY_LEFT_SHIFT || keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT) {
+    public boolean keyPressed(KeyEvent event) {
+        if (event.hasShiftDown()) {
             menu.pauseSorting(true);
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(event);
     }
 
     @Override
-    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
-        //Note: We only want to unpause sorting if they aren't pressing shift. If they were pressing both shift keys and then released one
-        // we want to make sure it stays paused. We just pass the value of if the other key is pressed and let the code that handles
-        // pausing/unpausing on value change handle determining if we should stay paused
-        if (keyCode == GLFW.GLFW_KEY_LEFT_SHIFT) {
-            menu.pauseSorting(InputConstants.isKeyDown(getMinecraft().getWindow().getWindow(), GLFW.GLFW_KEY_RIGHT_SHIFT));
-        } else if (keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT) {
-            menu.pauseSorting(InputConstants.isKeyDown(getMinecraft().getWindow().getWindow(), GLFW.GLFW_KEY_LEFT_SHIFT));
+    public boolean keyReleased(KeyEvent event) {
+        if (!event.hasShiftDown()) {
+            menu.pauseSorting(false);
         }
-        return super.keyReleased(keyCode, scanCode, modifiers);
+        return super.keyReleased(event);
     }
 }

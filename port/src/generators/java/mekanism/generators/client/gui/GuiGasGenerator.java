@@ -9,15 +9,13 @@ import mekanism.client.gui.element.bar.GuiVerticalPowerBar;
 import mekanism.client.gui.element.gauge.GaugeType;
 import mekanism.client.gui.element.gauge.GuiChemicalGauge;
 import mekanism.client.gui.element.tab.GuiEnergyTab;
-import mekanism.common.MekanismLang;
 import mekanism.common.inventory.container.tile.MekanismTileContainer;
 import mekanism.common.util.text.EnergyDisplay;
 import mekanism.generators.common.GeneratorsLang;
 import mekanism.generators.common.tile.TileEntityGasGenerator;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
 
 public class GuiGasGenerator extends GuiMekanismTile<TileEntityGasGenerator, MekanismTileContainer<TileEntityGasGenerator>> {
 
@@ -32,17 +30,18 @@ public class GuiGasGenerator extends GuiMekanismTile<TileEntityGasGenerator, Mek
         addRenderableWidget(GuiSideHolder.create(this, -26, 6, 98, true, true, SpecialColors.TAB_ARMOR_SLOTS));
         super.addGuiElements();
         addRenderableWidget(new GuiEnergyTab(this, () -> {
-            long productionAmount = MathUtils.clampToLong(tile.getGenerationRate() * tile.getUsed() * tile.getMaxBurnTicks());
+            long fuelDensity = tile.getCachedFuel() == null ? 0 : tile.getCachedFuel().energyDensity();
+            long productionAmount = MathUtils.clampToLong(fuelDensity * tile.getUsed());
             return List.of(
-                  GeneratorsLang.PRODUCING_AMOUNT.translate(EnergyDisplay.of(productionAmount)),
-                  MekanismLang.MAX_OUTPUT.translate(EnergyDisplay.of(tile.getMaxOutput())));
+                  GeneratorsLang.PRODUCING_AMOUNT.translate(EnergyDisplay.of(productionAmount))
+            );
         }));
-        addRenderableWidget(new GuiChemicalGauge(() -> tile.fuelTank, () -> tile.getChemicalTanks(null), GaugeType.WIDE, this, 55, 18));
-        addRenderableWidget(new GuiVerticalPowerBar(this, tile.getEnergyContainer(), 164, 15));
+        addRenderableWidget(new GuiChemicalGauge(tile::getFuelTank, tile::getChemicalTanks, GaugeType.WIDE, this, 55, 18));
+        addRenderableWidget(new GuiVerticalPowerBar(this, tile.energyContainer(), 164, 15));
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         renderTitleText(guiGraphics);
         renderInventoryTextAndOther(guiGraphics, GeneratorsLang.GAS_BURN_RATE.translate(tile.getUsed()));
         super.drawForegroundText(guiGraphics, mouseX, mouseY);

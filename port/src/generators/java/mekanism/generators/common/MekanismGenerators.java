@@ -1,21 +1,14 @@
 package mekanism.generators.common;
 
+import java.util.Objects;
 import mekanism.api.MekanismIMC;
 import mekanism.common.Mekanism;
 import mekanism.common.base.IModModule;
 import mekanism.common.command.builders.BuildCommand;
 import mekanism.common.lib.Version;
-import mekanism.common.lib.multiblock.MultiblockManager;
 import mekanism.generators.common.config.MekanismGeneratorsConfig;
-import mekanism.generators.common.content.fission.FissionReactorCache;
-import mekanism.generators.common.content.fission.FissionReactorMultiblockData;
-import mekanism.generators.common.content.fission.FissionReactorValidator;
-import mekanism.generators.common.content.fusion.FusionReactorCache;
-import mekanism.generators.common.content.fusion.FusionReactorMultiblockData;
-import mekanism.generators.common.content.fusion.FusionReactorValidator;
-import mekanism.generators.common.content.turbine.TurbineCache;
+import mekanism.generators.common.content.MekanismGeneratorsMultiblocks;
 import mekanism.generators.common.content.turbine.TurbineMultiblockData;
-import mekanism.generators.common.content.turbine.TurbineValidator;
 import mekanism.generators.common.network.GeneratorsPacketHandler;
 import mekanism.generators.common.registries.GeneratorsBlocks;
 import mekanism.generators.common.registries.GeneratorsBuilders.FissionReactorBuilder;
@@ -30,33 +23,27 @@ import mekanism.generators.common.registries.GeneratorsItems;
 import mekanism.generators.common.registries.GeneratorsModules;
 import mekanism.generators.common.registries.GeneratorsSounds;
 import mekanism.generators.common.registries.GeneratorsTileEntityTypes;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import mekanism.neoshim.bus.api.IEventBus;
 import mekanism.neoshim.fml.ModContainer;
 import mekanism.neoshim.fml.common.Mod;
 import mekanism.neoshim.fml.event.lifecycle.FMLCommonSetupEvent;
 import mekanism.neoshim.fml.event.lifecycle.InterModEnqueueEvent;
+import org.jspecify.annotations.Nullable;
 
 @Mod(MekanismGenerators.MODID)
 public class MekanismGenerators implements IModModule {
 
     public static final String MODID = "mekanismgenerators";
 
+    @Nullable
     public static MekanismGenerators instance;
 
-    /**
-     * MekanismGenerators version number
-     */
+    /// MekanismGenerators version number
     public final Version versionNumber;
-    /**
-     * Mekanism Generators Packet Pipeline
-     */
+    /// Mekanism Generators Packet Pipeline
     private final GeneratorsPacketHandler packetHandler;
-
-    public static final MultiblockManager<TurbineMultiblockData> turbineManager = new MultiblockManager<>("industrialTurbine", TurbineCache::new, TurbineValidator::new);
-    public static final MultiblockManager<FissionReactorMultiblockData> fissionReactorManager = new MultiblockManager<>("fissionReactor", FissionReactorCache::new, FissionReactorValidator::new);
-    public static final MultiblockManager<FusionReactorMultiblockData> fusionReactorManager = new MultiblockManager<>("fusionReactor", FusionReactorCache::new, FusionReactorValidator::new);
-
+    
     public MekanismGenerators(ModContainer modContainer, IEventBus modEventBus) {
         Mekanism.addModule(instance = this);
         //Set our version number to match the neoforge.mods.toml file, which matches the one in our build.gradle
@@ -76,15 +63,16 @@ public class MekanismGenerators implements IModModule {
         GeneratorsTileEntityTypes.TILE_ENTITY_TYPES.register(modEventBus);
         GeneratorsChemicals.CHEMICALS.register(modEventBus);
         GeneratorsModules.MODULES.register(modEventBus);
+        MekanismGeneratorsMultiblocks.register(modEventBus);
         packetHandler = new GeneratorsPacketHandler(modEventBus, versionNumber);
     }
 
     public static GeneratorsPacketHandler packetHandler() {
-        return instance.packetHandler;
+        return Objects.requireNonNull(instance).packetHandler;
     }
 
-    public static ResourceLocation rl(String path) {
-        return ResourceLocation.fromNamespaceAndPath(MODID, path);
+    public static Identifier rl(String path) {
+        return Identifier.fromNamespaceAndPath(MODID, path);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {

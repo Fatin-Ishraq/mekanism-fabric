@@ -2,7 +2,9 @@ package mekanism.client;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import mekanism.client.model.robit.RobitSkinManager;
 import mekanism.client.render.RenderTickHandler;
 import mekanism.client.render.tileentity.RenderSPS;
 import mekanism.client.sound.SoundHandler;
@@ -14,29 +16,40 @@ import mekanism.common.lib.transmitter.TransmitterNetworkRegistry;
 import mekanism.common.network.PacketUtils;
 import mekanism.common.network.to_server.PacketKey;
 import mekanism.common.recipe.MekanismRecipeType;
+import mekanism.common.util.MekanismUtils;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.Connection;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.RecipeMap;
 import net.minecraft.world.level.Level;
 import mekanism.neoshim.api.distmarker.Dist;
+import mekanism.neoshim.bus.api.IEventBus;
 import mekanism.neoshim.bus.api.SubscribeEvent;
 import mekanism.neoshim.fml.ModContainer;
+import mekanism.neoshim.fml.common.EventBusSubscriber;
 import mekanism.neoshim.fml.common.Mod;
 import mekanism.neoshim.neoforge.client.event.ClientPlayerNetworkEvent;
+import mekanism.neoshim.neoforge.client.event.RecipesReceivedEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import mekanism.neoshim.neoforge.client.gui.IConfigScreenFactory;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @Mod(value = Mekanism.MODID, dist = Dist.CLIENT)
+@EventBusSubscriber(modid = Mekanism.MODID, value = Dist.CLIENT)
 public class MekanismClient {
-
-    public MekanismClient(ModContainer container) {
-        container.registerExtensionPoint(IConfigScreenFactory.class, () -> (c, parent) -> new ConfigurationScreen(c.getModId(), parent));//FABRIC: FCAP screen ctor takes a mod id
-    }
 
     public static final Map<UUID, SecurityData> clientSecurityMap = new Object2ObjectOpenHashMap<>();
     public static final Map<UUID, String> clientUUIDMap = new Object2ObjectOpenHashMap<>();
+    private static boolean isConnected;
+    private static RecipeMap clientRecipeMap = RecipeMap.EMPTY;
+
+    public MekanismClient(ModContainer container, IEventBus modEventBus) {
+        container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
+        modEventBus.register(RobitSpriteUploader.class);
+        modEventBus.register(RobitSkinManager.class);
+    }
 
     public static void updateKey(KeyMapping key, int type) {
         updateKey(key.isDown(), type);
@@ -53,9 +66,7 @@ public class MekanismClient {
         }
     }
 
-    /**
-     * Reset things that aren't needed between levels or would leak
-     */
+    /// Reset things that aren't needed between levels or would leak
     public static void resetDimensionChange() {
         Mekanism.playerState.clear(true);
         Mekanism.activeVibrators.clear();
@@ -72,6 +83,7 @@ public class MekanismClient {
     public static void reset() {
         clientSecurityMap.clear();
         clientUUIDMap.clear();
+        clientRecipeMap = RecipeMap.EMPTY;
 
         ClientTickHandler.reset();
         SoundHandler.radiationSoundMap.clear();
@@ -105,5 +117,40 @@ public class MekanismClient {
         if (event.getOldPlayer().level() != event.getNewPlayer().level()) {
             resetDimensionChange();
         }
+    }
+
+    public static String getModId(ItemStack stack) {
+        return MekanismUtils.getModId(Objects.requireNonNull(Minecraft.getInstance().level, "No active Level").registryAccess(), stack);
+    }
+
+    @SubscribeEvent
+    public static void onJoinServer(ClientPlayerNetworkEvent.LoggingIn event) {
+        if (!isConnected) {//Note: This should always be true when the event is fired
+            isConnected = true;
+            launchClient(event.getConnection());
+        }
+    }
+
+    @SubscribeEvent
+    public static void onLeaveServer(ClientPlayerNetworkEvent.LoggingOut event) {
+        //Note: We check if the client has actually connected before handling this, as this event is also called when the client is setting up the server
+        if (isConnected) {
+            isConnected = false;
+            reset();
+        }
+    }
+
+    @SubscribeEvent
+    public static void recipesUpdated(RecipesReceivedEvent event) {
+        //Note: Dedicated servers first connection the server sends recipes then tags, and on reload sends tags then recipes.
+        // We ignore this fact and only clear the cache in the recipes updated event however, as the cache should already be
+        // empty on our initial connection, and even if it isn't the client has no way to query the recipes and cause the
+        // caches to be initialized before the tags are then received as we lazily initialize our recipe caches.
+        MekanismRecipeType.clearCache();
+        clientRecipeMap = event.getRecipeMap();
+    }
+
+    public static RecipeMap clientRecipes() {
+        return clientRecipeMap;
     }
 }

@@ -1,32 +1,45 @@
 package mekanism.client;
 
-import java.util.Collections;
-import java.util.List;
 import mekanism.common.Mekanism;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.client.renderer.texture.TextureManager;
-import net.minecraft.client.resources.TextureAtlasHolder;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.client.resources.model.sprite.AtlasManager.AtlasConfig;
+import net.minecraft.client.resources.model.sprite.SpriteId;
+import net.minecraft.resources.Identifier;
+import mekanism.neoshim.bus.api.SubscribeEvent;
+import mekanism.neoshim.neoforge.client.event.ModelEvent;
+import mekanism.neoshim.neoforge.client.event.RegisterTextureAtlasesEvent;
 
-public class RobitSpriteUploader extends TextureAtlasHolder {
+public class RobitSpriteUploader {
 
-    public static final ResourceLocation ATLAS_LOCATION = Mekanism.rl("textures/atlas/robit.png");
-    public static final RenderType RENDER_TYPE = RenderType.entityCutoutNoCull(ATLAS_LOCATION);
-    public static final List<RenderType> RENDER_TYPES = Collections.singletonList(RENDER_TYPE);
-    @Nullable
-    public static RobitSpriteUploader UPLOADER;
+    public static final Identifier ATLAS_LOCATION = Mekanism.rl("textures/atlas/robit.png");
+    public static final Identifier ATLAS_ID = Mekanism.rl("entity/robit");
+    public static final RenderType RENDER_TYPE = RenderTypes.entityCutout(ATLAS_LOCATION);
 
-    public RobitSpriteUploader(TextureManager textureManager) {
-        super(textureManager, ATLAS_LOCATION, Mekanism.rl("entity/robit"));
-        UPLOADER = this;
+
+    @SubscribeEvent
+    public static void registerAtlases(RegisterTextureAtlasesEvent event) {
+        event.register(new AtlasConfig(ATLAS_LOCATION, ATLAS_ID, false));
     }
 
-    @NotNull
-    @Override
-    public TextureAtlasSprite getSprite(@NotNull ResourceLocation location) {
-        return super.getSprite(location);
+    public static SpriteId getSpriteId(Identifier texture) {
+        return new SpriteId(ATLAS_ID, texture);
     }
+
+    @SubscribeEvent
+    public static void bakingCompleted(ModelEvent.BakingCompleted event) {
+
+    }
+
+    public static TextureAtlas getAtlas() {
+        return Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(ATLAS_ID);
+    }
+
+    public static TextureAtlasSprite getSprite(Identifier location) {
+        return getAtlas().getSprite(location);
+    }
+
 }

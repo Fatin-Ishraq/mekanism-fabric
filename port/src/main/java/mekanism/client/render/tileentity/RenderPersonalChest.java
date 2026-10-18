@@ -1,59 +1,33 @@
 package mekanism.client.render.tileentity;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.Axis;
-import mekanism.api.annotations.NothingNullByDefault;
+import mekanism.common.Mekanism;
 import mekanism.common.base.ProfilerConstants;
 import mekanism.common.tile.TileEntityPersonalChest;
-import mekanism.common.util.MekanismUtils;
-import mekanism.common.util.MekanismUtils.ResourceType;
-import net.minecraft.client.model.geom.ModelLayers;
-import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
-import net.minecraft.util.profiling.ProfilerFiller;
+import net.minecraft.client.renderer.blockentity.ChestRenderer;
+import net.minecraft.client.renderer.blockentity.state.ChestRenderState;
+import net.minecraft.client.resources.model.sprite.SpriteId;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
-public class RenderPersonalChest extends MekanismTileEntityRenderer<TileEntityPersonalChest> {
+public class RenderPersonalChest extends ChestRenderer<TileEntityPersonalChest> {
 
-    private static final ResourceLocation texture = MekanismUtils.getResource(ResourceType.TEXTURE_BLOCKS, "models/personal_chest.png");
-
-    private final ModelPart lid;
-    private final ModelPart bottom;
-    private final ModelPart lock;
+    //nb: this is stitched by the Item's use of the texture
+    private static final Identifier TEXTURE = Mekanism.rl("models/personal_chest");
+    public static final SpriteId MATERIAL = Sheets.BLOCKS_MAPPER.apply(TEXTURE);
 
     public RenderPersonalChest(BlockEntityRendererProvider.Context context) {
         super(context);
-        ModelPart modelpart = context.bakeLayer(ModelLayers.CHEST);
-        this.bottom = modelpart.getChild("bottom");
-        this.lid = modelpart.getChild("lid");
-        this.lock = modelpart.getChild("lock");
     }
 
+    @Nullable
     @Override
-    protected void render(TileEntityPersonalChest tile, float partialTick, PoseStack matrix, MultiBufferSource renderer, int light, int overlayLight, ProfilerFiller profiler) {
-        matrix.pushPose();
-        if (!tile.isRemoved()) {
-            matrix.translate(0.5D, 0.5D, 0.5D);
-            matrix.mulPose(Axis.YP.rotationDegrees(-tile.getDirection().toYRot()));
-            matrix.translate(-0.5D, -0.5D, -0.5D);
-        }
-        float lidAngle = 1.0F - tile.getOpenNess(partialTick);
-        lidAngle = 1.0F - lidAngle * lidAngle * lidAngle;
-        VertexConsumer builder = renderer.getBuffer(RenderType.entityCutout(texture));
-        lid.xRot = -(lidAngle * Mth.HALF_PI);
-        lock.xRot = lid.xRot;
-        lid.render(matrix, builder, light, overlayLight);
-        lock.render(matrix, builder, light, overlayLight);
-        bottom.render(matrix, builder, light, overlayLight);
-        matrix.popPose();
+    protected SpriteId getCustomSprite(TileEntityPersonalChest chest, ChestRenderState state) {
+        return MATERIAL;
     }
 
-    @Override
+    //@Override//TODO - 26.1: Figure out if we need to setup profiling for this again?
     protected String getProfilerSection() {
         return ProfilerConstants.PERSONAL_CHEST;
     }

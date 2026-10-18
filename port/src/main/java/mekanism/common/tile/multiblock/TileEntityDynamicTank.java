@@ -1,22 +1,22 @@
 package mekanism.common.tile.multiblock;
 
-import mekanism.common.Mekanism;
+import mekanism.common.component.containers.type.ContainerType;
 import mekanism.common.content.tank.TankMultiblockData;
-import mekanism.common.lib.multiblock.MultiblockManager;
+import mekanism.common.lib.multiblock.MekanismMultiblocks;
+import mekanism.common.lib.multiblock.MultiblockType;
+import mekanism.common.lib.transaction.TransactionHelper;
 import mekanism.common.registries.MekanismBlocks;
 import mekanism.common.tile.interfaces.IFluidContainerManager;
 import mekanism.common.tile.prefab.TileEntityMultiblock;
-import mekanism.common.util.FluidUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.NotNull;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
 
 public class TileEntityDynamicTank extends TileEntityMultiblock<TankMultiblockData> implements IFluidContainerManager {
 
@@ -29,36 +29,40 @@ public class TileEntityDynamicTank extends TileEntityMultiblock<TankMultiblockDa
     }
 
     @Override
-    public ItemInteractionResult onActivate(Player player, InteractionHand hand, ItemStack stack) {
+    public InteractionResult onActivate(Level level, Player player, InteractionHand hand) {
         if (!player.isShiftKeyDown()) {
             TankMultiblockData multiblock = getMultiblock();
             if (multiblock.isFormed()) {
-                if (manageInventory(multiblock, player, hand, stack)) {
-                    player.getInventory().setChanged();
-                    return ItemInteractionResult.SUCCESS;
+                try (Transaction transaction = TransactionHelper.openTransactionSafe()) {
+                    if (ContainerType.FLUID.interactWithHandler(player, hand, null, multiblock.getDirectFluidHandler(), transaction) ||
+                        ContainerType.CHEMICAL.interactWithHandler(player, hand, null, multiblock.getDirectChemicalHandler(), transaction)) {
+                        transaction.commit();
+                        return InteractionResult.SUCCESS_SERVER;
+                    }
                 }
                 InteractionResult result = openGui(player);
-                return switch (result) {
-                    case SUCCESS, SUCCESS_NO_ITEM_USED -> ItemInteractionResult.SUCCESS;
-                    case CONSUME -> ItemInteractionResult.CONSUME;
-                    case CONSUME_PARTIAL -> ItemInteractionResult.CONSUME_PARTIAL;
-                    case PASS -> ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
-                    case FAIL -> ItemInteractionResult.FAIL;
-                };
+                return result;
+                //TODO - 26.1: why are these being remapped??
+                /*return switch (result) {
+                    case InteractionResult.SUCCESS, InteractionResult.SUCCESS_NO_ITEM_USED -> ItemInteractionResult.SUCCESS;
+                    case InteractionResult.CONSUME -> ItemInteractionResult.CONSUME;
+                    case InteractionResult.CONSUME_PARTIAL -> ItemInteractionResult.CONSUME_PARTIAL;
+                    case InteractionResult.PASS -> InteractionResult.TRY_WITH_EMPTY_HAND;
+                    case InteractionResult.FAIL -> InteractionResult.FAIL;
+                };*/
             }
         }
-        return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        return InteractionResult.TRY_WITH_EMPTY_HAND;
     }
 
-    @NotNull
     @Override
     public TankMultiblockData createMultiblock() {
         return new TankMultiblockData(this);
     }
 
     @Override
-    public MultiblockManager<TankMultiblockData> getManager() {
-        return Mekanism.tankManager;
+    public MultiblockType<TankMultiblockData> getMultiblockType() {
+        return MekanismMultiblocks.TANK;
     }
 
     @Override
@@ -76,12 +80,5 @@ public class TileEntityDynamicTank extends TileEntityMultiblock<TankMultiblockDa
     public void previousMode() {
         TankMultiblockData multiblock = getMultiblock();
         multiblock.setContainerEditMode(multiblock.editMode.getPrevious());
-    }
-
-    private boolean manageInventory(TankMultiblockData multiblock, Player player, InteractionHand hand, ItemStack itemStack) {
-        if (multiblock.isFormed()) {
-            return FluidUtils.handleTankInteraction(player, hand, itemStack, multiblock.getFluidTank());
-        }
-        return false;
     }
 }

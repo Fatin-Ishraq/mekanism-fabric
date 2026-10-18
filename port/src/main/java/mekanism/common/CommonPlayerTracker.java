@@ -1,10 +1,12 @@
 package mekanism.common;
 
+import java.net.URI;
 import mekanism.api.text.EnumColor;
 import mekanism.common.advancements.MekanismCriteriaTriggers;
 import mekanism.common.block.BlockBounding;
 import mekanism.common.block.BlockCardboardBox;
 import mekanism.common.block.BlockMekanism;
+import mekanism.common.config.MekanismConfig;
 import mekanism.common.lib.radiation.PlayerExposure;
 import mekanism.common.network.to_client.player_data.PacketPlayerData;
 import mekanism.common.network.to_client.player_data.PacketResetPlayerClient;
@@ -12,16 +14,15 @@ import mekanism.common.network.to_client.radiation.PacketPlayerRadiationData;
 import mekanism.common.registries.MekanismItems;
 import mekanism.common.tags.MekanismTags.Items;
 import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.ClickEvent.Action;
+import net.minecraft.network.chat.ClickEvent.OpenUrl;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.TriState;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import mekanism.neoshim.bus.api.SubscribeEvent;
 import mekanism.neoshim.neoforge.common.NeoForge;
-import mekanism.neoshim.neoforge.common.util.TriState;
 import mekanism.neoshim.neoforge.event.entity.player.PlayerEvent;
 import mekanism.neoshim.neoforge.event.entity.player.PlayerEvent.PlayerChangedDimensionEvent;
 import mekanism.neoshim.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent;
@@ -32,8 +33,7 @@ import mekanism.neoshim.neoforge.network.PacketDistributor;
 public class CommonPlayerTracker {
 
     private static final Component ALPHA_WARNING = MekanismLang.LOG_FORMAT.translateColored(EnumColor.RED, MekanismLang.MEKANISM, EnumColor.GRAY,
-          MekanismLang.ALPHA_WARNING.translate(EnumColor.INDIGO, ChatFormatting.UNDERLINE, new ClickEvent(Action.OPEN_URL,
-                "https://github.com/mekanism/Mekanism#alpha-status"), MekanismLang.ALPHA_WARNING_HERE));
+          MekanismLang.ALPHA_WARNING.translate(EnumColor.INDIGO, ChatFormatting.UNDERLINE, new OpenUrl(URI.create("https://github.com/mekanism/Mekanism#alpha-status")), MekanismLang.ALPHA_WARNING_HERE));
 
     public CommonPlayerTracker() {
         NeoForge.EVENT_BUS.register(this);
@@ -41,12 +41,12 @@ public class CommonPlayerTracker {
 
     @SubscribeEvent
     public void onPlayerLoginEvent(PlayerLoggedInEvent event) {
-        Player player = event.getEntity();
-        if (!player.level().isClientSide) {
-            /*if (MekanismConfig.general.enableAlphaWarning.getAsBoolean()) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            //TODO - 26.1: Enable alpha warning everywhere it should be
+            if (MekanismConfig.general.enableAlphaWarning.getAsBoolean()) {
                 player.sendSystemMessage(ALPHA_WARNING);
-            }*/
-            MekanismCriteriaTriggers.LOGGED_IN.value().trigger((ServerPlayer) player);
+            }
+            MekanismCriteriaTriggers.LOGGED_IN.value().trigger(player);
         }
     }
 
@@ -79,9 +79,7 @@ public class CommonPlayerTracker {
         PacketDistributor.sendToAllPlayers(new PacketResetPlayerClient(player.getUUID()));
     }
 
-    /**
-     * If the player is sneaking and the dest block is a cardboard box, ensure onBlockActivated is called, and that the item use is not.
-     */
+    /// If the player is sneaking and the dest block is a cardboard box, ensure onBlockActivated is called, and that the item use is not.
     @SubscribeEvent
     public void rightClickEvent(RightClickBlock event) {
         ItemStack itemInHand = event.getEntity().getItemInHand(event.getHand());

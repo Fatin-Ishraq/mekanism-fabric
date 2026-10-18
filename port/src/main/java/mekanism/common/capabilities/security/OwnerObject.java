@@ -2,27 +2,28 @@ package mekanism.common.capabilities.security;
 
 import java.util.Objects;
 import java.util.UUID;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.security.IOwnerObject;
 import mekanism.common.registries.MekanismDataComponents;
+import mekanism.common.util.ItemAccessUtils;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.text.OwnerDisplay;
-import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public class OwnerObject implements IOwnerObject {
 
-    protected final ItemStack stack;
+    protected final ItemAccess itemAccess;
 
-    public OwnerObject(ItemStack stack) {
-        this.stack = stack;
+    public OwnerObject(ItemAccess itemAccess) {
+        this.itemAccess = itemAccess;
     }
 
     @Nullable
     @Override
     public UUID getOwnerUUID() {
-        return stack.get(MekanismDataComponents.OWNER);
+        return itemAccess.getResource().get(MekanismDataComponents.OWNER);
     }
 
     @Nullable
@@ -37,16 +38,17 @@ public class OwnerObject implements IOwnerObject {
     }
 
     @Override
-    public void setOwnerUUID(@Nullable UUID owner) {
-        UUID ownerUUID = getOwnerUUID();
+    public void setOwnerUUID(@Nullable UUID owner, @Nullable TransactionContext transaction) {
+        ItemResource resource = itemAccess.getResource();
+        UUID ownerUUID = resource.get(MekanismDataComponents.OWNER);
         if (!Objects.equals(ownerUUID, owner)) {
             if (ownerUUID != null) {
                 //If the object happens to be a frequency aware object reset the frequency when the owner changes
-                stack.remove(MekanismDataComponents.INVENTORY_FREQUENCY);
-                stack.remove(MekanismDataComponents.TELEPORTER_FREQUENCY);
-                stack.remove(MekanismDataComponents.QIO_FREQUENCY);
+                resource = resource.without(MekanismDataComponents.INVENTORY_FREQUENCY)
+                      .without(MekanismDataComponents.TELEPORTER_FREQUENCY)
+                      .without(MekanismDataComponents.QIO_FREQUENCY);
             }
-            stack.set(MekanismDataComponents.OWNER, owner);
+            ItemAccessUtils.exchange(itemAccess, resource.with(MekanismDataComponents.OWNER, owner), transaction);
         }
     }
 }

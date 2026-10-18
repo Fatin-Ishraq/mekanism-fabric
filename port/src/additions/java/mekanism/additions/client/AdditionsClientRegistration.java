@@ -3,22 +3,18 @@ package mekanism.additions.client;
 import java.util.Map;
 import mekanism.additions.client.model.AdditionsModelCache;
 import mekanism.additions.client.model.ModelBabyCreeper;
+import mekanism.additions.client.model.ModelBabyEnderman;
 import mekanism.additions.client.render.entity.RenderBabyCreeper;
 import mekanism.additions.client.render.entity.RenderBabyEnderman;
 import mekanism.additions.client.render.entity.RenderBalloon;
 import mekanism.additions.common.MekanismAdditions;
-import mekanism.additions.common.item.ItemBalloon;
-import mekanism.additions.common.item.ItemWalkieTalkie.WalkieData;
 import mekanism.additions.common.registries.AdditionsBlocks;
-import mekanism.additions.common.registries.AdditionsDataComponents;
 import mekanism.additions.common.registries.AdditionsEntityTypes;
-import mekanism.additions.common.registries.AdditionsItems;
 import mekanism.api.text.EnumColor;
 import mekanism.client.ClientRegistrationUtil;
 import mekanism.common.registration.impl.BlockRegistryObject;
-import mekanism.common.registration.impl.ItemRegistryObject;
-import net.minecraft.client.color.item.ItemColor;
 import net.minecraft.client.model.geom.builders.CubeDeformation;
+import net.minecraft.client.model.monster.enderman.EndermanModel;
 import net.minecraft.client.renderer.entity.BoggedRenderer;
 import net.minecraft.client.renderer.entity.SkeletonRenderer;
 import net.minecraft.client.renderer.entity.StrayRenderer;
@@ -27,10 +23,8 @@ import net.minecraft.client.renderer.entity.WitherSkeletonRenderer;
 import mekanism.neoshim.api.distmarker.Dist;
 import mekanism.neoshim.bus.api.SubscribeEvent;
 import mekanism.neoshim.fml.common.EventBusSubscriber;
-import mekanism.neoshim.fml.event.lifecycle.FMLClientSetupEvent;
 import mekanism.neoshim.neoforge.client.event.EntityRenderersEvent;
-import mekanism.neoshim.neoforge.client.event.ModelEvent.BakingCompleted;
-import mekanism.neoshim.neoforge.client.event.ModelEvent.RegisterAdditional;
+import mekanism.neoshim.neoforge.client.event.ModelEvent;
 import mekanism.neoshim.neoforge.client.event.RegisterColorHandlersEvent;
 import mekanism.neoshim.neoforge.client.event.RegisterKeyMappingsEvent;
 import mekanism.neoshim.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
@@ -39,14 +33,6 @@ import mekanism.neoshim.neoforge.client.extensions.common.RegisterClientExtensio
 public class AdditionsClientRegistration {
 
     private AdditionsClientRegistration() {
-    }
-
-    @SubscribeEvent
-    public static void init(FMLClientSetupEvent event) {
-        event.enqueueWork(() -> ClientRegistrationUtil.setPropertyOverride(AdditionsItems.WALKIE_TALKIE, MekanismAdditions.rl("channel"), (stack, world, entity, seed) -> {
-            WalkieData data = stack.getOrDefault(AdditionsDataComponents.WALKIE_DATA, WalkieData.DEFAULT);
-            return data.running() ? data.channel() : 0;
-        }));
     }
 
     @SubscribeEvent
@@ -72,6 +58,8 @@ public class AdditionsClientRegistration {
         event.registerLayerDefinition(ModelBabyCreeper.CREEPER_LAYER, () -> ModelBabyCreeper.createBodyLayer(CubeDeformation.NONE));
         //Note: Use 1 instead of 2 for size
         event.registerLayerDefinition(ModelBabyCreeper.ARMOR_LAYER, () -> ModelBabyCreeper.createBodyLayer(new CubeDeformation(1)));
+
+        event.registerLayerDefinition(ModelBabyEnderman.BABY_ENDERMAN_LAYER, () -> EndermanModel.createBodyLayer().apply(ModelBabyEnderman.BABY_MODEL_TRANSFORM));
     }
 
     @SubscribeEvent
@@ -80,30 +68,17 @@ public class AdditionsClientRegistration {
     }
 
     @SubscribeEvent
-    public static void registerAdditionalModels(RegisterAdditional event) {
+    public static void registerAdditionalModels(ModelEvent.RegisterStandalone event) {
         AdditionsModelCache.INSTANCE.setup(event);
     }
 
     @SubscribeEvent
-    public static void onModelBake(BakingCompleted event) {
+    public static void onModelBake(ModelEvent.BakingCompleted event) {
         AdditionsModelCache.INSTANCE.onBake(event);
     }
 
     @SubscribeEvent
-    public static void registerBlockColorHandlers(RegisterColorHandlersEvent.Block event) {
-        registerIColoredBlocks(event);
-    }
-
-    @SubscribeEvent
-    public static void registerItemColorHandlers(RegisterColorHandlersEvent.Item event) {
-        registerIColoredBlocks(event);
-        ItemColor balloonColorHandler = (stack, tintIndex) -> stack.getItem() instanceof ItemBalloon balloon ? balloon.getColor().getPackedColor() : -1;
-        for (ItemRegistryObject<ItemBalloon> balloon : AdditionsItems.BALLOONS.values()) {
-            ClientRegistrationUtil.registerItemColorHandler(event, balloonColorHandler, balloon);
-        }
-    }
-
-    private static void registerIColoredBlocks(RegisterColorHandlersEvent event) {
+    public static void registerBlockColorHandlers(RegisterColorHandlersEvent.BlockTintSources event) {
         registerBlockColorHandles(event, AdditionsBlocks.GLOW_PANELS, AdditionsBlocks.PLASTIC_BLOCKS,
               AdditionsBlocks.SLICK_PLASTIC_BLOCKS, AdditionsBlocks.PLASTIC_GLOW_BLOCKS, AdditionsBlocks.REINFORCED_PLASTIC_BLOCKS, AdditionsBlocks.PLASTIC_ROADS,
               AdditionsBlocks.TRANSPARENT_PLASTIC_BLOCKS, AdditionsBlocks.PLASTIC_STAIRS, AdditionsBlocks.PLASTIC_SLABS, AdditionsBlocks.PLASTIC_FENCES,

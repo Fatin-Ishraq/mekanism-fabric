@@ -14,13 +14,12 @@ import mekanism.common.MekanismLang;
 import mekanism.common.lib.Color;
 import mekanism.common.util.EnumUtils;
 import mekanism.common.util.UpgradeUtils;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class GuiSupportedUpgrades extends GuiElement {
 
@@ -66,10 +65,10 @@ public class GuiSupportedUpgrades extends GuiElement {
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
         //Draw the background
-        renderBackgroundTexture(guiGraphics, GuiElementHolder.HOLDER, GuiElementHolder.HOLDER_SIZE, GuiElementHolder.HOLDER_SIZE);
+        guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, GuiElementHolder.HOLDER, getButtonX(), getButtonY(), getButtonWidth(), getButtonHeight());
         int backgroundColor = Color.argb(GuiElementHolder.getBackgroundColor()).alpha(0.5).argb();
         for (int i = 0; i < EnumUtils.UPGRADES.length; i++) {
             Upgrade upgrade = EnumUtils.UPGRADES[i];
@@ -79,20 +78,20 @@ public class GuiSupportedUpgrades extends GuiElement {
             gui().renderItem(guiGraphics, UpgradeUtils.getStack(upgrade), xPos, yPos, 0.75F);
             if (!supportedUpgrades.contains(upgrade)) {
                 //Make the upgrade appear faded if it is not supported
-                guiGraphics.fill(RenderType.guiGhostRecipeOverlay(), xPos, yPos, xPos + ELEMENT_SIZE, yPos + ELEMENT_SIZE, backgroundColor);
+                //TODO - 26.1: Figure out if we need a new version of RenderType.guiGhostRecipeOverlay(), or if it just supports it natively now
+                guiGraphics.fill(xPos, yPos, xPos + ELEMENT_SIZE, yPos + ELEMENT_SIZE, backgroundColor);
             }
         }
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         //Note: We don't have to specify where the upgrades start, because the upgrades get moved out of the way. This is only a scrolling string
         // in case the translation needs more space than the entire width of the first row
         drawScrollingString(guiGraphics, SUPPORTED, 0, 3, TextAlignment.LEFT, titleTextColor(), 2, false);
     }
 
-    @NotNull
     @Override
     protected ScreenRectangle getTooltipRectangle(int mouseX, int mouseY) {
         return cachedTooltipRect == null ? super.getTooltipRectangle(mouseX, mouseY) : cachedTooltipRect;

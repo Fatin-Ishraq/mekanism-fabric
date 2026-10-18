@@ -3,8 +3,8 @@ package mekanism.client.recipe_viewer.jei.machine;
 import com.mojang.serialization.Codec;
 import java.util.Collections;
 import java.util.List;
+import mekanism.api.chemical.ChemicalStackTemplate;
 import mekanism.api.heat.HeatAPI;
-import mekanism.api.math.MathUtils;
 import mekanism.api.text.EnumColor;
 import mekanism.client.gui.element.GuiInnerScreen;
 import mekanism.client.gui.element.gauge.GaugeType;
@@ -25,10 +25,10 @@ import mezz.jei.api.helpers.IGuiHelper;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.IRecipeManager;
 import mezz.jei.api.recipe.RecipeIngredientRole;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.context.ContextMap;
+import org.jspecify.annotations.Nullable;
 
 public class BoilerRecipeCategory extends BaseRecipeCategory<BoilerRecipeViewerRecipe> {
 
@@ -51,7 +51,7 @@ public class BoilerRecipeCategory extends BaseRecipeCategory<BoilerRecipeViewerR
                 boilRate = 0;
             } else {
                 temperature = recipe.temperature();
-                boilRate = MathUtils.clampToInt(recipe.steam().getAmount());
+                boilRate = recipe.steam().amount();
             }
             return List.of(MekanismLang.TEMPERATURE.translate(MekanismUtils.getTemperatureDisplay(temperature, TemperatureUnit.KELVIN, true)),
                   MekanismLang.BOIL_RATE.translate(TextUtils.format(boilRate)));
@@ -64,7 +64,7 @@ public class BoilerRecipeCategory extends BaseRecipeCategory<BoilerRecipeViewerR
     }
 
     @Override
-    public void draw(BoilerRecipeViewerRecipe recipe, IRecipeSlotsView recipeSlotView, GuiGraphics guiGraphics, double mouseX, double mouseY) {
+    public void draw(BoilerRecipeViewerRecipe recipe, IRecipeSlotsView recipeSlotView, GuiGraphicsExtractor guiGraphics, double mouseX, double mouseY) {
         //Update what the current recipe is so that we have the proper values for temperature and the like
         this.recipe = recipe;
         super.draw(recipe, recipeSlotView, guiGraphics, mouseX, mouseY);
@@ -72,7 +72,7 @@ public class BoilerRecipeCategory extends BaseRecipeCategory<BoilerRecipeViewerR
     }
 
     @Override
-    protected void renderElements(BoilerRecipeViewerRecipe recipe, IRecipeSlotsView recipeSlotView, GuiGraphics guiGraphics, int x, int y) {
+    protected void renderElements(BoilerRecipeViewerRecipe recipe, IRecipeSlotsView recipeSlotView, GuiGraphicsExtractor guiGraphics, int x, int y) {
         super.renderElements(recipe, recipeSlotView, guiGraphics, x, y);
         if (recipe.superHeatedCoolant() == null) {
             superHeatedCoolantTank.drawBarOverlay(guiGraphics);
@@ -82,25 +82,26 @@ public class BoilerRecipeCategory extends BaseRecipeCategory<BoilerRecipeViewerR
 
     @Nullable
     @Override
-    public ResourceLocation getRegistryName(@NotNull BoilerRecipeViewerRecipe recipe) {
+    public Identifier getIdentifier(BoilerRecipeViewerRecipe recipe) {
         return recipe.id();
     }
 
-    @NotNull
     @Override
-    public Codec<BoilerRecipeViewerRecipe> getCodec(@NotNull ICodecHelper codecHelper, @NotNull IRecipeManager recipeManager) {
+    public Codec<BoilerRecipeViewerRecipe> getCodec(ICodecHelper codecHelper, IRecipeManager recipeManager) {
         return BoilerRecipeViewerRecipe.CODEC;
     }
 
     @Override
-    public void setRecipe(@NotNull IRecipeLayoutBuilder builder, BoilerRecipeViewerRecipe recipe, @NotNull IFocusGroup focusGroup) {
-        initFluid(builder, RecipeIngredientRole.INPUT, waterTank, recipe.water().getRepresentations());
-        if (recipe.superHeatedCoolant() == null) {
-            initChemical(builder, RecipeIngredientRole.OUTPUT, steamTank, Collections.singletonList(recipe.steam()));
+    public void setRecipe(IRecipeLayoutBuilder builder, BoilerRecipeViewerRecipe recipe, IFocusGroup focusGroup) {
+        ContextMap context = getSlotDisplayContext();
+        initFluid(builder, RecipeIngredientRole.INPUT, waterTank, recipe.water().getRepresentations(context));
+        ChemicalStackTemplate cooledCoolant = recipe.cooledCoolant();
+        if (recipe.superHeatedCoolant() == null || cooledCoolant == null) {
+            initChemical(builder, steamTank, Collections.singletonList(recipe.steam()));
         } else {
-            initChemical(builder, RecipeIngredientRole.INPUT, superHeatedCoolantTank, recipe.superHeatedCoolant().getRepresentations());
-            initChemical(builder, RecipeIngredientRole.OUTPUT, steamTank, Collections.singletonList(recipe.steam()));
-            initChemical(builder, RecipeIngredientRole.OUTPUT, cooledCoolantTank, Collections.singletonList(recipe.cooledCoolant()));
+            initChemical(builder, RecipeIngredientRole.INPUT, superHeatedCoolantTank, recipe.superHeatedCoolant().getRepresentations(context));
+            initChemical(builder, steamTank, Collections.singletonList(recipe.steam()));
+            initChemical(builder, cooledCoolantTank, Collections.singletonList(cooledCoolant));
         }
     }
 }

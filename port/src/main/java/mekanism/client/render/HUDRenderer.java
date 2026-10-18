@@ -1,37 +1,30 @@
 package mekanism.client.render;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import java.util.List;
 import java.util.function.Predicate;
 import mekanism.api.gear.IHUDElement;
-import mekanism.api.gear.IModuleContainer;
 import mekanism.api.gear.IModuleHelper;
 import mekanism.api.text.ILangEntry;
 import mekanism.client.render.hud.MekanismHUD.DelayedString;
-import mekanism.common.MekanismLang;
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.content.gear.HUDElement.HUDColor;
-import mekanism.common.item.gear.ItemMekaSuitArmor;
-import mekanism.common.item.gear.ItemMekaTool;
-import mekanism.common.util.EnumUtils;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
 import mekanism.common.util.StorageUtils;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.SubtitleOverlay;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import org.joml.Matrix3x2fStack;
 import org.joml.Matrix4f;
 
 //TODO - 1.20: Decide if we want font rendering in this to support GuiUtils#drawBackdrop and if so how to best go about it
@@ -39,13 +32,13 @@ public class HUDRenderer {
 
     private static final EquipmentSlot[] EQUIPMENT_ORDER = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET, EquipmentSlot.MAINHAND,
                                                             EquipmentSlot.OFFHAND};
-    private static final ResourceLocation[] ARMOR_ICONS = {MekanismUtils.getResource(ResourceType.GUI_HUD, "hud_mekasuit_helmet.png"),
-                                                           MekanismUtils.getResource(ResourceType.GUI_HUD, "hud_mekasuit_chest.png"),
-                                                           MekanismUtils.getResource(ResourceType.GUI_HUD, "hud_mekasuit_leggings.png"),
-                                                           MekanismUtils.getResource(ResourceType.GUI_HUD, "hud_mekasuit_boots.png")};
-    private static final ResourceLocation TOOL_ICON = MekanismUtils.getResource(ResourceType.GUI_HUD, "hud_mekatool.png");
+    private static final Identifier[] ARMOR_ICONS = {MekanismUtils.getResource(ResourceType.GUI_HUD, "hud_mekasuit_helmet.png"),
+                                                     MekanismUtils.getResource(ResourceType.GUI_HUD, "hud_mekasuit_chest.png"),
+                                                     MekanismUtils.getResource(ResourceType.GUI_HUD, "hud_mekasuit_leggings.png"),
+                                                     MekanismUtils.getResource(ResourceType.GUI_HUD, "hud_mekasuit_boots.png")};
+    private static final Identifier TOOL_ICON = MekanismUtils.getResource(ResourceType.GUI_HUD, "hud_mekatool.png");
 
-    private static final ResourceLocation COMPASS = MekanismUtils.getResource(ResourceType.GUI, "compass.png");
+    private static final Identifier COMPASS = MekanismUtils.getResource(ResourceType.GUI, "compass.png");
 
     private int lastSubtitleGuiTick = -1;
     private int lastSubtitleWidth = 0;
@@ -53,18 +46,18 @@ public class HUDRenderer {
     private float prevRotationYaw;
     private float prevRotationPitch;
 
-    public void renderHUD(Minecraft minecraft, GuiGraphics guiGraphics, Font font, List<DelayedString> delayedDraws, DeltaTracker delta, int screenWidth, int screenHeight,
+    public void renderHUD(Minecraft minecraft, GuiGraphicsExtractor guiGraphics, Font font, List<DelayedString> delayedDraws, DeltaTracker delta, int screenWidth, int screenHeight,
           int maxTextHeight, boolean reverseHud) {
         Player player = minecraft.player;
         update(minecraft.level, player);
         if (MekanismConfig.client.hudOpacity.get() < 0.05F) {
             return;
         }
-        PoseStack pose = guiGraphics.pose();
-        pose.pushPose();
+        Matrix3x2fStack matrix = guiGraphics.pose();
+        matrix.pushMatrix();
         float yawJitter = -absSqrt(player.yHeadRot - prevRotationYaw);
         float pitchJitter = -absSqrt(player.getXRot() - prevRotationPitch);
-        pose.translate(yawJitter, pitchJitter, 0);
+        matrix.translate(yawJitter, pitchJitter);
         int audibleSubtitlesWidth = MekanismConfig.client.hudAvoidSoundSubtitleOverlay.get() ? getAudibleSubtitlesWidth(minecraft, font) : 0;
         if (MekanismConfig.client.hudCompassEnabled.get()) {
             renderCompass(player, font, guiGraphics, delayedDraws, delta, screenWidth, screenHeight, maxTextHeight, reverseHud, audibleSubtitlesWidth);
@@ -73,7 +66,7 @@ public class HUDRenderer {
         renderMekaSuitEnergyIcons(player, font, guiGraphics, delayedDraws);
         renderMekaSuitModuleIcons(player, font, guiGraphics, delayedDraws, screenWidth, screenHeight, reverseHud, audibleSubtitlesWidth);
 
-        pose.popPose();
+        matrix.popMatrix();
     }
 
     private void update(Level level, Player player) {
@@ -95,10 +88,11 @@ public class HUDRenderer {
         return val < 0 ? -ret : ret;
     }
 
-    private void renderMekaSuitEnergyIcons(Player player, Font font, GuiGraphics guiGraphics, List<DelayedString> delayedDraws) {
-        PoseStack pose = guiGraphics.pose();
-        pose.pushPose();
-        pose.translate(10, 10, 0);
+    private void renderMekaSuitEnergyIcons(Player player, Font font, GuiGraphicsExtractor guiGraphics, List<DelayedString> delayedDraws) {
+        //TODO - 26.1: rendering
+        /*Matrix3x2fStack pose = guiGraphics.pose();
+        pose.pushMatrix();
+        pose.translate(10, 10);
         Matrix4f matrix = new Matrix4f(pose.last().pose());
         int posX = 0;
         Predicate<Item> showArmorPercent = item -> item instanceof ItemMekaSuitArmor;
@@ -109,10 +103,10 @@ public class HUDRenderer {
         for (EquipmentSlot hand : EnumUtils.HAND_SLOTS) {
             posX += renderEnergyIcon(player, font, guiGraphics, matrix, delayedDraws, posX, TOOL_ICON, hand, showToolPercent);
         }
-        pose.popPose();
+        pose.popMatrix();*/
     }
 
-    private int renderEnergyIcon(Player player, Font font, GuiGraphics guiGraphics, Matrix4f matrix, List<DelayedString> delayedDraws, int posX, ResourceLocation icon,
+    private int renderEnergyIcon(Player player, Font font, GuiGraphicsExtractor guiGraphics, Matrix4f matrix, List<DelayedString> delayedDraws, int posX, Identifier icon,
           EquipmentSlot slot, Predicate<Item> showPercent) {
         ItemStack stack = player.getItemBySlot(slot);
         if (showPercent.test(stack.getItem())) {
@@ -123,9 +117,10 @@ public class HUDRenderer {
         return 0;
     }
 
-    private void renderMekaSuitModuleIcons(Player player, Font font, GuiGraphics guiGraphics, List<DelayedString> delayedDraws, int screenWidth, int screenHeight,
+    private void renderMekaSuitModuleIcons(Player player, Font font, GuiGraphicsExtractor guiGraphics, List<DelayedString> delayedDraws, int screenWidth, int screenHeight,
           boolean reverseHud, int subtitlesWidth) {
-        int startX = screenWidth - 10;
+        //TODO - 26.1: rendering
+        /*int startX = screenWidth - 10;
         int curY = screenHeight - 10;
         Matrix4f matrix = new Matrix4f(guiGraphics.pose().last().pose());
         //Render any elements that might be on modules in the meka suit while worn or on the meka tool while held
@@ -145,12 +140,10 @@ public class HUDRenderer {
                     }
                 }
             }
-        }
+        }*/
     }
 
-    /**
-     * Based on how {@link SubtitleOverlay#render(GuiGraphics)} calculates the width
-     */
+    /// Based on how [SubtitleOverlay#extractRenderState(GuiGraphicsExtractor)] calculates the width
     private int getAudibleSubtitlesWidth(Minecraft minecraft, Font font) {
         if (!minecraft.options.showSubtitles().get() || minecraft.gui.subtitleOverlay.audibleSubtitles.isEmpty()) {
             //Subtitles are disabled or none are currently showing, don't bother calculating a width
@@ -172,25 +165,26 @@ public class HUDRenderer {
         return lastSubtitleWidth;
     }
 
-    private void renderHUDElement(Font font, GuiGraphics guiGraphics, Matrix4f matrix, List<DelayedString> delayedDraws, int x, int y, IHUDElement element,
+    private void renderHUDElement(Font font, GuiGraphicsExtractor guiGraphics, Matrix4f matrix, List<DelayedString> delayedDraws, int x, int y, IHUDElement element,
           boolean iconRight) {
+        //TODO - 26.1: rendering
         int color = element.getColor();
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        MekanismRenderer.color(guiGraphics, color);
-        guiGraphics.blit(element.getIcon(), iconRight ? x + font.width(element.getText()) + 2 : x, y, 0, 0, 16, 16, 16, 16);
+        /*RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();*/
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, element.getIcon(), iconRight ? x + font.width(element.getText()) + 2 : x, y, 0, 0, 16, 16, 16, 16, color);
         MekanismRenderer.resetColor(guiGraphics);
         delayedDraws.add(new DelayedString(matrix, element.getText(), iconRight ? x : x + 18, y + 5, color, false));
     }
 
-    private void renderCompass(Player player, Font font, GuiGraphics guiGraphics, List<DelayedString> delayedDraws, DeltaTracker delta, int screenWidth,
+    private void renderCompass(Player player, Font font, GuiGraphicsExtractor guiGraphics, List<DelayedString> delayedDraws, DeltaTracker delta, int screenWidth,
           int screenHeight, int maxTextHeight, boolean reverseHud, int audibleSubtitlesWidth) {
         int color = HUDColor.REGULAR.getColorARGB();
         //Reversed hud causes the compass to render on the right side of the screen
         int posX = reverseHud ? screenWidth - 125 - audibleSubtitlesWidth : 25;
         //Pin the compass above the bottom of the screen and also above the text hud that may render below it
         int posY = Math.min(screenHeight - 20, maxTextHeight) - 80;
-        PoseStack pose = guiGraphics.pose();
+        //TODO - 26.1: rendering
+        /*PoseStack pose = guiGraphics.pose();
         pose.pushPose();
         pose.translate(posX + 50, posY + 50, 0);
         pose.pushPose();
@@ -212,19 +206,20 @@ public class HUDRenderer {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         MekanismRenderer.color(guiGraphics, color);
-        guiGraphics.blit(COMPASS, -50, -50, 100, 100, 0, 0, 256, 256, 256, 256);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, COMPASS, -50, -50, 100, 100, 0, 0, 256, 256, 256, 256);
         MekanismRenderer.resetColor(guiGraphics);
         pose.popPose();
-        pose.popPose();
+        pose.popPose();*/
     }
 
-    private void rotateStr(GuiGraphics guiGraphics, List<DelayedString> delayedDraws, ILangEntry langEntry, float rotation, float shift, int color) {
-        PoseStack pose = guiGraphics.pose();
+    private void rotateStr(GuiGraphicsExtractor guiGraphics, List<DelayedString> delayedDraws, ILangEntry langEntry, float rotation, float shift, int color) {
+        //TODO - 26.1: rendering
+        /*PoseStack pose = guiGraphics.pose();
         pose.pushPose();
         pose.mulPose(Axis.ZP.rotationDegrees(shift));
         pose.translate(0, -50, 0);
         pose.mulPose(Axis.ZP.rotationDegrees(-rotation - shift));
         delayedDraws.add(new DelayedString(pose, langEntry.translate(), -2.5F, -4, color, false));
-        pose.popPose();
+        pose.popPose();*/
     }
 }
