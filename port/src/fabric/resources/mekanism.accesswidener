@@ -146,3 +146,4 @@ accessible class net/minecraft/client/resources/model/ModelManager$ReloadState
 accessible field net/minecraft/client/renderer/block/model/BlockModel parentLocation Lnet/minecraft/resources/ResourceLocation;
 accessible field net/minecraft/client/renderer/block/model/BlockModel textureMap Ljava/util/Map;
 accessible field net/minecraft/world/inventory/MenuType constructor Lnet/minecraft/world/inventory/MenuType$MenuSupplier;
+accessible method net/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen selectTab (Lnet/minecraft/world/item/CreativeModeTab;)V

@@ -104,17 +104,91 @@ public final class SmokeWorldDriver {
                     if (client.player != null) {
                         client.player.closeContainer();
                     }
+                    guiBlocks = collectGuiBlocks();
+                    log("cycling through {} GUI blocks", guiBlocks.size());
                 }
             }
-            case 4 -> {
+            case 4 -> cycleGuiBlocks(client);
+            case 5 -> {
+                if (++ticks == 1) {
+                    log("rendering the Mekanism creative tab");
+                    var screen = new net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen(client.player, client.player.connection.enabledFeatures(), true);
+                    client.setScreen(screen);
+                    screen.selectTab(mekanism.common.registries.MekanismCreativeTabs.MEKANISM.value());
+                } else if (ticks > 40) {
+                    client.setScreen(null);
+                    stage = 6;
+                    ticks = 0;
+                }
+            }
+            case 6 -> {
                 if (++ticks > 20) {
-                    stage = 5;
+                    stage = 7;
                     log("finished with {} failure(s){}", failures.size(), failures.isEmpty() ? "" : ": " + failures);
                     client.stop();
                 }
             }
             default -> {
             }
+        }
+    }
+
+    private static List<Block> guiBlocks = List.of();
+    private static int guiIndex = 0;
+    private static final List<String> noGui = new ArrayList<>();
+    private static int guiOk = 0;
+
+    private static List<Block> collectGuiBlocks() {
+        List<Block> blocks = new ArrayList<>();
+        for (Block block : net.minecraft.core.registries.BuiltInRegistries.BLOCK) {
+            if (net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).getNamespace().startsWith("mekanism")
+                && mekanism.common.block.attribute.Attribute.has(block, mekanism.common.block.attribute.AttributeGui.class)) {
+                blocks.add(block);
+            }
+        }
+        return blocks;
+    }
+
+    private static void cycleGuiBlocks(Minecraft client) {
+        ticks++;
+        if (guiIndex >= guiBlocks.size()) {
+            log("GUI blocks: {} opened a Mekanism screen, {} did not (multiblock parts / conditional GUIs): {}", guiOk, noGui.size(), noGui);
+            stage = 5;
+            ticks = 0;
+            return;
+        }
+        Block block = guiBlocks.get(guiIndex);
+        if (ticks == 1) {
+            MinecraftServer server = client.getSingleplayerServer();
+            server.execute(() -> {
+                ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
+                ServerLevel level = player.serverLevel();
+                BlockPos pos = base.above(3);
+                level.setBlockAndUpdate(pos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+                place(level, pos, block.defaultBlockState());
+            });
+        } else if (ticks == 4) {
+            //Open in a later tick so the client already has the block entity (like a real player interaction)
+            MinecraftServer server = client.getSingleplayerServer();
+            server.execute(() -> {
+                ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
+                ServerLevel level = player.serverLevel();
+                BlockPos pos = base.above(3);
+                level.getBlockState(pos).useWithoutItem(level, player, new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false));
+            });
+        } else if (ticks == 16) {
+            String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).getPath();
+            if (client.screen != null && client.screen.getClass().getName().startsWith("mekanism.client.gui")) {
+                guiOk++;
+            } else {
+                noGui.add(id);
+            }
+            if (client.player != null) {
+                client.player.closeContainer();
+            }
+        } else if (ticks > 18) {
+            guiIndex++;
+            ticks = 0;
         }
     }
 
