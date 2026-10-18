@@ -77,7 +77,7 @@ Fuzs' Forge Config API Port (FCAP, `fuzs.forgeconfigapiport:forgeconfigapiport-f
 * Fabric mod id `mekanism_fabric`, with `"provides": ["mekanism"]` so Fabric addons that depend on `mekanism` still resolve.
 * Resource namespace stays **`mekanism`** (`mekanism:*` block, item and recipe IDs), so datapacks, scripts and saves are compatible. `Mekanism.MODID` stays `"mekanism"`. The shim `ModList.isLoaded("mekanism")` works because of `provides`.
 * Display name: **"Mekanism (Unofficial Fabric Port)"**. The description states it is unofficial and unaffiliated. MIT LICENSE and the upstream copyright notice are kept.
-* Generators, additions and tools will follow the same pattern (`mekanismgenerators_fabric`, and so on).
+* Generators, Additions and Tools follow the same pattern: `mekanismgenerators_fabric`, `mekanismadditions_fabric`, `mekanismtools_fabric`, each providing its upstream id.
 
 ### D10. Source layout & upstream-merge workflow
 * `port/` mirrors upstream's `src/` layout (`src/api`, `src/main`, `src/generators`, ..., `src/datagen/generated`), so `diff -r` against upstream is meaningful.
@@ -87,7 +87,7 @@ Fuzs' Forge Config API Port (FCAP, `fuzs.forgeconfigapiport:forgeconfigapiport-f
 
 ### D11. Resources / datagen
 * Datagen is **not** ported for now. The upstream `src/datagen/generated/**` output is committed and used directly, as upstream itself does.
-* NeoForge-specific JSON is converted at build time by a `processResources` transform (`port/scripts` / Gradle): `neoforge:conditions` becomes `fabric:load_conditions`, `neoforge:mod_loaded` becomes `fabric:all_mods_loaded`, `neoforge:not`/`tag_empty` map to the fabric equivalents, and `neoforge:difference`/`compound`/`intersection` ingredients map to `fabric:difference`/`any_of`/`all_of`. Biome modifiers are replaced by Fabric `BiomeModifications` in code, and `neoforge:fluid_container` item models by a Fabric model plugin. Nothing in the committed resources is hand-edited.
+* NeoForge-specific JSON is converted at build time by a `processResources` transform (`port/scripts` / Gradle): `neoforge:conditions` becomes `fabric:load_conditions`, `neoforge:mod_loaded` becomes `fabric:all_mods_loaded`, `neoforge:not`/`tag_empty` map to the fabric equivalents, and `neoforge:difference`/`compound`/`intersection` ingredients map to `fabric:difference`/`any_of`/`all_of`. Biome modifier JSON is replayed through Fabric `BiomeModifications` by BiomeModifierBridge, and NeoForge model loaders (including `neoforge:fluid_container`) are handled by a Fabric model plugin. `#neoforge:` tag references become optional `#c:` entries. Nothing in the committed resources is hand-edited.
 * AccessTransformers are converted to `mekanism.accesswidener` by script (`public-f` → `accessible` + `mutable`/`extendable`; `protected` → `accessible`).
 
 ### D12. Toolchain
@@ -99,73 +99,113 @@ Fabric Loom `1.11.8` on Gradle 9.2.1 (remapping, intermediary), Minecraft 1.21.1
 |---|---|---|
 | 0 | Clone, survey, decisions (this file) | done |
 | 1 | Gradle/Loom scaffold, vendor import of upstream sources, AT→AW, fabric.mod.json | done |
-| 2 | neoshim: registries, event bus, config bridge, networking, fluids, items, energy, capabilities, extension interfaces | done (runtime behaviour of some hooks pending, see the hook table) |
-| 3 | Core compiles (`api` + `main`), with integrations excluded or stubbed | **done**: 0 errors |
-| 4 | Dev server + client launch with core content registered | **done**: `runServer` reaches "Done"; `runSmokeClient` finishes resource loading and exits cleanly |
-| 5 | Machines tick, energy/fluid/chemical transfer, transmitters, multiblocks | in progress: machine processing verified by GameTest; transmitters and multiblocks not yet verified |
-| 6 | GUIs, client rendering, models (OBJ loader, ModelData → FRAPI), particles, sounds, keybinds | todo (shim types exist; rendering bridges not yet wired) |
-| 7 | Resource transform (conditions/ingredients), worldgen (ores via BiomeModifications) | transform done; worldgen todo |
-| 8 | Generators, Additions, Tools modules | todo |
-| 9 | Integrations: EMI/JEI, Jade/WTHIT, CC:Tweaked (Fabric), others as available | todo |
+| 2 | neoshim: registries, event bus, config bridge, networking, fluids, items, energy, capabilities, extension interfaces | done |
+| 3 | Core compiles (`api` + `main`) | done |
+| 4 | Dev server + client launch with core content registered | done |
+| 5 | Machines tick, energy/fluid/chemical transfer, transmitters, multiblocks | done (GameTest verified: machine processing, cable network, dynamic tank formation) |
+| 6 | GUIs, client rendering, models (OBJ loader, ModelData → FRAPI), particles, sounds, keybinds, shaders | done (smoke verified: 0 missing models, every GUI block opens, creative tabs render) |
+| 7 | Resource transform (conditions/ingredients), worldgen, biome modifiers | done (ores and Additions baby mobs GameTest verified) |
+| 8 | Generators, Additions, Tools modules | done (each a separate Fabric mod and release jar) |
+| 9 | Integrations | done where the other mod exists on Fabric 1.21.1 (see "Integrations") |
+| 10 | Release packaging + production verification | done (4 remapped jars; production server/client/world smoke) |
+
+Remaining before a public release is the user's call (nothing is published): versioning/metadata review, a play-test pass by a human, and the later
+roadmap versions (26.2, 26.1.2, 26.3), which have not been started.
 
 ### How things are verified (no manual play-testing)
-* `gradlew compileJava`: the full core compile.
-* `gradlew runServer`: dedicated dev server. At startup it logs a registration summary and the loaded recipe count (`[Fabric port] ...`).
-* `gradlew runSmokeClient`: dev client with `-Dmekanism_fabric.smokeTest=true`. It quits by itself once resource loading has finished and the first screen shows. This is a non-interactive boot check.
-* `gradlew runGametest`: headless Fabric GameTests in `src/fabric/gametest`. The junit report is written to `build/gametest/junit.xml`.
+* `gradlew build`: compiles everything, runs upstream's unit tests (`test`, 91 tests under fabric-loader-junit with a vanilla bootstrap extension, plus
+  `propertyTest`, 3 jqwik properties), builds the four release jars, rewrites remapping bridges (`bridgeReleaseJars`) and runs
+  `checkRemappedImplementations` (scripts/ImplChecker.java: fails on any interface method left unimplemented or any unresolved method reference in the
+  release jars, honouring injected interfaces).
+* `gradlew runServer`: dedicated dev server; logs a registration summary and the loaded recipe count (`[Fabric port] ...`).
+* `gradlew runSmokeClient`: dev client with `-Dmekanism_fabric.smokeTest=true`; exits after resource loading, logs missing block-state/item models and
+  runs a Mixin audit (applies every mixin).
+* `gradlew runSmokeWorld`: dev client with `-Dmekanism_fabric.smokeWorld=true` (SmokeWorldDriver): creates a flat world, places machines/transmitters,
+  checks client sync, server energy, positional light and entity spawn data, opens every Mekanism GUI block, renders all Mekanism creative tabs and checks
+  their label colour, checks fog events fired, then quits.
+* `gradlew runGametest`: headless Fabric GameTests (`src/fabric/gametest`), junit report at `build/gametest/junit.xml`. 22 tests.
+* `gradlew prodSmokeClient` / `prodSmokeWorld`: the same smoke runs against the **release jars** in a production (intermediary) client.
+* Optional integrations are added to dev runs by property (never bundled): `-Precipe_viewer=jei|emi`, `-Plooking_at=jade|wthit`, `-Pcomputers=cc`,
+  `-Paccessories=trinkets`, `-Ptweaker=crt` (also installs a test ZenScript), `-Pgender=true`. Their GameTests skip when the mod is absent.
 
-Current numbers (2026-10-18): 200 blocks, 381 items, 154 block entity types, 36 fluids, 65 chemicals, 1578 Mekanism recipes, and 0 recipe parse errors. 5/5 GameTests pass.
+Current numbers (2026-10-18, all modules): 499 blocks, 782 items, 178 block entity types, 44 fluids, 10 entity types, 87 menus, 68 chemicals,
+2814 Mekanism recipes, 0 recipe parse errors; 0/15322 block states and 0/782 items without a model; 104 GUI blocks open a screen (the 17 that do not
+are multiblock parts that only open on a formed structure); 22/22 GameTests; 94/94 upstream unit tests.
 
 ## Hook status (vanilla behaviour NeoForge adds that Mekanism relies on)
 | Hook | Used for | Fabric implementation | Status |
 |---|---|---|---|
-| DeferredRegister / RegisterEvent order | all content | ModBusLifecycle: data components, attributes, sounds, effects and particles first, then modded registries, then vanilla order | done |
-| Capabilities (block/item/entity) | everything | Fabric API Lookup + CapabilityBridge (Transfer API, TR Energy) | blocks done (GameTest verified); item-level (ContainerItemContext) export TODO |
-| BlockCapabilityCache invalidation | transmitters, machines | CapabilityInvalidation (BE load/unload, chunk load/unload, `invalidateCapabilities`) | done, not yet stress-tested |
-| BlockEntity#onLoad | all tiles | Server/ClientBlockEntityEvents.BLOCK_ENTITY_LOAD | done |
-| BlockEntity#onChunkUnloaded | transmitters | Server/ClientChunkEvents.CHUNK_UNLOAD | done |
-| BlockEntity#onDataPacket / handleUpdateTag | client sync | ClientPacketListenerMixin / LevelChunkMixin | done (not yet client-verified in a world) |
-| Extended menus (`openMenu(provider, buf)`) | all GUIs | ExtendedScreenHandlerType + raw bytes | done (not yet client-verified) |
-| Payloads | network | Fabric Networking v1 (handlers run on the main thread) | done |
-| Config | all | Forge Config API Port + ModConfigEvent bridge | done |
-| Data maps | chemical fuels/coolants, MekaSuit absorption | DataMapLoader (+ furnace_fuels → FuelRegistry; client sync) | done (GameTest verified); `vibration_frequencies` and `parrot_imitations` ignored |
-| Attachments | radiation, flamethrower mode, level data | Fabric Data Attachment API | done; NeoForge's "should serialize" predicate and copy handlers are approximated by copyOnDeath |
-| Load conditions / NeoForge ingredients in data | recipes | build-time JSON transform + ConditionBridge + ingredient serializers | done |
-| Annotation scan data | @ContainerSync, computer methods | runtime ASM scan (ScanDataLoader) | done (not yet GUI-verified) |
-| PlayerTickEvent | MekaSuit, jetpack, radiation | PlayerTickMixin | done |
-| Server/level ticks, lifecycle, commands, tags, datapack sync, login/logout/respawn/clone/dimension change, start tracking | various | Fabric API events (GameEventBridge) | done |
-| Block break / right-click events | security, configurator | PlayerBlockBreakEvents / UseBlockCallback | done |
+| DeferredRegister / RegisterEvent order | all content | ModBusLifecycle: data components, attributes, sounds, effects, particles first, then modded registries, then vanilla order | done |
+| Registry aliases | renamed ids in old saves | RegistryAliases + MappedRegistryAliasMixin | done (GameTest) |
+| Block capabilities | everything | Fabric API Lookup + CapabilityBridge (Transfer API, TR Energy) both ways | done (GameTest) |
+| Item capabilities | buckets, tanks, batteries, tablets | FluidStorage.ITEM / EnergyStorage.ITEM export via ContainerItemContext exchange; import of foreign item storages written back into the stack | done (GameTest) |
+| BlockCapabilityCache invalidation | transmitters, machines | CapabilityInvalidation (BE load/unload, chunk load/unload, `invalidateCapabilities`) | done |
+| BlockEntity#onLoad / onChunkUnloaded / onDataPacket / handleUpdateTag | all tiles, client sync | Fabric BE/chunk events, ClientPacketListenerMixin, LevelChunkMixin | done (smoke) |
+| Extended menus (`openMenu(provider, buf)`) | all GUIs | payload before the open-screen packet + MenuTypeMixin | done (smoke) |
+| Payloads, config, data maps, attachments, load conditions, annotation scan data | various | see D2–D11 | done |
+| PlayerTickEvent, EntityTickEvent.Post | MekaSuit, jetpack, radiation | PlayerTickMixin, ServerLevelEntityTickMixin | done |
+| Server/level ticks, lifecycle, commands, tags, datapack sync, login/logout/respawn/clone/dimension change, tracking | various | Fabric API events (GameEventBridge) | done |
+| Block break / right-click / BreakSpeed / ItemCrafted | security, configurator, Atomic Disassembler, bins | Fabric events, BlockBreakSpeedMixin, ResultSlotMixin | done |
+| LivingIncomingDamage / LivingFall / LivingJump / EntityInvulnerabilityCheck | MekaSuit, free runners, gas mask, radiation immunity | LivingEntityHooksMixin, EntityInvulnerabilityMixin | done (GameTest) |
+| ItemAttributeModifierEvent | Meka-Tool, MekaSuit, free runners | ItemStackAttributesMixin | done (GameTest) |
+| `neoforge:swim_speed`, `neoforge:creative_flight` attributes | MekaSuit | NeoAttributes (registered with vanilla's), travel/abilities mixins | done (GameTest: present) |
+| FinalizeSpawnEvent | Tools mob gear | MobFinalizeSpawnMixin | done |
+| Enchantment hooks | Meka-Tool modules | not needed: modules write the vanilla ENCHANTMENTS component | n/a |
 | LightningBolt#setDamage | SPS | LightningBoltMixin + EntityThunderHitMixin | done |
-| AbstractWidget#onClick(x, y, button) | all GUI widgets | AbstractWidgetMixin | done |
-| Positional light emission (`getLightEmission(level, pos)`) | fluid tank glow, etc. | — | TODO (falls back to state light) |
-| Living damage/fall/shield/jump events | MekaSuit, free runners | — | TODO (mixins) |
-| ItemAttributeModifierEvent | Meka-Tool damage/attack speed | — | TODO |
-| Item enchantment hooks (getEnchantmentLevel, ...) | Meka-Tool modules | — | TODO (EnchantmentHelper mixin) |
-| Creative flight / swim speed attributes | MekaSuit | — | TODO |
-| Chunk tickets (TicketController) | anchor upgrade | vanilla region tickets | partial: not persisted across restarts |
-| IEntityWithComplexSpawn | flame and robit entities | — | TODO |
-| Biome modifiers (ore generation) | worldgen | — | TODO (BiomeModifications) |
-| Models: geometry loaders, OBJ, ModelData/IDynamicBakedModel, fluid_container buckets, separate transforms | most block/item rendering | shim types + clean-room OBJ loader | TODO: Fabric ModelLoadingPlugin + FRAPI bridge |
-| Client extensions (BEWLR item renderers, armor models, fluid rendering) | machines as items, MekaSuit, fluids | registry maps only | TODO |
-| Shaders | flame/MekaSuit/SPS rendering | RegisterShadersEvent | TODO (CoreShaderRegistrationCallback) |
-| GUI layers / HUD | MekaSuit HUD, radiation overlay | HudRenderCallback | done, ordering approximated |
+| Positional light emission | glowing fluid tanks | DynamicLightEmission + BlockLightEngineMixin + ChunkAccessLightMixin | done (GameTest + client smoke) |
+| Chunk tickets (TicketController) | anchor upgrade, dimensional stabilizer | ForcedChunkStore (per-level SavedData, reinstated + validated on server start) | done (GameTest) |
+| IEntityWithComplexSpawn | flame, balloon | ComplexSpawns payload in the pairing bundle | done (smoke) |
+| Biome modifiers | ores, Additions baby mobs | BiomeModifierBridge (add_features + any registered modifier codec); server configs loaded for the pass | done (GameTest) |
+| Models: geometry loaders, OBJ, ModelData, fluid_container, separate transforms | block/item rendering | PreparableModelLoadingPlugin + NeoBlockModel + FRAPI bridge | done (smoke) |
+| Client extensions, shaders, GUI layers, key mappings, particles, item decorators | rendering, HUD | client bridges and mixins | done (smoke) |
+| ViewportEvent fog colour / render fog | MekaSuit vision | FogRendererMixin | done (smoke) |
+| RenderGuiLayerEvent.Pre (crosshair), RenderHighlightEvent, ScreenEvent.Render.Post, ClientPlayerNetworkEvent.Clone | radial menus, outlines, GUIs | GuiCrosshairMixin, Fabric events, ClientRespawnMixin | done |
+| Creative tab label colour | Mekanism tabs | per-tab colour + CreativeModeInventoryScreenMixin | done (smoke) |
+
+## Integrations
+| Mod | Fabric 1.21.1 | Status |
+|---|---|---|
+| JEI | yes | plugins for all modules via `jei_mod_plugin`; fluid ingredients converted to JEI's droplet type (smoke with JEI) |
+| EMI | yes | plugins via `emi`; fluids converted to droplet EmiStacks (smoke with EMI) |
+| Jade, WTHIT | yes | upstream code unchanged (`jade` entrypoint, `wthit_plugins.json`) (smoke with each) |
+| CC: Tweaked | yes | peripherals through CC:T's Fabric lookup `computercraft:peripheral` (GameTest with CC:T) |
+| CraftTweaker | yes | upstream integration; 4 conversions rewritten (GameTest with CrT + script) |
+| Curios → Trinkets | Trinkets | CuriosIntegration override implemented on Trinkets; MekanismHooks checks `trinkets` (GameTest with Trinkets) |
+| Wildfire's Female Gender Mod | yes | registers through WildfireAPI#addGenderArmor (GameTest with the mod) |
+| Team Reborn Energy | yes | energy interop (D8) |
+| The One Probe | no 1.21.1 Fabric build | excluded |
+| ProjectE, FramedBlocks, JsonThings, OpenComputers2, Flux Networks, Grand Power | NeoForge only | excluded; the user decided (2026-10-18) not to port these mods for now |
+| JeiTweaker | not released for 1.21.1 | excluded (upstream does not load it either) |
 
 ## Overrides / manual upstream edits
-* `src/fabric/overrides/java/.../CuriosIntegration.java`: a no-op stand-in.
-* Upstream files with `//FABRIC:` edits (`grep -rn "FABRIC:" src/main src/api`): MekanismHooks, MekanismAccess, ComputerCapabilityHelper, EnergyCompatUtils, MekanismKeyHandler, MekKeyBinding, MekanismClient, MekanismTags, ChemicalBuilder, BaseModelCache, RenderTransmitterBase, ClientRegistration, ClientRegistrationUtil, MekanismShaders, MekanismStatusOverlay, MekaSuitEnergyLevel, GuiElement, VirtualSlotContainerScreen, CreativeTabDeferredRegister, MekanismSavedData, SyncAllSecurityData, EntityFlame, and 10 `ListTag(int)` sites.
+* `src/fabric/overrides/java/.../CuriosIntegration.java`: Curios entry points implemented on Trinkets.
+* 50 upstream files carry `//FABRIC:` edits (`grep -rln "FABRIC" src/main src/api src/generators src/additions src/tools`): AdditionsClient, AdditionsTags,
+  BabyEndermanHeldBlockLayer, BaseModelCache, BaseRecipeCategory, BlockPlasticFenceGate, CCCapabilityHelper, ChemicalBuilder, ClientRegistration,
+  ClientRegistrationUtil, ComputerCapabilityHelper, CrTUtils, CreativeTabDeferredRegister, EmiStackUnderMouseProvider, EnergyCompatUtils, EntityFlame,
+  FilterManager, FissionReactorMultiblockData, FrequencyManager, GeneratorTags, GeneratorsClient, GeneratorsClientRegistration, GuiElement,
+  ItemMekanismSword, JEIAliasHelper, JadeLookingAtHelper, LogisticalTransporterBase, MekKeyBinding, MekaSuitEnergyLevel, MekanismAccess,
+  MekanismClient, MekanismEmiRecipe, MekanismGenderArmor, MekanismHooks, MekanismJEI, MekanismKeyHandler, MekanismSavedData, MekanismShaders,
+  MekanismStatusOverlay, MekanismTags, MeltdownLevelData, MultiblockManager, PersonalStorageData, RadiationLevelData, SPSMultiblockData,
+  SyncAllSecurityData, ToolsClient, ToolsTags, Upgrade, VirtualSlotContainerScreen.
 
-## Stubbed / disabled
-* Integrations not compiled: CraftTweaker, FramedBlocks, Gender, JsonThings, Jade/TOP/WTHIT (`lookingat`), ProjectE, OpenComputers2, Flux Networks, Grand Power, the JEI and EMI plugins, ComputerCraft peripherals, and the Curios renderer. JEI, EMI and CC:T APIs are on the compile classpath so the shared code compiles.
-* Curios: CuriosIntegration is a no-op. Accessory slots (Trinkets/Accessories) are TODO.
-* Datagen is not ported. The committed generated resources are used.
-* Custom creative-tab label colour (NeoForge `withTabFactory`): tabs use the default colour.
-* Registry aliases (`DeferredRegister#addAlias`) are recorded but not applied.
+## Build-time fixes for the release jars
+* Module jars are remapped with the module compile classpath (otherwise inherited Minecraft members called through Mekanism subclasses stay unmapped).
+* **Interface bridge:** Mekanism interfaces (`ITileWrapper`, `IRecipeLookupHandler`, `IQIOCraftingWindowHolder`) declare `getLevel()`/`getBlockPos()` that
+  block entities only implement through inherited vanilla methods. Remapping renames the vanilla methods but not Mekanism's, which threw
+  AbstractMethodError in production. `bridgeReleaseJars` renames every Mekanism declaration with those exact signatures, and all references, to the
+  intermediary names in one TinyRemapper pass over all four jars. `checkRemappedImplementations` guards against regressions.
 
-## Known bugs
-* Fabric storage adapters execute on outer commit. Several operations on the same slot inside one transaction each see the unmodified slot.
+## Known limitations
+* Fabric storage adapters execute on outer commit: several operations on the same slot inside one transaction each see the unmodified slot.
+* Biome modifier files are read from the mod jars at startup, so datapacks cannot override them.
+* `creative_flight` is granted by the server toggling `abilities.mayfly` (synced by the vanilla abilities packet) rather than by patching every mayfly check.
 * `EffectiveSide` treats only threads named "Server thread", or ones marked at server start, as server threads.
-* The log shows "No data fixer registered for flame/robit", which is harmless (vanilla warning for modded entity types).
+* Harmless log noise: "No data fixer registered for <mekanism entity>" (vanilla dev warning), EMI's "Recipe mekanism:info/... not present" (same as upstream).
 
 ## Log
 * **2026-10-18**: Cloned upstream at the 10.7.19 tag and surveyed it. Recorded architecture decisions D1–D12. User decisions: Team Reborn Energy, Forge Config API Port, mod id `mekanism_fabric` with namespace `mekanism`.
 * **2026-10-18**: Vendor import, Loom scaffold, and the neoshim layer. Core compiles. The dedicated server starts with all core content and recipes. The client completes resource loading (automated smoke run). Added the Transfer/TR Energy bridges, data maps and BE sync mixins. 5 GameTests pass.
+* **2026-10-18**: Models (loaders, FRAPI bridge), client hooks, extended menus, world smoke driver, ore worldgen. Generators, Additions and Tools load as separate Fabric mods.
+* **2026-10-18**: Gameplay hooks (damage/fall/jump/attributes/spawn/crafting/break speed), complex spawn data, persistent chunk tickets, positional light, custom biome modifiers, fog/clone/crosshair events, registry aliases, item-level Transfer API interop, tab label colour.
+* **2026-10-18**: Integrations: JEI, EMI, Jade, WTHIT, CC: Tweaked, Trinkets (Curios replacement), CraftTweaker, Wildfire's Gender Mod. User decided not to port ProjectE/TOP/Flux Networks/Grand Power etc. for now.
+* **2026-10-18**: Release jars per module, upstream unit tests, production server/client/world verification; fixed two production-only remapping bugs.
