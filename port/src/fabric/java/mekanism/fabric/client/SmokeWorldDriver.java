@@ -40,6 +40,7 @@ public final class SmokeWorldDriver {
 
     private static int stage = 0;
     private static int waitTicks = 0;
+    private static int guiWaitTicks = 0;
     private static int renderFogEvents = 0;
     private static int fogColorEvents = 0;
     private static int ticks = 0;
@@ -103,7 +104,8 @@ public final class SmokeWorldDriver {
                 }
             }
             case 3 -> {
-                if (++ticks > 40) {
+                //Wait for the screen rather than a fixed delay (up to 200 ticks)
+                if (++ticks > 40 && (client.screen != null && isMekanismScreen(client.screen) || ticks > 200)) {
                     stage = 4;
                     ticks = 0;
                     if (client.screen == null || !isMekanismScreen(client.screen)) {
@@ -217,6 +219,7 @@ public final class SmokeWorldDriver {
                 return;
             }
             MinecraftServer server = client.getSingleplayerServer();
+            lastUseResult = "";
             server.execute(() -> {
                 ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
                 ServerLevel level = player.serverLevel();
@@ -224,9 +227,18 @@ public final class SmokeWorldDriver {
                 InteractionResult result = level.getBlockState(pos).useWithoutItem(level, player, new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false));
                 lastUseResult = result + " state=" + level.getBlockState(pos) + " be=" + level.getBlockEntity(pos);
             });
-        } else if (ticks == 16) {
+        } else if (ticks >= 16 && ticks < 17) {
             String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).getPath();
-            if (client.screen != null && isMekanismScreen(client.screen)) {
+            boolean opened = client.screen != null && isMekanismScreen(client.screen);
+            //The server accepted the interaction: wait for the screen (up to 80 ticks) instead of assuming fixed latency, so a slow server tick cannot make
+            // the driver replace the block while the open-screen packet is still in flight
+            if (!opened && lastUseResult != null && lastUseResult.startsWith("CONSUME") && guiWaitTicks < 80) {
+                guiWaitTicks++;
+                ticks = 15;
+                return;
+            }
+            guiWaitTicks = 0;
+            if (opened) {
                 guiOk++;
             } else {
                 noGui.add(id + "[" + lastUseResult + "]");
