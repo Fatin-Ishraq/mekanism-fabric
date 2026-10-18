@@ -155,4 +155,67 @@ public class MekanismPortGameTests implements FabricGameTest {
         helper.assertTrue(MekanismAPI.CHEMICAL_REGISTRY.size() > 50, "Chemical registry looks empty");
         helper.succeed();
     }
+
+    @GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 300)
+    public void universalCablesFormNetworkAndDeliverEnergy(GameTestHelper helper) {
+        BlockPos machine = new BlockPos(1, 1, 1);
+        helper.setBlock(machine, MekanismBlocks.ENRICHMENT_CHAMBER.value());
+        BlockEntity machineTile = helper.getBlockEntity(machine);
+        machineTile.applyComponentsFromItemStack(new ItemStack(MekanismBlocks.ENRICHMENT_CHAMBER.value()));
+        BlockPos cableA = new BlockPos(2, 1, 1);
+        BlockPos cableB = new BlockPos(3, 1, 1);
+        helper.setBlock(cableA, MekanismBlocks.BASIC_UNIVERSAL_CABLE.value());
+        helper.setBlock(cableB, MekanismBlocks.BASIC_UNIVERSAL_CABLE.value());
+        helper.runAfterDelay(5, () -> {
+            var transmitter = ((mekanism.common.tile.transmitter.TileEntityTransmitter) helper.getBlockEntity(cableA)).getTransmitter();
+            helper.assertTrue(transmitter.hasTransmitterNetwork(), "Universal cable did not form a network");
+            helper.assertTrue(transmitter.getTransmitterNetwork().transmittersSize() == 2,
+                  "Cable network has " + transmitter.getTransmitterNetwork().transmittersSize() + " transmitters instead of 2");
+            //Real energy source: a creative energy cube whose front (output by default) faces the cable network
+            BlockPos cube = new BlockPos(4, 1, 1);
+            var cubeState = MekanismBlocks.CREATIVE_ENERGY_CUBE.value().defaultBlockState();
+            for (var property : cubeState.getProperties()) {
+                if (property.getName().equals("facing")) {
+                    cubeState = cubeState.setValue((net.minecraft.world.level.block.state.properties.DirectionProperty) property, Direction.WEST);
+                }
+            }
+            helper.setBlock(cube, cubeState);
+            helper.getBlockEntity(cube).applyComponentsFromItemStack(new ItemStack(MekanismBlocks.CREATIVE_ENERGY_CUBE.value()));
+            //Fill it (the "filled" creative cube only exists as a creative-tab item variant)
+            ((mekanism.common.tile.TileEntityEnergyCube) helper.getBlockEntity(cube)).getEnergyContainer().setEnergy(Long.MAX_VALUE);
+            helper.succeedWhen(() -> {
+                var strict = mekanism.common.capabilities.Capabilities.STRICT_ENERGY.block().getCapability(helper.getLevel(), helper.absolutePos(machine), null, null, null);
+                if (strict == null || strict.getEnergy(0) <= 0) {
+                    var cubeStrict = mekanism.common.capabilities.Capabilities.STRICT_ENERGY.block().getCapability(helper.getLevel(), helper.absolutePos(cube), null, null, null);
+                    var cableB2 = (mekanism.common.content.network.transmitter.UniversalCable) ((mekanism.common.tile.transmitter.TileEntityTransmitter) helper.getBlockEntity(cableB)).getTransmitter();
+                    var cableA2 = (mekanism.common.content.network.transmitter.UniversalCable) ((mekanism.common.tile.transmitter.TileEntityTransmitter) helper.getBlockEntity(cableA)).getTransmitter();
+                    var cubeFacing = ((TileEntityMekanism) helper.getBlockEntity(cube)).getDirection();
+                    var cubeWest = mekanism.common.capabilities.Capabilities.STRICT_ENERGY.block().getCapability(helper.getLevel(), helper.absolutePos(cube), null, null, Direction.WEST);
+                    helper.fail("Energy did not reach the machine: cube=" + (cubeStrict == null ? "null" : cubeStrict.getEnergy(0) + "/" + cubeStrict.getMaxEnergy(0))
+                                + " cubeFacing=" + cubeFacing + " cubeWestCap=" + cubeWest
+                                + " cableB east=" + cableB2.getConnectionType(Direction.EAST) + " cableA west=" + cableA2.getConnectionType(Direction.WEST)
+                                + " net energy=" + (cableB2.hasTransmitterNetwork() ? cableB2.getTransmitterNetwork().energyContainer.getEnergy() + " acceptors=" + cableB2.getTransmitterNetwork().getAcceptorCount() : "none"));
+                }
+            });
+        });
+    }
+
+
+    @GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 200)
+    public void dynamicTankMultiblockForms(GameTestHelper helper) {
+        for (int x = 0; x < 3; x++) {
+            for (int y = 1; y < 4; y++) {
+                for (int z = 0; z < 3; z++) {
+                    boolean interior = x == 1 && y == 2 && z == 1;
+                    if (!interior) {
+                        helper.setBlock(new BlockPos(x, y, z), MekanismBlocks.DYNAMIC_TANK.value());
+                    }
+                }
+            }
+        }
+        helper.succeedWhen(() -> {
+            var tile = (mekanism.common.tile.prefab.TileEntityMultiblock<?>) helper.getBlockEntity(new BlockPos(0, 1, 0));
+            helper.assertTrue(tile.getMultiblock().isFormed(), "Dynamic tank did not form");
+        });
+    }
 }
