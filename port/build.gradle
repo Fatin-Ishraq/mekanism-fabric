@@ -40,6 +40,10 @@ repositories {
         forRepository { maven { name = 'Modrinth'; url = 'https://api.modrinth.com/maven' } }
         filter { includeGroup('maven.modrinth') }
     }
+    exclusiveContent {
+        forRepository { maven { name = 'Ladysnake (Cardinal Components, used by Trinkets)'; url = 'https://maven.ladysnake.org/releases' } }
+        filter { includeGroup('org.ladysnake.cardinal-components-api') }
+    }
     mavenCentral()
 }
 
@@ -211,6 +215,12 @@ dependencies {
     } else if (project.findProperty('looking_at') == 'wthit') {
         modLocalRuntime("mcp.mobius.waila:wthit:fabric-${wthit_version}")
         modLocalRuntime("lol.bai:badpackets:fabric-${badpackets_version}")
+    }
+    modCompileOnly("dev.emi:trinkets:${trinkets_version}") { transitive = false }
+    modCompileOnly("org.ladysnake.cardinal-components-api:cardinal-components-base:${cca_version}") { transitive = false }
+    // Accessory slots at dev runtime: -Paccessories=trinkets (verification runs only; never bundled)
+    if (project.findProperty('accessories') == 'trinkets') {
+        modLocalRuntime("dev.emi:trinkets:${trinkets_version}")
     }
     // ComputerCraft at dev runtime: -Pcomputers=cc (verification runs only; never bundled)
     if (project.findProperty('computers') == 'cc') {

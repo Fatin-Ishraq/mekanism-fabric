@@ -73,7 +73,7 @@ public final class MekanismHooks {
         Predicate<String> loadedCheck = modList == null ? modid -> false : modList::isLoaded;
         computerCraft = new IntegrationInfo("computercraft", loadedCheck);
         craftTweaker = new IntegrationInfo("crafttweaker", loadedCheck);
-        curios = new IntegrationInfo("curios", loadedCheck);
+        curios = new IntegrationInfo("trinkets", loadedCheck);//FABRIC: Curios is NeoForge-only; CuriosIntegration is implemented on Trinkets
         darkModeEverywhere = new IntegrationInfo("darkmodeeverywhere", loadedCheck);
         fluxNetworks = new IntegrationInfo("fluxnetworks", loadedCheck);
         grandPower = new IntegrationInfo("grandpower", loadedCheck);

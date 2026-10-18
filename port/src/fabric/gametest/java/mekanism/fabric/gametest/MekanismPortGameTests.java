@@ -401,4 +401,26 @@ public class MekanismPortGameTests implements FabricGameTest {
         mekanism.common.Mekanism.logger.info("[Fabric port] GameTest: enrichment chamber peripheral type {}", peripheral.getType());
         helper.succeed();
     }
+
+    /** Accessory slots (only when Trinkets is installed, -Paccessories=trinkets; the test mod defines a chest/back slot): a jetpack worn there is found. */
+    @GameTest(template = EMPTY_STRUCTURE)
+    public void jetpackFoundInTrinketSlot(GameTestHelper helper) {
+        if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("trinkets")) {
+            helper.succeed();
+            return;
+        }
+        var player = helper.makeMockServerPlayerInLevel();
+        var component = dev.emi.trinkets.api.TrinketsApi.getTrinketComponent(player).orElseThrow();
+        var group = component.getInventory().get("chest");
+        helper.assertTrue(group != null && group.containsKey("back"), "Player has no chest/back trinket slot: " + component.getInventory().keySet());
+        ItemStack jetpack = new ItemStack(mekanism.common.registries.MekanismItems.JETPACK.get());
+        group.get("back").setItem(0, jetpack);
+        helper.assertTrue(mekanism.common.integration.curios.CuriosIntegration.findFirstCurio(player, stack -> stack.getItem() instanceof mekanism.common.item.interfaces.IJetpackItem)
+              == jetpack, "Jetpack in trinket slot not found");
+        helper.assertTrue(mekanism.common.integration.curios.CuriosIntegration.getCurioStack(player, "chest/back", 0) == jetpack, "getCurioStack(chest/back, 0) mismatch");
+        var handler = mekanism.common.integration.curios.CuriosIntegration.getCuriosInventory(player);
+        helper.assertTrue(handler != null && handler.getSlots() >= 1, "No accessory item handler");
+        helper.assertTrue(mekanism.common.Mekanism.hooks.curios.isLoaded(), "Mekanism does not see the accessory integration as loaded");
+        helper.succeed();
+    }
 }

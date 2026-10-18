@@ -78,8 +78,21 @@ public class MekanismKeyHandler {
             if (IModeItem.isModeItem(player, slot)) {
                 PacketUtils.sendToServer(new PacketModeChange(slot, player.isShiftKeyDown()));
                 SoundHandler.playSound(MekanismSounds.HYDRAULIC);
+            } else if (mekanism.common.Mekanism.hooks.curios.isLoaded()) {
+                //FABRIC: accessory slots come from Trinkets (CuriosIntegration override); slot ids are Trinkets' group/slot ids
+                java.util.Optional<mekanism.common.integration.curios.CuriosIntegration.AccessorySlot> curiosResult =
+                      mekanism.common.integration.curios.CuriosIntegration.findFirstCurioSlot(player, stack -> {
+                          if (stack.canEquip(slot, player) && IModeItem.isModeItem(stack, slot)) {
+                              return !(stack.getItem() instanceof mekanism.common.item.interfaces.IChemicalItem item) || item.hasChemical(stack);
+                          }
+                          return false;
+                      });
+                if (curiosResult.isPresent()) {
+                    PacketUtils.sendToServer(new mekanism.common.network.to_server.PacketModeChangeCurios(curiosResult.get().slotType(), curiosResult.get().index(),
+                          player.isShiftKeyDown()));
+                    SoundHandler.playSound(MekanismSounds.HYDRAULIC);
+                }
             }
-            //FABRIC: removed the Curios accessory-slot branch (Curios is NeoForge-only; Trinkets/Accessories support is TODO)
         }
     }
 }
