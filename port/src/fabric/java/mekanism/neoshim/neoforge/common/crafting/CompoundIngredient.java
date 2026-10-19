@@ -1,50 +1,43 @@
 package mekanism.neoshim.neoforge.common.crafting;
 
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.MapCodec;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
-import mekanism.fabric.compat.IngredientCodecs;
-import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
-import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.core.Holder;
 import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.display.SlotDisplay;
 
-/** Union of ingredients. Serialized like NeoForge: {@code {"type": "neoforge:compound", "children": [...]}}. */
+/** Union of ingredients: {@code {"neoforge:ingredient_type": "neoforge:compound", "children": [...]}}. */
 public record CompoundIngredient(List<Ingredient> children) implements ICustomIngredient {
 
-    public static final Identifier ID = Identifier.fromNamespaceAndPath("neoforge", "compound");
-    public static final MapCodec<CompoundIngredient> CODEC = IngredientCodecs.LIST_CODEC_NONEMPTY.fieldOf("children").xmap(CompoundIngredient::new, CompoundIngredient::children);
-    public static final StreamCodec<RegistryFriendlyByteBuf, CompoundIngredient> STREAM_CODEC = Ingredient.CONTENTS_STREAM_CODEC.apply(ByteBufCodecs.list())
-          .map(CompoundIngredient::new, CompoundIngredient::children);
-    public static final CustomIngredientSerializer<CompoundIngredient> SERIALIZER = IngredientCodecs.serializer(ID, CODEC, STREAM_CODEC);
+    public static final MapCodec<CompoundIngredient> CODEC = Ingredient.CODEC.listOf()
+          .validate(list -> list.isEmpty() ? DataResult.error(() -> "Compound ingredient must have at least one child") : DataResult.success(list))
+          .fieldOf("children").xmap(CompoundIngredient::new, CompoundIngredient::children);
+    public static final IngredientType<CompoundIngredient> TYPE = new IngredientType<>(CODEC,
+          Ingredient.CONTENTS_STREAM_CODEC.apply(ByteBufCodecs.list()).map(CompoundIngredient::new, CompoundIngredient::children));
 
     public CompoundIngredient {
         if (children.isEmpty()) {
             throw new IllegalArgumentException("Compound ingredient must have at least one child");
         }
+        children = List.copyOf(children);
     }
 
     public static Ingredient of(Ingredient... children) {
         if (children.length == 1) {
             return children[0];
         }
-        return of(Arrays.asList(children));
-    }
-
-    public static Ingredient of(List<Ingredient> children) {
-        if (children.size() == 1) {
-            return children.getFirst();
-        }
-        return new CompoundIngredient(List.copyOf(children)).toVanilla();
+        return new CompoundIngredient(Arrays.asList(children)).toVanilla();
     }
 
     @Override
-    public Stream<ItemStack> getItems() {
-        return children.stream().flatMap(child -> Arrays.stream(child.getItems()));
+    public Stream<Holder<Item>> items() {
+        return children.stream().flatMap(Ingredient::items).distinct();
     }
 
     @Override
@@ -68,7 +61,12 @@ public record CompoundIngredient(List<Ingredient> children) implements ICustomIn
     }
 
     @Override
-    public CustomIngredientSerializer<?> getSerializer() {
-        return SERIALIZER;
+    public IngredientType<?> getType() {
+        return TYPE;
+    }
+
+    @Override
+    public SlotDisplay display() {
+        return new SlotDisplay.Composite(children.stream().map(Ingredient::display).toList());
     }
 }

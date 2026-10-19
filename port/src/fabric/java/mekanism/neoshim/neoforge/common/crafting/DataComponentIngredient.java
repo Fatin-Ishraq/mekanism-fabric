@@ -3,68 +3,74 @@ package mekanism.neoshim.neoforge.common.crafting;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import java.util.Arrays;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
-import mekanism.fabric.compat.IngredientCodecs;
-import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
-import net.minecraft.core.component.DataComponentPredicate;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.HolderSetCodec;
-import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.display.SlotDisplay;
 import net.minecraft.world.level.ItemLike;
 
-/** Serialized like NeoForge: {@code {"type": "neoforge:components", "items": ..., "components": {...}, "strict": bool}}. */
+/**
+ * Matches items whose components match a patch: {@code {"neoforge:ingredient_type": "neoforge:components", "items": ..., "components": {...}, "strict": bool}}.
+ * Strict ingredients require the stack's component patch to equal the given patch exactly; otherwise every entry of the patch must hold on the stack.
+ */
 public class DataComponentIngredient implements ICustomIngredient {
 
-    public static final Identifier ID = Identifier.fromNamespaceAndPath("neoforge", "components");
     public static final MapCodec<DataComponentIngredient> CODEC = RecordCodecBuilder.mapCodec(builder -> builder.group(
-          HolderSetCodec.create(Registries.ITEM, net.minecraft.core.registries.BuiltInRegistries.ITEM.holderByNameCodec(), false).fieldOf("items").forGetter(DataComponentIngredient::items),
-          DataComponentPredicate.CODEC.fieldOf("components").forGetter(DataComponentIngredient::components),
-          Codec.BOOL.optionalFieldOf("strict", false).forGetter(DataComponentIngredient::isStrict)
+          Ingredient.NON_AIR_HOLDER_SET_CODEC.fieldOf("items").forGetter(DataComponentIngredient::itemSet),
+          DataComponentPatch.CODEC.fieldOf("components").forGetter(DataComponentIngredient::components),
+          Codec.BOOL.optionalFieldOf("strict", false).forGetter(DataComponentIngredient::componentsExhaustive)
     ).apply(builder, DataComponentIngredient::new));
-    public static final StreamCodec<RegistryFriendlyByteBuf, DataComponentIngredient> STREAM_CODEC = StreamCodec.composite(
-          ByteBufCodecs.holderSet(Registries.ITEM), DataComponentIngredient::items,
-          DataComponentPredicate.STREAM_CODEC, DataComponentIngredient::components,
-          ByteBufCodecs.BOOL, DataComponentIngredient::isStrict,
-          DataComponentIngredient::new);
-    public static final CustomIngredientSerializer<DataComponentIngredient> SERIALIZER = IngredientCodecs.serializer(ID, CODEC, STREAM_CODEC);
+    public static final IngredientType<DataComponentIngredient> TYPE = new IngredientType<>(CODEC, StreamCodec.composite(
+          ByteBufCodecs.holderSet(Registries.ITEM), DataComponentIngredient::itemSet,
+          DataComponentPatch.STREAM_CODEC, DataComponentIngredient::components,
+          ByteBufCodecs.BOOL, DataComponentIngredient::componentsExhaustive,
+          DataComponentIngredient::new));
 
     private final HolderSet<Item> items;
-    private final DataComponentPredicate components;
+    private final DataComponentPatch components;
     private final boolean strict;
-    private final ItemStack[] stacks;
 
-    public DataComponentIngredient(HolderSet<Item> items, DataComponentPredicate components, boolean strict) {
+    public DataComponentIngredient(HolderSet<Item> items, DataComponentPatch components, boolean strict) {
         this.items = items;
         this.components = components;
         this.strict = strict;
-        this.stacks = items.stream().map(item -> new ItemStack(item, 1, components.asPatch())).toArray(ItemStack[]::new);
     }
 
     @Override
     public boolean test(ItemStack stack) {
-        if (strict) {
-            for (ItemStack stack2 : this.stacks) {
-                if (ItemStack.isSameItemSameComponents(stack, stack2)) {
-                    return true;
-                }
-            }
+        if (!items.contains(stack.typeHolder())) {
             return false;
         }
-        return this.items.contains(stack.getItemHolder()) && this.components.test(stack);
+        if (strict) {
+            return stack.getComponentsPatch().equals(components);
+        }
+        for (Map.Entry<DataComponentType<?>, Optional<?>> entry : components.entrySet()) {
+            Optional<?> expected = entry.getValue();
+            Object actual = stack.get(entry.getKey());
+            if (expected.isPresent() ? !expected.get().equals(actual) : actual != null) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
-    public Stream<ItemStack> getItems() {
-        return Arrays.stream(stacks);
+    public Stream<Holder<Item>> items() {
+        return items.stream();
     }
 
     @Override
@@ -73,50 +79,96 @@ public class DataComponentIngredient implements ICustomIngredient {
     }
 
     @Override
-    public CustomIngredientSerializer<?> getSerializer() {
-        return SERIALIZER;
+    public IngredientType<?> getType() {
+        return TYPE;
     }
 
-    public HolderSet<Item> items() {
+    @Override
+    public SlotDisplay display() {
+        return new SlotDisplay.Composite(items.stream()
+              .map(item -> (SlotDisplay) new SlotDisplay.ItemStackSlotDisplay(new ItemStackTemplate(item, 1, components)))
+              .toList());
+    }
+
+    public HolderSet<Item> itemSet() {
         return items;
     }
 
-    public DataComponentPredicate components() {
+    public DataComponentPatch components() {
         return components;
     }
 
-    public boolean isStrict() {
+    public boolean componentsExhaustive() {
         return strict;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        return o == this || o instanceof DataComponentIngredient other && strict == other.strict && items.equals(other.items) && components.equals(other.components);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(items, components, strict);
+    }
+
     public static Ingredient of(boolean strict, ItemStack stack) {
-        return of(strict, stack.getComponents(), stack.getItem());
+        return of(strict, stack.getComponentsPatch(), stack.typeHolder());
     }
 
-    public static Ingredient of(boolean strict, net.minecraft.core.component.DataComponentMap map, ItemLike... items) {
-        return of(strict, DataComponentPredicate.allOf(map), items);
+    public static Ingredient of(boolean strict, ItemStackTemplate stack) {
+        return of(strict, stack.components(), stack.item());
+    }
+
+    public static <T> Ingredient of(DataComponentType<? super T> type, T value, ItemLike... items) {
+        return of(false, type, value, items);
+    }
+
+    public static <T> Ingredient of(boolean strict, DataComponentType<? super T> type, T value, ItemLike... items) {
+        return of(strict, DataComponentPatch.builder().set(type(type), value).build(), items);
+    }
+
+    public static <T> Ingredient of(boolean strict, Supplier<? extends DataComponentType<? super T>> type, T value, ItemLike... items) {
+        return of(strict, type.get(), value, items);
+    }
+
+    public static Ingredient of(boolean strict, DataComponentMap map, ItemLike... items) {
+        return of(strict, patchOf(map), items);
     }
 
     @SafeVarargs
-    public static Ingredient of(boolean strict, net.minecraft.core.component.DataComponentMap map, Holder<Item>... items) {
-        return of(strict, DataComponentPredicate.allOf(map), items);
+    public static Ingredient of(boolean strict, DataComponentMap map, Holder<Item>... items) {
+        return of(strict, patchOf(map), items);
     }
 
-    public static Ingredient of(boolean strict, net.minecraft.core.component.DataComponentMap map, HolderSet<Item> items) {
-        return of(strict, DataComponentPredicate.allOf(map), items);
+    public static Ingredient of(boolean strict, DataComponentMap map, HolderSet<Item> items) {
+        return of(strict, patchOf(map), items);
     }
 
     @SafeVarargs
-    public static Ingredient of(boolean strict, DataComponentPredicate predicate, Holder<Item>... items) {
-        return of(strict, predicate, HolderSet.direct(items));
+    public static Ingredient of(boolean strict, DataComponentPatch patch, Holder<Item>... items) {
+        return of(strict, patch, HolderSet.direct(items));
+    }
+
+    public static Ingredient of(DataComponentPatch patch, ItemLike... items) {
+        return of(false, patch, items);
     }
 
     @SuppressWarnings("deprecation")
-    public static Ingredient of(boolean strict, DataComponentPredicate predicate, ItemLike... items) {
-        return of(strict, predicate, HolderSet.direct(Arrays.stream(items).map(ItemLike::asItem).map(Item::builtInRegistryHolder).toList()));
+    public static Ingredient of(boolean strict, DataComponentPatch patch, ItemLike... items) {
+        return of(strict, patch, HolderSet.direct(Stream.of(items).map(item -> item.asItem().builtInRegistryHolder()).toList()));
     }
 
-    public static Ingredient of(boolean strict, DataComponentPredicate predicate, HolderSet<Item> items) {
-        return new DataComponentIngredient(items, predicate, strict).toVanilla();
+    public static Ingredient of(boolean strict, DataComponentPatch patch, HolderSet<Item> items) {
+        return new DataComponentIngredient(items, patch, strict).toVanilla();
+    }
+
+    private static DataComponentPatch patchOf(DataComponentMap map) {
+        return DataComponentPatch.builder().set(map).build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> DataComponentType<T> type(DataComponentType<? super T> type) {
+        return (DataComponentType<T>) type;
     }
 }

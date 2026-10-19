@@ -1,6 +1,6 @@
 # 26.1.2 port — status (work in progress, does not compile yet)
 
-Last compile: 2008 javac error lines (`./gradlew compileJava --offline -q > log; python scripts/errareas.py log 3`).
+Last compile: 2008 javac error lines before the ingredient rewrite (`./gradlew compileJava -q > log; python3 scripts/errareas.py log 3`). The ingredient rewrite in progress is not compiled yet; see CLAUDE.md at the repo root.
 
 ## Done
 - Toolchain: non-remapping Loom 1.19.1, Java 25, Gradle 9.8.1, Fabric API 0.155.3+26.1.2 (core only, integrations excluded).
