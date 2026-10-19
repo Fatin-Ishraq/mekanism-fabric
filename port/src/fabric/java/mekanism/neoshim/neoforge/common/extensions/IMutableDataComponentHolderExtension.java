@@ -15,7 +15,7 @@ public interface IMutableDataComponentHolderExtension {
     }
 
     @Nullable
-    default <T> T set(Supplier<? extends DataComponentType<? super T>> type, @Nullable T value) {
+    default <T> T set(Supplier<? extends DataComponentType<T>> type, @Nullable T value) {
         return self().set(type.get(), value);
     }
 

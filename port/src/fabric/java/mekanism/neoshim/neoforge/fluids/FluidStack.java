@@ -318,8 +318,13 @@ public final class FluidStack implements DataComponentHolder, FluidInstance {
     }
 
     @Nullable
-    public <T> T set(DataComponentType<? super T> type, @Nullable T component) {
+    public <T> T set(DataComponentType<T> type, @Nullable T component) {
         return this.components.set(type, component);
+    }
+
+    @Nullable
+    public <T> T set(net.minecraft.core.component.TypedDataComponent<T> component) {
+        return this.components.set(component);
     }
 
     @Nullable

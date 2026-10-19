@@ -128,7 +128,7 @@ public final class DataMapLoader {
     private static Map<DataMapType<?, ?>, List<RawEntry>> load(ResourceManager manager) {
         Map<DataMapType<?, ?>, List<RawEntry>> result = new HashMap<>();
         for (DataMapType<?, ?> type : TYPES.values()) {
-            Identifier registry = type.registryKey().location();
+            Identifier registry = type.registryKey().identifier();
             String registryPath = registry.getNamespace().equals("minecraft") ? registry.getPath() : registry.getNamespace() + "/" + registry.getPath();
             Identifier file = Identifier.fromNamespaceAndPath(type.id().getNamespace(), "data_maps/" + registryPath + "/" + type.id().getPath() + ".json");
             List<RawEntry> entries = new ArrayList<>();
@@ -205,7 +205,7 @@ public final class DataMapLoader {
         appliedFuels.clear();
         Map<ResourceKey<?>, Object> values = VALUES.getOrDefault(fuels, Map.of());
         for (Map.Entry<ResourceKey<?>, Object> entry : values.entrySet()) {
-            net.minecraft.core.registries.BuiltInRegistries.ITEM.getOptional(entry.getKey().location()).ifPresent(item -> {
+            net.minecraft.core.registries.BuiltInRegistries.ITEM.getOptional(entry.getKey().identifier()).ifPresent(item -> {
                 int burnTime = ((FurnaceFuel) entry.getValue()).burnTime();
                 FuelRegistry.INSTANCE.add(item, burnTime);
                 appliedFuels.put(item, burnTime);
@@ -226,7 +226,7 @@ public final class DataMapLoader {
             for (Map.Entry<ResourceKey<?>, Object> value : entry.getValue().entrySet()) {
                 ((Codec) type.networkCodec()).encodeStart(ops, value.getValue()).result().ifPresent(encoded -> {
                     CompoundTag pair = new CompoundTag();
-                    pair.putString("key", value.getKey().location().toString());
+                    pair.putString("key", value.getKey().identifier().toString());
                     pair.put("value", (Tag) encoded);
                     list.add(pair);
                 });

@@ -27,7 +27,6 @@ SPEC = [
     ("net/minecraft/core/component/DataComponentHolder", True, "", [EXT + "IDataComponentHolderExtension"], False, False),
     ("net/minecraft/core/component/DataComponentMap$Builder", False, "", [EXT + "IDataComponentMapBuilderExtension"], False, False),
     ("net/minecraft/core/component/DataComponentPatch$Builder", False, "", [EXT + "IDataComponentPatchBuilderExtension"], False, False),
-    ("net/minecraft/world/level/block/entity/BlockEntity$DataComponentInput", True, "", [EXT + "IBlockEntityDataComponentInputExtension"], False, False),
     ("net/minecraft/world/item/Item$Properties", False, "", [EXT + "IItemPropertiesExtension"], False, True),
     ("net/minecraft/world/level/block/Block", False, "", [EXT + "IBlockExtension"], False, False),
     ("net/minecraft/world/level/block/state/BlockBehaviour$BlockStateBase", False, "", [EXT + "IBlockStateExtension"], False, False),
@@ -57,6 +56,8 @@ SPEC = [
     ("net/minecraft/world/item/CreativeModeTab", False, "", [EXT + "ICreativeModeTabExtension"], False, False),
     ("net/minecraft/world/entity/EntityType$Builder", False, "T", [EXT + "IEntityTypeBuilderExtension<T>"], False, False),
     ("net/minecraft/world/item/CreativeModeTab$Builder", False, "", [EXT + "ICreativeModeTabBuilderExtension"], False, False),
+    ("net/minecraft/util/random/WeightedList$Builder", False, "E", [EXT + "IWeightedListBuilderExtension<E>"], False, False),
+    ("net/minecraft/world/entity/Shearable", True, "", ["mekanism/neoshim/neoforge/common/IShearable"], False, False),
     ("net/minecraft/world/item/DispensibleContainerItem", True, "", [EXT + "IDispensibleContainerItemExtension"], False, False),
     # client
     ("net/minecraft/client/KeyMapping", False, "", [CEXT + "IKeyMappingExtension"], True, True),

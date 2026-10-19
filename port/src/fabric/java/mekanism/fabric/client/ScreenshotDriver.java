@@ -267,7 +267,7 @@ public final class ScreenshotDriver {
             }
             var screen = new net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen(client.player, client.player.connection.enabledFeatures(), true);
             client.setScreen(screen);
-            BuiltInRegistries.CREATIVE_MODE_TAB.entrySet().stream().filter(e -> e.getKey().location().equals(Mekanism.rl("mekanism")))
+            BuiltInRegistries.CREATIVE_MODE_TAB.entrySet().stream().filter(e -> e.getKey().identifier().equals(Mekanism.rl("mekanism")))
                   .findFirst().ifPresent(e -> {
                       //Modded tabs live on Fabric's extra creative tab pages
                       var fabricScreen = (net.fabricmc.fabric.api.client.itemgroup.v1.FabricCreativeInventoryScreen) screen;

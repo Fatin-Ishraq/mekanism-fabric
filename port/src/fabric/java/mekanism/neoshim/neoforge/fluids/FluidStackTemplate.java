@@ -76,7 +76,7 @@ public record FluidStackTemplate(Holder<Fluid> fluid, int amount, DataComponentP
     @Override
     @Nullable
     public <T> T get(DataComponentType<? extends T> type) {
-        return components.get(type) == null ? null : components.get(type).orElse(null);
+        return components.get(net.minecraft.core.component.DataComponentMap.EMPTY, type);
     }
 
     public static Codec<FluidStackTemplate> fixedAmountCodec(int amount) {

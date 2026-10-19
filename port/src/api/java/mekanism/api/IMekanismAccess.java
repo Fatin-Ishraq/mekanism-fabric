@@ -1,7 +1,5 @@
 package mekanism.api;
 
-import mekanism.api.integration.emi.IMekanismEmiHelper;
-import mekanism.api.integration.jei.IMekanismJEIHelper;
 import mekanism.api.recipes.ingredients.creator.IChemicalIngredientCreator;
 import mekanism.api.recipes.ingredients.creator.IChemicalStackIngredientCreator;
 import mekanism.api.recipes.ingredients.creator.IFluidStackIngredientCreator;
@@ -15,16 +13,7 @@ public interface IMekanismAccess {
     /// Provides access to Mekanism's internals.
     IMekanismAccess INSTANCE = MekanismAPI.getService(IMekanismAccess.class);
 
-    /// Gets a helper to interact with some of Mekanism's JEI integration internals. This should only be called if JEI is loaded.
-    ///
-    /// @throws IllegalStateException if JEI is not loaded.
-    IMekanismJEIHelper jeiHelper();
-
-    /// Gets a helper to interact with some of Mekanism's EMI integration internals. This should only be called if EMI is loaded.
-    ///
-    /// @throws IllegalStateException if EMI is not loaded.
-    /// @since 10.5.10
-    IMekanismEmiHelper emiHelper();
+    //FABRIC: 26.1 phase 1 - jeiHelper()/emiHelper() are compiled out with the JEI and EMI integrations
 
     /// Gets the item stack ingredient creator.
     ///

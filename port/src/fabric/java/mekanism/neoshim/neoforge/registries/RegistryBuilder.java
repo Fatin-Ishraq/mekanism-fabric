@@ -30,7 +30,7 @@ public class RegistryBuilder<T> {
     }
 
     public RegistryBuilder<T> defaultKey(ResourceKey<T> key) {
-        this.defaultKey = key.location();
+        this.defaultKey = key.identifier();
         return this;
     }
 

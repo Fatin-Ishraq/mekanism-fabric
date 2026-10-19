@@ -30,7 +30,7 @@ public final class PacketDistributor {
     }
 
     public static void sendToPlayersInDimension(ServerLevel level, CustomPacketPayload payload, CustomPacketPayload... payloads) {
-        for (ServerPlayer player : PlayerLookup.world(level)) {
+        for (ServerPlayer player : PlayerLookup.level(level)) {
             sendToPlayer(player, payload, payloads);
         }
     }

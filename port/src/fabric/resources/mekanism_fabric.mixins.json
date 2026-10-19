@@ -23,6 +23,7 @@
     "PlayerHooksMixin",
     "PlayerTickMixin",
     "ResultSlotMixin",
+    "SavedDataStorageMixin",
     "ServerConfigEarlyLoadMixin",
     "ServerConfigEarlyUnloadMixin",
     "ServerEntityMixin",
@@ -31,7 +32,6 @@
     "inject.BiomeInjectMixin",
     "inject.BlockBehaviour_BlockStateBaseInjectMixin",
     "inject.BlockEntityInjectMixin",
-    "inject.BlockEntity_DataComponentInputInjectMixin",
     "inject.BlockGetterInjectMixin",
     "inject.BlockInjectMixin",
     "inject.BucketPickupInjectMixin",
@@ -61,7 +61,9 @@
     "inject.PlayerInjectMixin",
     "inject.RegistryInjectMixin",
     "inject.ServerConfigurationPacketListenerInjectMixin",
-    "inject.TransformationInjectMixin"
+    "inject.ShearableInjectMixin",
+    "inject.TransformationInjectMixin",
+    "inject.WeightedList_BuilderInjectMixin"
   ],
   "client": [
     "client.AbstractWidgetMixin",
@@ -79,8 +81,8 @@
     "client.LivingEntityRendererMixin",
     "client.MenuTypeMixin",
     "client.MinecraftInitMixin",
-    "client.ModelDiscoveryMixin",
     "client.MinecraftSetScreenMixin",
+    "client.ModelDiscoveryMixin",
     "client.ModelManagerApplyMixin",
     "client.ModelManagerMixin",
     "client.MouseHandlerMixin",

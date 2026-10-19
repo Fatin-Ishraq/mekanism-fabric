@@ -165,7 +165,7 @@ public class Meltdown {
                 toBlow.add(wallPos);
                 damageCalculator.wallExploded = true;
             }
-            hurtEntities(toBlow);
+            hurtEntities();//FABRIC: vanilla 26.1 has no NeoForge hurtEntities(List) overload
             if (interactsWithBlocks()) {
                 ProfilerFiller profiler = Profiler.get();
                 profiler.push("explosion_blocks");

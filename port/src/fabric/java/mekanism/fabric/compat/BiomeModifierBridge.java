@@ -116,8 +116,8 @@ public final class BiomeModifierBridge {
                       new mekanism.neoshim.neoforge.common.world.MobSpawnSettingsBuilder(selection.getBiome().getMobSettings());
                 modifier.modify(selection.getBiomeRegistryEntry(), phase, new mekanism.neoshim.neoforge.common.world.ModifiableBiomeInfo.BiomeInfo.Builder(
                       new net.minecraft.world.level.biome.BiomeGenerationSettings.PlainBuilder(), spawns));
-                spawns.getAddedSpawners().forEach((category, added) -> added.forEach(spawner -> context.getSpawnSettings().addSpawn(category, spawner)));
-                spawns.getAddedCosts().forEach((entityType, cost) -> context.getSpawnSettings().setSpawnCost(entityType, cost.charge(), cost.energyBudget()));
+                spawns.getAddedSpawners().forEach((category, added) -> added.forEach(spawner -> context.getSpawnSettings().addSpawn(category, spawner.value(), spawner.weight())));
+                spawns.getAddedCosts().forEach((entityType, cost) -> context.getSpawnSettings().addMobCharge(entityType, cost.charge(), cost.energyBudget()));
             });
         }
         Mekanism.logger.debug("[Fabric port] Applied biome modifier {} ({})", id, type);

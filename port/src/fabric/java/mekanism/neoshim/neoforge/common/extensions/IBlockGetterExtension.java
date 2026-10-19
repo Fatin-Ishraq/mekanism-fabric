@@ -1,7 +1,7 @@
 package mekanism.neoshim.neoforge.common.extensions;
 
 import mekanism.neoshim.neoforge.model.data.ModelData;
-import net.fabricmc.fabric.api.blockview.v2.FabricBlockView;
+import net.fabricmc.fabric.api.blockgetter.v2.FabricBlockGetter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 
@@ -9,7 +9,7 @@ import net.minecraft.world.level.BlockGetter;
 public interface IBlockGetterExtension {
 
     default ModelData getModelData(BlockPos pos) {
-        Object data = ((FabricBlockView) this).getBlockEntityRenderData(pos);
+        Object data = ((FabricBlockGetter) this).getBlockEntityRenderData(pos);
         return data instanceof ModelData modelData ? modelData : ModelData.EMPTY;
     }
 }

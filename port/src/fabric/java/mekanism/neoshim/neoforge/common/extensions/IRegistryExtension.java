@@ -19,7 +19,7 @@ public interface IRegistryExtension<T> {
     /** Like getKey, but never falls back to a defaulted registry's default key. */
     @Nullable
     default Identifier getKeyOrNull(T element) {
-        return self().getResourceKey(element).map(ResourceKey::location).orElse(null);
+        return self().getResourceKey(element).map(ResourceKey::identifier).orElse(null);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -29,7 +29,7 @@ public interface IRegistryExtension<T> {
 
     @Nullable
     default <A> A getData(DataMapType<T, A> type, ResourceKey<T> key) {
-        return self().getHolder(key).map(holder -> DataMapLoader.getData(type, (Holder<T>) holder)).orElse(null);
+        return self().get(key).map(holder -> DataMapLoader.getData(type, (Holder<T>) holder)).orElse(null);
     }
 
     default boolean containsValue(T value) {

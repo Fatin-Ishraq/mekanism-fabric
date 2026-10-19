@@ -14,18 +14,39 @@ public interface ITransformationExtension {
     }
 
     default boolean isIdentity() {
-        return self().equals(Transformation.identity());
+        return self().equals(Transformation.IDENTITY);
+    }
+
+    default void transformPosition(Vector4f position) {
+        self().getMatrix().transform(position);
+    }
+
+    default void transformNormal(Vector3f normal) {
+        self().getMatrix().transformDirection(normal);
+        normal.normalize();
     }
 
     default Direction rotateTransform(Direction facing) {
         Vector3f dir = facing.step();
         Vector4f vec = new Vector4f(dir, 0);
-        Matrix4f matrix = self().getMatrix();
-        matrix.transform(vec);
-        return Direction.getNearest(vec.x(), vec.y(), vec.z());
+        self().getMatrix().transform(vec);
+        return Direction.getApproximateNearest(vec.x(), vec.y(), vec.z());
     }
 
     default Transformation blockCenterToCorner() {
-        return self();
+        return applyOrigin(new Vector3f(0.5F, 0.5F, 0.5F));
+    }
+
+    default Transformation blockCornerToCenter() {
+        return applyOrigin(new Vector3f(-0.5F, -0.5F, -0.5F));
+    }
+
+    /** The same transformation, applied around {@code origin} instead of the coordinate origin. */
+    default Transformation applyOrigin(Vector3f origin) {
+        if (isIdentity()) {
+            return self();
+        }
+        Matrix4f matrix = new Matrix4f().translation(origin).mul(self().getMatrix()).translate(-origin.x(), -origin.y(), -origin.z());
+        return new Transformation(matrix);
     }
 }

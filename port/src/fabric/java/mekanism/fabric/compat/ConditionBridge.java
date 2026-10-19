@@ -29,7 +29,7 @@ public final class ConditionBridge {
     /** Called after RegisterEvents so that the shim condition registry is populated. */
     public static void registerAll() {
         for (Map.Entry<ResourceKey<MapCodec<? extends ICondition>>, MapCodec<? extends ICondition>> entry : NeoForgeRegistries.CONDITION_SERIALIZERS.entrySet()) {
-            register(entry.getKey().location(), entry.getValue());
+            register(entry.getKey().identifier(), entry.getValue());
         }
     }
 

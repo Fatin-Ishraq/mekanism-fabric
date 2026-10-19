@@ -1,6 +1,6 @@
 package mekanism.fabric.client.bridge;
 
-import fuzs.forgeconfigapiport.fabric.api.neoforge.v4.client.ConfigScreenFactoryRegistry;
+import fuzs.forgeconfigapiport.fabric.api.v5.client.ConfigScreenFactoryRegistry;
 import java.util.List;
 import mekanism.fabric.client.HudHeights;
 import mekanism.neoshim.bus.api.IEventBus;

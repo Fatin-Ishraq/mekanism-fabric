@@ -8,14 +8,14 @@ import mekanism.neoshim.neoforge.common.SoundAction;
 import mekanism.neoshim.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariantAttributes;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
-import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.BlockAndLightGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
@@ -148,8 +148,29 @@ public class FluidType {
         return this.canDrown;
     }
 
-    public boolean supportsBoating(net.minecraft.world.entity.vehicle.Boat boat) {
+    public boolean supportsBoating(net.minecraft.world.entity.vehicle.boat.AbstractBoat boat) {
         return this.supportsBoating;
+    }
+
+    public boolean supportsBoating(FluidState state, net.minecraft.world.entity.vehicle.boat.AbstractBoat boat) {
+        return supportsBoating(boat);
+    }
+
+    public boolean canRideVehicleUnder(net.minecraft.world.entity.Entity vehicle, net.minecraft.world.entity.Entity rider) {
+        return this != VanillaTypes.WATER;
+    }
+
+    public boolean canExtinguish(FluidState state, net.minecraft.world.level.BlockGetter getter, BlockPos pos) {
+        return this.canExtinguish;
+    }
+
+    public boolean canHydrate(FluidState state, net.minecraft.world.level.BlockGetter getter, BlockPos pos, net.minecraft.world.level.block.state.BlockState source,
+          BlockPos sourcePos) {
+        return this.canHydrate;
+    }
+
+    public boolean getIsWaterLike() {
+        return this == VanillaTypes.WATER;
     }
 
     public boolean canConvertToSource(FluidState state, net.minecraft.world.level.LevelReader reader, BlockPos pos) {
@@ -178,7 +199,12 @@ public class FluidType {
     }
 
     @Nullable
-    public SoundEvent getSound(@Nullable net.minecraft.world.entity.player.Player player, net.minecraft.world.level.BlockGetter getter, BlockPos pos,
+    public SoundEvent getSound(@Nullable net.minecraft.world.entity.Entity entity, SoundAction action) {
+        return getSound(action);
+    }
+
+    @Nullable
+    public SoundEvent getSound(@Nullable net.minecraft.world.entity.LivingEntity entity, net.minecraft.world.level.BlockGetter getter, BlockPos pos,
           SoundAction action) {
         return getSound(action);
     }
@@ -204,7 +230,7 @@ public class FluidType {
         return getLightLevel();
     }
 
-    public int getLightLevel(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
+    public int getLightLevel(FluidState state, BlockAndLightGetter getter, BlockPos pos) {
         return getLightLevel();
     }
 
@@ -216,7 +242,7 @@ public class FluidType {
         return getDensity();
     }
 
-    public int getDensity(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
+    public int getDensity(FluidState state, BlockAndLightGetter getter, BlockPos pos) {
         return getDensity();
     }
 
@@ -228,7 +254,7 @@ public class FluidType {
         return getTemperature();
     }
 
-    public int getTemperature(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
+    public int getTemperature(FluidState state, BlockAndLightGetter getter, BlockPos pos) {
         return getTemperature();
     }
 
@@ -240,7 +266,7 @@ public class FluidType {
         return getViscosity();
     }
 
-    public int getViscosity(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
+    public int getViscosity(FluidState state, BlockAndLightGetter getter, BlockPos pos) {
         return getViscosity();
     }
 
@@ -265,28 +291,28 @@ public class FluidType {
     }
 
     public boolean isVaporizedOnPlacement(Level level, BlockPos pos, FluidStack stack) {
-        return level.dimensionType().ultraWarm() && this == VanillaTypes.WATER;
+        return level.environmentAttributes().getValue(net.minecraft.world.attribute.EnvironmentAttributes.WATER_EVAPORATES, pos) && this == VanillaTypes.WATER;
     }
 
-    public void onVaporize(@Nullable net.minecraft.world.entity.player.Player player, Level level, BlockPos pos, FluidStack stack) {
+    public void onVaporize(@Nullable net.minecraft.world.entity.LivingEntity player, Level level, BlockPos pos, FluidStack stack) {
         SoundEvent sound = this.getSound(player, level, pos, mekanism.neoshim.neoforge.common.SoundActions.FLUID_VAPORIZE);
         level.playSound(player, pos, sound != null ? sound : net.minecraft.sounds.SoundEvents.FIRE_EXTINGUISH, net.minecraft.sounds.SoundSource.BLOCKS, 0.5F,
-              2.6F + (level.random.nextFloat() - level.random.nextFloat()) * 0.8F);
+              2.6F + (level.getRandom().nextFloat() - level.getRandom().nextFloat()) * 0.8F);
         for (int i = 0; i < 8; ++i) {
             level.addAlwaysVisibleParticle(net.minecraft.core.particles.ParticleTypes.LARGE_SMOKE, pos.getX() + Math.random(), pos.getY() + Math.random(),
                   pos.getZ() + Math.random(), 0.0D, 0.0D, 0.0D);
         }
     }
 
-    public boolean canBePlacedInLevel(BlockAndTintGetter level, BlockPos pos, FluidState state) {
+    public boolean canBePlacedInLevel(BlockAndLightGetter level, BlockPos pos, FluidState state) {
         return state.getType() != Fluids.EMPTY;
     }
 
-    public boolean canBePlacedInLevel(BlockAndTintGetter level, BlockPos pos, FluidStack stack) {
+    public boolean canBePlacedInLevel(BlockAndLightGetter level, BlockPos pos, FluidStack stack) {
         return !stack.isEmpty() && !stack.getFluid().defaultFluidState().createLegacyBlock().isAir();
     }
 
-    public FluidState getStateForPlacement(BlockAndTintGetter level, BlockPos pos, FluidStack stack) {
+    public FluidState getStateForPlacement(BlockAndLightGetter level, BlockPos pos, FluidStack stack) {
         return stack.getFluid().defaultFluidState();
     }
 

@@ -25,8 +25,6 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import mekanism.neoshim.neoforge.client.event.RegisterKeyMappingsEvent;
 import mekanism.neoshim.neoforge.client.settings.KeyModifier;
-import top.theillusivec4.curios.api.SlotContext;
-import top.theillusivec4.curios.api.SlotResult;
 
 public class MekanismKeyHandler {
 
@@ -85,15 +83,15 @@ public class MekanismKeyHandler {
                 PacketUtils.sendToServer(new PacketModeChange(slot, player.isShiftKeyDown()));
                 SoundHandler.playSound(MekanismSounds.HYDRAULIC);
             } else if (Mekanism.hooks.curios.isLoaded()) {
-                Optional<SlotResult> curiosResult = CuriosIntegration.findFirstCurioAsResult(player, stack -> {
+                //FABRIC: accessory slots come from the CuriosIntegration override (Trinkets); slot ids are Trinkets' group/slot ids
+                Optional<CuriosIntegration.AccessorySlot> curiosResult = CuriosIntegration.findFirstCurioAsResult(player, stack -> {
                     if (stack.canEquip(slot, player) && IModeItem.isModeItem(stack, slot)) {
                         return !(stack.getItem() instanceof IChemicalItem item) || item.hasChemical(stack);
                     }
                     return false;
                 });
                 if (curiosResult.isPresent()) {
-                    SlotContext slotContext = curiosResult.get().slotContext();
-                    PacketUtils.sendToServer(new PacketModeChangeCurios(slotContext.identifier(), slotContext.index(), player.isShiftKeyDown()));
+                    PacketUtils.sendToServer(new PacketModeChangeCurios(curiosResult.get().slotType(), curiosResult.get().index(), player.isShiftKeyDown()));
                     SoundHandler.playSound(MekanismSounds.HYDRAULIC);
                 }
             }

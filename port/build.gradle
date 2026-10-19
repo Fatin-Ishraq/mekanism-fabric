@@ -56,6 +56,11 @@ def excludedFromCompile = [
         'mekanism/common/integration/lookingat/**',
         'mekanism/common/integration/computer/computercraft/**',
         'mekanism/common/integration/gender/**',
+        'mekanism/api/integration/emi/**',
+        'mekanism/api/integration/jei/**',
+        'mekanism/fabric/compat/computer/**',
+        'mekanism/fabric/compat/recipeviewer/**',
+        'mekanism/fabric/compat/trinkets/**',
         // Curios client renderer (Curios is NeoForge-only; Fabric equivalent TBD) - phase 9
         'mekanism/client/render/MekanismCurioRenderer.java',
         // Third-party integrations compiled against NeoForge builds of other mods - phase 9
@@ -258,12 +263,11 @@ def fabricModJsonProps = ['version': project.version, 'minecraft_version': minec
 //  * neoforge:tag_empty {tag}           -> fabric:not {fabric:tags_populated {registry: item, values: [tag]}}
 //  * neoforge:true/false                -> fabric:true/false
 //  * other conditions (mekanism:*)      -> same id, registered as Fabric resource conditions by mekanism.fabric.compat.ConditionBridge
-//  * ingredient {"type": "neoforge:difference|compound|intersection|components"} -> "fabric:type" so vanilla's Fabric-patched Ingredient codec
-//    dispatches them (the shim registers serializers under those ids)
+//  * custom ingredients {"neoforge:ingredient_type": "neoforge:difference|compound|intersection|components", ...} -> key "fabric:type" so
+//    vanilla's Fabric-patched Ingredient codec dispatches them (the shim registers serializers under those ids; the shim's FluidIngredient
+//    codec accepts either key)
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
-
-def neoIngredientTypes = ['neoforge:difference', 'neoforge:compound', 'neoforge:intersection', 'neoforge:components'] as Set
 
 def convertCondition
 convertCondition = { Map c ->
@@ -293,7 +297,7 @@ transformJson = { Object node ->
             } else if (v instanceof String && v.startsWith('#neoforge:')) {
                 //NeoForge-namespaced tag references -> Fabric convention ("c") tags
                 out[k] = '#c:' + v.substring('#neoforge:'.length())
-            } else if (k == 'type' && neoIngredientTypes.contains(v)) {
+            } else if (k == 'neoforge:ingredient_type') {
                 out['fabric:type'] = v
             } else {
                 out[k] = transformJson(v)

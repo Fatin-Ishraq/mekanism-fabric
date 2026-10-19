@@ -8,15 +8,16 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.List;
+import java.util.stream.LongStream;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
@@ -27,22 +28,23 @@ import com.mojang.logging.LogUtils;
 public final class ForcedChunkStore extends SavedData {
 
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final String NAME = "mekanism_fabric_forced_chunks";
-    private static final SavedData.Factory<ForcedChunkStore> FACTORY = new SavedData.Factory<>(ForcedChunkStore::new, ForcedChunkStore::load, null);
+    private static final SavedDataType<ForcedChunkStore> TYPE = new SavedDataType<>(Identifier.fromNamespaceAndPath("mekanism_fabric", "forced_chunks"),
+          ForcedChunkStore::new, Codec.lazyInitialized(() -> ForcedChunkStore.CODEC), null);
 
     /** controller id -> owner position -> chunks */
     private final Map<Identifier, Map<BlockPos, TicketSet>> blockTickets = new HashMap<>();
 
     public static ForcedChunkStore get(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(FACTORY, NAME);
+        return level.getDataStorage().computeIfAbsent(TYPE);
     }
 
-    void update(Identifier controller, BlockPos owner, long chunk, boolean add, boolean ticking) {
+    boolean update(Identifier controller, BlockPos owner, long chunk, boolean add, boolean ticking) {
         if (add) {
             TicketSet set = blockTickets.computeIfAbsent(controller, c -> new HashMap<>()).computeIfAbsent(owner.immutable(),
                   o -> new TicketSet(new LongOpenHashSet(), new LongOpenHashSet()));
             if ((ticking ? set.ticking() : set.nonTicking()).add(chunk)) {
                 setDirty();
+                return true;
             }
         } else {
             Map<BlockPos, TicketSet> owners = blockTickets.get(controller);
@@ -56,9 +58,11 @@ public final class ForcedChunkStore extends SavedData {
                         }
                     }
                     setDirty();
+                    return true;
                 }
             }
         }
+        return false;
     }
 
     /** Re-adds every saved ticket, then lets each controller validate its own. */
@@ -71,7 +75,7 @@ public final class ForcedChunkStore extends SavedData {
             for (Iterator<Map.Entry<Identifier, Map<BlockPos, TicketSet>>> iterator = store.blockTickets.entrySet().iterator(); iterator.hasNext(); ) {
                 Map.Entry<Identifier, Map<BlockPos, TicketSet>> entry = iterator.next();
                 if (!TicketController.CONTROLLERS.containsKey(entry.getKey())) {
-                    LOGGER.warn("Dropping forced chunks of unknown ticket controller {} in {}", entry.getKey(), level.dimension().location());
+                    LOGGER.warn("Dropping forced chunks of unknown ticket controller {} in {}", entry.getKey(), level.dimension().identifier());
                     iterator.remove();
                     store.setDirty();
                 }
@@ -86,8 +90,8 @@ public final class ForcedChunkStore extends SavedData {
             copy.forEach((controllerId, owners) -> {
                 TicketController controller = TicketController.CONTROLLERS.get(controllerId);
                 owners.forEach((pos, set) -> {
-                    set.nonTicking().forEach(chunk -> controller.forceChunk(level, pos, ChunkPos.getX(chunk), ChunkPos.getZ(chunk), true, false));
-                    set.ticking().forEach(chunk -> controller.forceChunk(level, pos, ChunkPos.getX(chunk), ChunkPos.getZ(chunk), true, true));
+                    set.nonTicking().forEach(chunk -> TicketController.applyTicket(level, chunk, false, true));
+                    set.ticking().forEach(chunk -> TicketController.applyTicket(level, chunk, true, true));
                 });
                 if (controller.callback() != null) {
                     controller.callback().validateTickets(level, new Helper(level, controller, owners));
@@ -127,41 +131,33 @@ public final class ForcedChunkStore extends SavedData {
         }
     }
 
-    private static ForcedChunkStore load(CompoundTag tag, HolderLookup.Provider provider) {
+    private record OwnerEntry(BlockPos pos, long[] chunks, long[] ticking) {
+
+        static final Codec<OwnerEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+              BlockPos.CODEC.fieldOf("pos").forGetter(OwnerEntry::pos),
+              Codec.LONG_STREAM.xmap(LongStream::toArray, LongStream::of).fieldOf("chunks").forGetter(OwnerEntry::chunks),
+              Codec.LONG_STREAM.xmap(LongStream::toArray, LongStream::of).fieldOf("ticking").forGetter(OwnerEntry::ticking)
+        ).apply(instance, OwnerEntry::new));
+    }
+
+    private static final Codec<ForcedChunkStore> CODEC = Codec.unboundedMap(Identifier.CODEC, OwnerEntry.CODEC.listOf()).xmap(map -> {
         ForcedChunkStore store = new ForcedChunkStore();
-        for (String controllerId : tag.getAllKeys()) {
-            Identifier controller = Identifier.tryParse(controllerId);
-            if (controller == null) {
-                continue;
-            }
+        map.forEach((controller, entries) -> {
             Map<BlockPos, TicketSet> owners = new HashMap<>();
-            for (Tag element : tag.getList(controllerId, Tag.TAG_COMPOUND)) {
-                CompoundTag ownerTag = (CompoundTag) element;
-                owners.put(BlockPos.of(ownerTag.getLong("pos")), new TicketSet(new LongOpenHashSet(ownerTag.getLongArray("chunks")),
-                      new LongOpenHashSet(ownerTag.getLongArray("ticking"))));
+            for (OwnerEntry entry : entries) {
+                owners.put(entry.pos(), new TicketSet(new LongOpenHashSet(entry.chunks()), new LongOpenHashSet(entry.ticking())));
             }
             if (!owners.isEmpty()) {
                 store.blockTickets.put(controller, owners);
             }
-        }
-        return store;
-    }
-
-    @Override
-    public CompoundTag save(CompoundTag tag, HolderLookup.Provider provider) {
-        blockTickets.forEach((controller, owners) -> {
-            ListTag list = new ListTag();
-            owners.forEach((pos, set) -> {
-                CompoundTag ownerTag = new CompoundTag();
-                ownerTag.putLong("pos", pos.asLong());
-                ownerTag.putLongArray("chunks", toArray(set.nonTicking()));
-                ownerTag.putLongArray("ticking", toArray(set.ticking()));
-                list.add(ownerTag);
-            });
-            tag.put(controller.toString(), list);
         });
-        return tag;
-    }
+        return store;
+    }, store -> {
+        Map<Identifier, List<OwnerEntry>> map = new HashMap<>();
+        store.blockTickets.forEach((controller, owners) -> map.put(controller, owners.entrySet().stream()
+              .map(e -> new OwnerEntry(e.getKey(), toArray(e.getValue().nonTicking()), toArray(e.getValue().ticking()))).toList()));
+        return map;
+    });
 
     private static long[] toArray(LongSet set) {
         return set.toLongArray();

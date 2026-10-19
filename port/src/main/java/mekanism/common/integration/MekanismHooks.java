@@ -4,11 +4,7 @@ import java.util.List;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import mekanism.common.integration.computer.FactoryRegistry;
-import mekanism.common.integration.computer.computercraft.CCCapabilityHelper;
 import mekanism.common.integration.curios.CuriosIntegration;
-import mekanism.common.integration.framedblocks.FramedBlocksIntegration;
-import mekanism.common.integration.gender.MekanismGenderArmor;
-import mekanism.common.integration.jsonthings.JsonThingsIntegration;
 import mekanism.common.recipe.bin.BinInsertRecipe;
 import mekanism.common.registries.MekanismItems;
 import net.minecraft.resources.Identifier;
@@ -69,7 +65,7 @@ public final class MekanismHooks {
         Predicate<String> loadedCheck = modList == null ? modid -> false : modList::isLoaded;
         computerCraft = new IntegrationInfo("computercraft", loadedCheck);
         craftTweaker = new IntegrationInfo(CRAFT_TWEAKER_MOD_ID, loadedCheck);
-        curios = new IntegrationInfo("curios", loadedCheck);
+        curios = new IntegrationInfo("trinkets", loadedCheck);//FABRIC: Curios is NeoForge-only; CuriosIntegration is implemented on Trinkets
         darkModeEverywhere = new IntegrationInfo("darkmodeeverywhere", loadedCheck);
         jei = new IntegrationInfo("jei", loadedCheck);
         emi = new IntegrationInfo("emi", loadedCheck);
@@ -87,32 +83,29 @@ public final class MekanismHooks {
         if (curios.isLoaded()) {
             CuriosIntegration.addListeners(modEventBus);
         }
-        if (jsonThings.isLoaded()) {
-            JsonThingsIntegration.hook(modEventBus);
-        }
         //TODO - 26.1: projectE
         //if (projecte.isLoaded()) {
         //    MekanismNormalizedSimpleStacks.NSS_SERIALIZERS.register(modEventBus);
         //}
-        if (framedBlocks.isLoaded()) {
-            FramedBlocksIntegration.init(modEventBus);
-        }
+        //FABRIC: JsonThings, ProjectE and FramedBlocks hooks removed (NeoForge-only integrations, see NOTES.md)
     }
 
     public void hookCapabilityRegistration(RegisterCapabilitiesEvent event) {
-        if (genderMod.isLoaded()) {
-            MekanismGenderArmor.HAZMAT.register(event, MekanismItems.HAZMAT_GOWN);
-            MekanismGenderArmor.OPEN_FRONT.register(event, MekanismItems.JETPACK, MekanismItems.SCUBA_TANK);
-            MekanismGenderArmor.HIDES_BREASTS.register(event, MekanismItems.ARMORED_JETPACK, MekanismItems.MEKASUIT_BODYARMOR);
-        }
+        //FABRIC: 26.1 phase 1 - the Wildfire's Gender Mod integration is compiled out until integrations come back
+        //if (genderMod.isLoaded()) {
+        //    MekanismGenderArmor.HAZMAT.register(event, MekanismItems.HAZMAT_GOWN);
+        //    MekanismGenderArmor.OPEN_FRONT.register(event, MekanismItems.JETPACK, MekanismItems.SCUBA_TANK);
+        //    MekanismGenderArmor.HIDES_BREASTS.register(event, MekanismItems.ARMORED_JETPACK, MekanismItems.MEKASUIT_BODYARMOR);
+        //}
     }
 
     public void hookCommonSetup() {
         if (computerCompatEnabled()) {
             FactoryRegistry.load();
-            if (computerCraft.isLoaded()) {
-                CCCapabilityHelper.registerApis();
-            }
+            //FABRIC: 26.1 phase 1 - the CC: Tweaked integration is compiled out until integrations come back
+            //if (computerCraft.isLoaded()) {
+            //    CCCapabilityHelper.registerApis();
+            //}
         }
 
         //TODO - 1.20: Move this out of here and back to always being registered whenever it gets fixed in Neo.
@@ -131,7 +124,7 @@ public final class MekanismHooks {
     }
 
     public boolean computerCompatEnabled() {
-        return computerCraft.isLoaded();
+        return false;//FABRIC: 26.1 phase 1 - computer integrations are compiled out
     }
 
     public boolean recipeViewerCompatEnabled() {

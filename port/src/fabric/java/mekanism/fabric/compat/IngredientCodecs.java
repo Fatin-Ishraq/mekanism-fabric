@@ -1,110 +1,77 @@
 package mekanism.fabric.compat;
 
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.DataResult;
-import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.MapCodec;
-import com.mojang.serialization.MapLike;
-import com.mojang.serialization.RecordBuilder;
-import java.util.List;
-import java.util.stream.Stream;
-import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredient;
+import java.util.IdentityHashMap;
+import java.util.Map;
+import mekanism.neoshim.neoforge.common.crafting.CompoundIngredient;
+import mekanism.neoshim.neoforge.common.crafting.DataComponentIngredient;
+import mekanism.neoshim.neoforge.common.crafting.DifferenceIngredient;
+import mekanism.neoshim.neoforge.common.crafting.ICustomIngredient;
+import mekanism.neoshim.neoforge.common.crafting.IngredientType;
+import mekanism.neoshim.neoforge.common.crafting.IntersectionIngredient;
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.Identifier;
-import net.minecraft.tags.TagKey;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
 
 /**
- * Codec helpers giving vanilla {@link Ingredient}s NeoForge's map-codec shape (needed for "flat" sized ingredients such as
- * {@code {"count": 2, "tag": "c:ingots/osmium"}}). Custom ingredients are dispatched by {@code "type"} (NeoForge format) or
- * {@code "fabric:type"} (Fabric format) through Fabric's {@link CustomIngredientSerializer} registry.
+ * Registers NeoForge-style {@link IngredientType}s as Fabric {@link CustomIngredientSerializer}s under NeoForge's ids. The resource transform in
+ * build.gradle renames NeoForge's {@code neoforge:ingredient_type} key to Fabric's {@code fabric:type}, so vanilla's (Fabric-patched) ingredient
+ * codec dispatches them.
  */
 public final class IngredientCodecs {
 
-    public static final MapCodec<Ingredient> MAP_CODEC_NONEMPTY = new MapCodec<>() {
-        @Override
-        public <T> Stream<T> keys(DynamicOps<T> ops) {
-            return Stream.of(ops.createString("item"), ops.createString("tag"), ops.createString("type"));
-        }
+    private static final Map<IngredientType<?>, CustomIngredientSerializer<?>> SERIALIZERS = new IdentityHashMap<>();
 
-        @Override
-        public <T> DataResult<Ingredient> decode(DynamicOps<T> ops, MapLike<T> input) {
-            T type = input.get("type");
-            if (type == null) {
-                type = input.get("fabric:type");
-            }
-            if (type != null) {
-                return Identifier.CODEC.parse(ops, type).flatMap(id -> {
-                    CustomIngredientSerializer<?> serializer = CustomIngredientSerializer.get(id);
-                    if (serializer == null) {
-                        return DataResult.error(() -> "Unknown ingredient type " + id);
-                    }
-                    return serializer.getCodec(false).decode(ops, input).map(CustomIngredient::toVanilla);
-                });
-            }
-            T item = input.get("item");
-            if (item != null) {
-                return net.minecraft.core.registries.BuiltInRegistries.ITEM.holderByNameCodec().parse(ops, item).map(holder -> Ingredient.of(new ItemStack(holder)));
-            }
-            T tag = input.get("tag");
-            if (tag != null) {
-                return TagKey.codec(Registries.ITEM).parse(ops, tag).map(Ingredient::of);
-            }
-            return DataResult.error(() -> "Ingredient needs an 'item', 'tag' or 'type'");
-        }
-
-        @Override
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        public <T> RecordBuilder<T> encode(Ingredient input, DynamicOps<T> ops, RecordBuilder<T> prefix) {
-            CustomIngredient custom = input.getCustomIngredient();
-            if (custom != null) {
-                CustomIngredientSerializer serializer = custom.getSerializer();
-                String key = serializer.getIdentifier().getNamespace().equals("neoforge") ? "type" : "fabric:type";
-                prefix.add(key, ops.createString(serializer.getIdentifier().toString()));
-                return serializer.getCodec(false).encode(custom, ops, prefix);
-            }
-            //Vanilla: delegate to the vanilla codec and merge its single map value
-            return Ingredient.CODEC_NONEMPTY.encodeStart(ops, input).flatMap(ops::getMap).map(map -> {
-                map.entries().forEach(pair -> prefix.add(pair.getFirst(), pair.getSecond()));
-                return prefix;
-            }).result().orElseGet(() -> prefix.withErrorsFrom(DataResult.error(() -> "Cannot encode multi-value ingredient as a map: " + input)));
-        }
-    };
-
-    public static final Codec<List<Ingredient>> LIST_CODEC_NONEMPTY = Ingredient.CODEC_NONEMPTY.listOf()
-          .validate(list -> list.isEmpty() ? DataResult.error(() -> "Ingredient list cannot be empty") : DataResult.success(list));
-
-    public static <T extends CustomIngredient> CustomIngredientSerializer<T> serializer(Identifier id, MapCodec<T> codec,
-          StreamCodec<RegistryFriendlyByteBuf, T> streamCodec) {
-        return new CustomIngredientSerializer<>() {
-            @Override
-            public Identifier getIdentifier() {
-                return id;
-            }
-
-            @Override
-            public MapCodec<T> getCodec(boolean allowEmpty) {
-                return codec;
-            }
-
-            @Override
-            public StreamCodec<RegistryFriendlyByteBuf, T> getPacketCodec() {
-                return streamCodec;
-            }
-        };
+    static {
+        register(Identifier.fromNamespaceAndPath("neoforge", "compound"), CompoundIngredient.TYPE);
+        register(Identifier.fromNamespaceAndPath("neoforge", "difference"), DifferenceIngredient.TYPE);
+        register(Identifier.fromNamespaceAndPath("neoforge", "intersection"), IntersectionIngredient.TYPE);
+        register(Identifier.fromNamespaceAndPath("neoforge", "components"), DataComponentIngredient.TYPE);
     }
 
-    /** Registers the NeoForge-format custom ingredient serializers with Fabric. Called by the bootstrap. */
+    /** Registers a custom ingredient type under the given id (also usable for ingredient types of other mods). */
+    public static synchronized <T extends ICustomIngredient> CustomIngredientSerializer<T> register(Identifier id, IngredientType<T> type) {
+        CustomIngredientSerializer<T> serializer = new Serializer<>(id, type);
+        if (SERIALIZERS.putIfAbsent(type, serializer) != null) {
+            throw new IllegalStateException("Ingredient type registered twice: " + id);
+        }
+        CustomIngredientSerializer.register(serializer);
+        return serializer;
+    }
+
+    @SuppressWarnings("unchecked")
+    public static synchronized <T extends ICustomIngredient> CustomIngredientSerializer<T> serializer(IngredientType<T> type) {
+        CustomIngredientSerializer<?> serializer = SERIALIZERS.get(type);
+        if (serializer == null) {
+            throw new IllegalStateException("Unregistered ingredient type " + type);
+        }
+        return (CustomIngredientSerializer<T>) serializer;
+    }
+
+    /** Registers the NeoForge custom ingredient types with Fabric and the fluid slot display types. Called by the bootstrap. */
     public static void registerNeoForgeIngredientTypes() {
-        CustomIngredientSerializer.register(mekanism.neoshim.neoforge.common.crafting.CompoundIngredient.SERIALIZER);
-        CustomIngredientSerializer.register(mekanism.neoshim.neoforge.common.crafting.DifferenceIngredient.SERIALIZER);
-        CustomIngredientSerializer.register(mekanism.neoshim.neoforge.common.crafting.IntersectionIngredient.SERIALIZER);
-        CustomIngredientSerializer.register(mekanism.neoshim.neoforge.common.crafting.DataComponentIngredient.SERIALIZER);
+        //Item ingredient types are registered by the static initializer
+        mekanism.neoshim.neoforge.fluids.crafting.FluidIngredientCodecs.registerSlotDisplays();
+    }
+
+    private record Serializer<T extends ICustomIngredient>(Identifier id, IngredientType<T> type) implements CustomIngredientSerializer<T> {
+
+        @Override
+        public Identifier getIdentifier() {
+            return id;
+        }
+
+        @Override
+        public MapCodec<T> getCodec() {
+            return type.codec();
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public StreamCodec<RegistryFriendlyByteBuf, T> getStreamCodec() {
+            return (StreamCodec<RegistryFriendlyByteBuf, T>) type.streamCodec();
+        }
     }
 
     private IngredientCodecs() {

@@ -1,17 +1,27 @@
 package mekanism.neoshim.neoforge.common.extensions;
 
-import mekanism.neoshim.neoforge.client.model.data.ModelData;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
+import mekanism.neoshim.neoforge.model.data.ModelData;
 import net.minecraft.network.Connection;
-import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.storage.ValueInput;
 
 /** Injected into {@link BlockEntity}. Lifecycle hooks are called by BlockEntityHooks (Fabric bridge), see NOTES.md "Hook status". */
 public interface IBlockEntityExtension {
 
     private BlockEntity self() {
         return (BlockEntity) this;
+    }
+
+    /** Called on the client when a block entity data packet arrives (NeoForge default: load it). */
+    default void onDataPacket(Connection net, ValueInput input) {
+        self().loadWithComponents(input);
+    }
+
+    /** Called on the client with the chunk's initial block entity tag. */
+    default void handleUpdateTag(ValueInput input) {
+        self().loadWithComponents(input);
     }
 
     default void onLoad() {
@@ -33,18 +43,10 @@ public interface IBlockEntityExtension {
         }
     }
 
-    default void onDataPacket(Connection net, ClientboundBlockEntityDataPacket pkt, HolderLookup.Provider lookupProvider) {
-        CompoundTag tag = pkt.getTag();
-        if (!tag.isEmpty()) {
-            self().loadWithComponents(tag, lookupProvider);
-        }
-    }
-
-    default void handleUpdateTag(CompoundTag tag, HolderLookup.Provider lookupProvider) {
-        self().loadWithComponents(tag, lookupProvider);
-    }
-
     default boolean hasCustomOutlineRendering(net.minecraft.world.entity.player.Player player) {
         return false;
+    }
+
+    default void applyStructureRotation(Mirror mirror, Rotation rotation) {
     }
 }

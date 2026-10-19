@@ -42,7 +42,7 @@ public abstract class MappedRegistryAliasMixin<T> {
     @ModifyReturnValue(method = "get(Lnet/minecraft/resources/ResourceKey;)Ljava/lang/Object;", at = @At("RETURN"))
     private T mekanism$aliasGetKey(T value, ResourceKey<T> key) {
         if (value == null && key != null) {
-            Identifier alias = RegistryAliases.resolve(key(), key.location());
+            Identifier alias = RegistryAliases.resolve(key(), key.identifier());
             if (alias != null) {
                 return get(alias);
             }
@@ -64,7 +64,7 @@ public abstract class MappedRegistryAliasMixin<T> {
     @ModifyReturnValue(method = "getHolder(Lnet/minecraft/resources/ResourceKey;)Ljava/util/Optional;", at = @At("RETURN"))
     private Optional<Holder.Reference<T>> mekanism$aliasHolderKey(Optional<Holder.Reference<T>> value, ResourceKey<T> key) {
         if (value.isEmpty()) {
-            Identifier alias = RegistryAliases.resolve(key(), key.location());
+            Identifier alias = RegistryAliases.resolve(key(), key.identifier());
             if (alias != null) {
                 return getHolder(alias);
             }

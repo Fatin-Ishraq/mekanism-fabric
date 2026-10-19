@@ -18,10 +18,4 @@ public interface IHolderExtension<T> extends IWithData<T> {
     default Holder<T> getDelegate() {
         return (Holder<T>) this;
     }
-
-    @Nullable
-    @SuppressWarnings("unchecked")
-    default String getRegisteredName() {
-        return ((Holder<T>) this).unwrapKey().map(key -> key.location().toString()).orElse("[unregistered]");
-    }
 }

@@ -1,23 +1,25 @@
 package mekanism.neoshim.neoforge.fluids.crafting;
 
+import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
+import net.minecraft.core.Holder;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.ExtraCodecs;
+import net.minecraft.world.item.crafting.display.SlotDisplay;
+import net.minecraft.world.level.material.Fluid;
 
+/** Union of fluid ingredients: {@code {"neoforge:ingredient_type": "neoforge:compound", "children": [...]}}. */
 public final class CompoundFluidIngredient extends FluidIngredient {
 
-    public static final MapCodec<CompoundFluidIngredient> CODEC = FluidIngredient.LIST_CODEC_NON_EMPTY.xmap(CompoundFluidIngredient::new, CompoundFluidIngredient::children)
-          .fieldOf("children");
-    public static final StreamCodec<RegistryFriendlyByteBuf, CompoundFluidIngredient> STREAM_CODEC = FluidIngredient.STREAM_CODEC.apply(ByteBufCodecs.list())
-          .map(CompoundFluidIngredient::new, CompoundFluidIngredient::children);
-    public static final FluidIngredientTypes.Type<CompoundFluidIngredient> TYPE = FluidIngredientTypes.register(
-          Identifier.fromNamespaceAndPath("neoforge", "compound"), CODEC, STREAM_CODEC);
+    public static final MapCodec<CompoundFluidIngredient> CODEC = ExtraCodecs.nonEmptyList(Codec.lazyInitialized(() -> FluidIngredient.CODEC).listOf())
+          .xmap(CompoundFluidIngredient::new, CompoundFluidIngredient::children).fieldOf("children");
+    static final StreamCodec<RegistryFriendlyByteBuf, CompoundFluidIngredient> STREAM_CODEC = FluidIngredientCodecs.lazyStreamCodec()
+          .apply(ByteBufCodecs.list()).map(CompoundFluidIngredient::new, CompoundFluidIngredient::children);
 
     private final List<FluidIngredient> children;
 
@@ -33,23 +35,15 @@ public final class CompoundFluidIngredient extends FluidIngredient {
     }
 
     public static FluidIngredient of(List<FluidIngredient> children) {
-        if (children.isEmpty()) {
-            return FluidIngredient.empty();
-        } else if (children.size() == 1) {
+        if (children.size() == 1) {
             return children.getFirst();
         }
         return new CompoundFluidIngredient(children);
     }
 
-    public static FluidIngredient of(Stream<FluidIngredient> stream) {
-        List<FluidIngredient> list = new ArrayList<>();
-        stream.forEach(list::add);
-        return of(list);
-    }
-
     @Override
-    protected Stream<FluidStack> generateStacks() {
-        return children.stream().flatMap(child -> Stream.of(child.getStacks()));
+    public Stream<Holder<Fluid>> generateFluids() {
+        return children.stream().flatMap(child -> child.fluids().stream());
     }
 
     @Override
@@ -73,8 +67,13 @@ public final class CompoundFluidIngredient extends FluidIngredient {
     }
 
     @Override
-    public FluidIngredientTypes.Type<?> getType() {
-        return TYPE;
+    public FluidIngredientType<?> getType() {
+        return FluidIngredientCodecs.Types.COMPOUND;
+    }
+
+    @Override
+    public SlotDisplay display() {
+        return new SlotDisplay.Composite(children.stream().map(FluidIngredient::display).toList());
     }
 
     public List<FluidIngredient> children() {

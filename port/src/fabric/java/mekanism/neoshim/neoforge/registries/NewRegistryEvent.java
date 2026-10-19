@@ -9,7 +9,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 public class NewRegistryEvent extends Event implements IModBusEvent {
 
     public <T> void register(Registry<T> registry) {
-        if (!BuiltInRegistries.REGISTRY.containsKey(registry.key().location())) {
+        if (!BuiltInRegistries.REGISTRY.containsKey(registry.key().identifier())) {
             throw new IllegalStateException("Registry " + registry.key() + " was not created through RegistryBuilder");
         }
     }

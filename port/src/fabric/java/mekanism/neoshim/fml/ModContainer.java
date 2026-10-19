@@ -1,6 +1,6 @@
 package mekanism.neoshim.fml;
 
-import fuzs.forgeconfigapiport.fabric.api.neoforge.v4.NeoForgeConfigRegistry;
+import fuzs.forgeconfigapiport.fabric.api.v5.ConfigRegistry;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -62,11 +62,11 @@ public class ModContainer {
     }
 
     public void registerConfig(ModConfig.Type type, IConfigSpec configSpec) {
-        NeoForgeConfigRegistry.INSTANCE.register(modId, type, (ModConfigSpec) configSpec);
+        ConfigRegistry.INSTANCE.register(modId, type, (ModConfigSpec) configSpec);
     }
 
     public void registerConfig(ModConfig.Type type, IConfigSpec configSpec, String fileName) {
-        NeoForgeConfigRegistry.INSTANCE.register(modId, type, (ModConfigSpec) configSpec, fileName);
+        ConfigRegistry.INSTANCE.register(modId, type, (ModConfigSpec) configSpec, fileName);
     }
 
     public <T extends IExtensionPoint> void registerExtensionPoint(Class<? extends T> point, Supplier<? extends T> extension) {

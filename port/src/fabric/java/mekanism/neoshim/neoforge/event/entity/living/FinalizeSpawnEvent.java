@@ -3,7 +3,7 @@ package mekanism.neoshim.neoforge.event.entity.living;
 import mekanism.neoshim.bus.api.ICancellableEvent;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.MobSpawnType;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.level.ServerLevelAccessor;
 import org.jetbrains.annotations.Nullable;
@@ -12,11 +12,11 @@ public class FinalizeSpawnEvent extends LivingEvent implements ICancellableEvent
 
     private final ServerLevelAccessor level;
     private DifficultyInstance difficulty;
-    private final MobSpawnType spawnType;
+    private final EntitySpawnReason spawnType;
     @Nullable
     private SpawnGroupData spawnData;
 
-    public FinalizeSpawnEvent(Mob entity, ServerLevelAccessor level, DifficultyInstance difficulty, MobSpawnType spawnType, @Nullable SpawnGroupData spawnData) {
+    public FinalizeSpawnEvent(Mob entity, ServerLevelAccessor level, DifficultyInstance difficulty, EntitySpawnReason spawnType, @Nullable SpawnGroupData spawnData) {
         super(entity);
         this.level = level;
         this.difficulty = difficulty;
@@ -41,7 +41,7 @@ public class FinalizeSpawnEvent extends LivingEvent implements ICancellableEvent
         this.difficulty = difficulty;
     }
 
-    public MobSpawnType getSpawnType() {
+    public EntitySpawnReason getSpawnType() {
         return spawnType;
     }
 

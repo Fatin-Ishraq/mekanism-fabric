@@ -124,7 +124,7 @@ public final class SmokeWorldDriver {
             case 5 -> {
                 if (ticks == 0) {
                     tabs = net.minecraft.core.registries.BuiltInRegistries.CREATIVE_MODE_TAB.entrySet().stream()
-                          .filter(e -> e.getKey().location().getNamespace().startsWith("mekanism")).map(java.util.Map.Entry::getValue).toList();
+                          .filter(e -> e.getKey().identifier().getNamespace().startsWith("mekanism")).map(java.util.Map.Entry::getValue).toList();
                     log("rendering {} Mekanism creative tabs", tabs.size());
                     for (net.minecraft.world.item.CreativeModeTab tab : tabs) {
                         if (tab.getLabelColor() != mekanism.client.SpecialColors.TEXT_TITLE.argb()) {

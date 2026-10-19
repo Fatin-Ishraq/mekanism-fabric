@@ -79,9 +79,6 @@
       "net/minecraft/core/component/DataComponentPatch$Builder": [
         "mekanism/neoshim/neoforge/common/extensions/IDataComponentPatchBuilderExtension"
       ],
-      "net/minecraft/world/level/block/entity/BlockEntity$DataComponentInput": [
-        "mekanism/neoshim/neoforge/common/extensions/IBlockEntityDataComponentInputExtension"
-      ],
       "net/minecraft/world/item/Item$Properties": [
         "mekanism/neoshim/neoforge/common/extensions/IItemPropertiesExtension"
       ],
@@ -171,6 +168,12 @@
       ],
       "net/minecraft/world/item/CreativeModeTab$Builder": [
         "mekanism/neoshim/neoforge/common/extensions/ICreativeModeTabBuilderExtension"
+      ],
+      "net/minecraft/util/random/WeightedList$Builder": [
+        "mekanism/neoshim/neoforge/common/extensions/IWeightedListBuilderExtension<TE;>"
+      ],
+      "net/minecraft/world/entity/Shearable": [
+        "mekanism/neoshim/neoforge/common/IShearable"
       ],
       "net/minecraft/world/item/DispensibleContainerItem": [
         "mekanism/neoshim/neoforge/common/extensions/IDispensibleContainerItemExtension"

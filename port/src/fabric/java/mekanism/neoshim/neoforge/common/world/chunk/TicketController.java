@@ -1,6 +1,5 @@
 package mekanism.neoshim.neoforge.common.world.chunk;
 
-import java.util.Comparator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
@@ -17,7 +16,26 @@ import org.jetbrains.annotations.Nullable;
 public record TicketController(Identifier id, @Nullable LoadingValidationCallback callback) {
 
     static final Map<Identifier, TicketController> CONTROLLERS = new ConcurrentHashMap<>();
-    private static final TicketType<BlockPos> BLOCK_TICKET = TicketType.create("mekanism_fabric:forced_block", Comparator.comparingLong(BlockPos::asLong));
+    /** Loads and simulates; not persisted by vanilla because {@link ForcedChunkStore} persists and reinstates the tickets itself. */
+    private static final TicketType TICKET = net.minecraft.core.Registry.register(net.minecraft.core.registries.BuiltInRegistries.TICKET_TYPE,
+          Identifier.fromNamespaceAndPath("mekanism_fabric", "forced"), new TicketType(TicketType.NO_TIMEOUT, TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION));
+    //Ticket levels: 31 - radius. Radius 2 keeps the chunk entity ticking, radius 1 block ticking (approximation of NeoForge's behavior)
+    private static final int TICKING_RADIUS = 2;
+    private static final int NON_TICKING_RADIUS = 1;
+
+    /** Forces the ticket type's registration during mod init (built-in registries freeze afterwards). */
+    public static void init() {
+    }
+
+    static void applyTicket(ServerLevel level, long chunk, boolean ticking, boolean add) {
+        ChunkPos pos = ChunkPos.unpack(chunk);
+        int radius = ticking ? TICKING_RADIUS : NON_TICKING_RADIUS;
+        if (add) {
+            level.getChunkSource().addTicketWithRadius(TICKET, pos, radius);
+        } else {
+            level.getChunkSource().removeTicketWithRadius(TICKET, pos, radius);
+        }
+    }
 
     public TicketController {
         CONTROLLERS.put(id, this);
@@ -28,15 +46,11 @@ public record TicketController(Identifier id, @Nullable LoadingValidationCallbac
     }
 
     public boolean forceChunk(ServerLevel level, BlockPos owner, int chunkX, int chunkZ, boolean add, boolean ticking) {
-        ChunkPos chunkPos = new ChunkPos(chunkX, chunkZ);
-        //Level 2 = entity ticking for ticking tickets, 3 = block ticking (approximation of NeoForge's behavior)
-        int distance = ticking ? 2 : 3;
-        if (add) {
-            level.getChunkSource().addRegionTicket(BLOCK_TICKET, chunkPos, distance, owner.immutable());
-        } else {
-            level.getChunkSource().removeRegionTicket(BLOCK_TICKET, chunkPos, distance, owner.immutable());
+        long chunk = ChunkPos.pack(chunkX, chunkZ);
+        //One ticket per owner and chunk: only touch the ticket when the stored state changes
+        if (ForcedChunkStore.get(level).update(id, owner, chunk, add, ticking)) {
+            applyTicket(level, chunk, ticking, add);
         }
-        ForcedChunkStore.get(level).update(id, owner, chunkPos.toLong(), add, ticking);
         return true;
     }
 

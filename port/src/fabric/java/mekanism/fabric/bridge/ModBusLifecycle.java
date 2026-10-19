@@ -27,9 +27,9 @@ import mekanism.neoshim.neoforge.registries.NeoForgeRegistries;
 import mekanism.neoshim.neoforge.registries.NewRegistryEvent;
 import mekanism.neoshim.neoforge.registries.RegisterEvent;
 import mekanism.neoshim.neoforge.registries.datamaps.RegisterDataMapTypesEvent;
-import fuzs.forgeconfigapiport.fabric.api.neoforge.v4.NeoForgeModConfigEvents;
+import fuzs.forgeconfigapiport.fabric.api.v5.ModConfigEvents;
 import net.fabricmc.fabric.api.item.v1.DefaultItemComponentEvents;
-import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
+import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents;
 import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
@@ -64,9 +64,9 @@ public final class ModBusLifecycle {
     public static void addMod(ModContainer container) {
         MODS.add(container);
         //Bridge Forge Config API Port's config events onto the mod bus
-        NeoForgeModConfigEvents.loading(container.getModId()).register(config -> container.getEventBus().post(new ModConfigEvent.Loading(config)));
-        NeoForgeModConfigEvents.reloading(container.getModId()).register(config -> container.getEventBus().post(new ModConfigEvent.Reloading(config)));
-        NeoForgeModConfigEvents.unloading(container.getModId()).register(config -> container.getEventBus().post(new ModConfigEvent.Unloading(config)));
+        ModConfigEvents.loading(container.getModId()).register(config -> container.getEventBus().post(new ModConfigEvent.Loading(config)));
+        ModConfigEvents.reloading(container.getModId()).register(config -> container.getEventBus().post(new ModConfigEvent.Reloading(config)));
+        ModConfigEvents.unloading(container.getModId()).register(config -> container.getEventBus().post(new ModConfigEvent.Unloading(config)));
     }
 
     private static void postAll(Supplier<? extends Event> event) {
@@ -92,7 +92,7 @@ public final class ModBusLifecycle {
         List<ResourceKey<? extends Registry<?>>> keys = new ArrayList<>(List.of(Registries.DATA_COMPONENT_TYPE, Registries.ATTRIBUTE, Registries.SOUND_EVENT,
               Registries.MOB_EFFECT, Registries.PARTICLE_TYPE));
         for (Registry<?> registry : BuiltInRegistries.REGISTRY) {
-            if (!registry.key().location().getNamespace().equals("minecraft") && !keys.contains(registry.key())) {
+            if (!registry.key().identifier().getNamespace().equals("minecraft") && !keys.contains(registry.key())) {
                 keys.add(registry.key());
             }
         }
@@ -102,7 +102,7 @@ public final class ModBusLifecycle {
             }
         }
         for (ResourceKey<? extends Registry<?>> key : keys) {
-            Registry<?> registry = BuiltInRegistries.REGISTRY.get(key.location());
+            Registry<?> registry = BuiltInRegistries.REGISTRY.get(key.identifier());
             for (ModContainer mod : MODS) {
                 mod.getEventBus().post(new RegisterEvent(key, registry));
             }
@@ -169,7 +169,7 @@ public final class ModBusLifecycle {
     /** Registries that only exist for NeoForge semantics need their entries pushed into the vanilla/Fabric systems. */
     private static void bindNeoForgeOnlyRegistries() {
         for (Map.Entry<ResourceKey<AttachmentType<?>>, AttachmentType<?>> entry : NeoForgeRegistries.ATTACHMENT_TYPES.entrySet()) {
-            entry.getValue().bind(entry.getKey().location());
+            entry.getValue().bind(entry.getKey().identifier());
         }
         for (EntityDataSerializer<?> serializer : NeoForgeRegistries.ENTITY_DATA_SERIALIZERS) {
             EntityDataSerializers.registerSerializer(serializer);
@@ -194,7 +194,7 @@ public final class ModBusLifecycle {
     }
 
     private static void hookCreativeTabs() {
-        ItemGroupEvents.MODIFY_ENTRIES_ALL.register((group, entries) -> {
+        CreativeModeTabEvents.MODIFY_OUTPUT_ALL.register((group, entries) -> {
             ResourceKey<CreativeModeTab> key = BuiltInRegistries.CREATIVE_MODE_TAB.getResourceKey(group).orElse(null);
             if (key != null) {
                 postAllShared(new BuildCreativeModeTabContentsEvent(group, key, entries));

@@ -53,6 +53,6 @@ public interface ILevelExtension {
     }
 
     default Component getDescription() {
-        return Component.literal(self().dimension().location().toString());
+        return Component.literal(self().dimension().identifier().toString());
     }
 }
