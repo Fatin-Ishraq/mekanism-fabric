@@ -14,7 +14,7 @@ public abstract class CreativeModeInventoryScreenMixin {
     @Shadow
     private static CreativeModeTab selectedTab;
 
-    @ModifyArg(method = "renderLabels", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiGraphics;drawString(Lnet/minecraft/client/gui/Font;Lnet/minecraft/network/chat/Component;IIIZ)I"), index = 4)
+    @ModifyArg(method = "renderLabels", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;drawString(Lnet/minecraft/client/gui/Font;Lnet/minecraft/network/chat/Component;IIIZ)I"), index = 4)
     private int mekanism$labelColor(int color) {
         return selectedTab.getLabelColor();
     }

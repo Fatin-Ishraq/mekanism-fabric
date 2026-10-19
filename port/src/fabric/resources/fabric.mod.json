@@ -184,20 +184,11 @@
       "net/minecraft/client/gui/components/AbstractWidget": [
         "mekanism/neoshim/neoforge/client/extensions/IAbstractWidgetExtension"
       ],
-      "net/minecraft/client/gui/screens/Screen": [
-        "mekanism/neoshim/neoforge/client/extensions/IScreenExtension"
-      ],
-      "net/minecraft/client/gui/screens/inventory/AbstractContainerScreen": [
-        "mekanism/neoshim/neoforge/client/extensions/IAbstractContainerScreenExtension"
-      ],
       "com/mojang/blaze3d/vertex/VertexConsumer": [
         "mekanism/neoshim/neoforge/client/extensions/IVertexConsumerExtension"
       ],
       "net/minecraft/client/resources/model/ModelManager": [
         "mekanism/neoshim/neoforge/client/extensions/IModelManagerExtension"
-      ],
-      "net/minecraft/client/renderer/entity/EntityRenderDispatcher": [
-        "mekanism/neoshim/neoforge/client/extensions/IEntityRenderDispatcherExtension"
       ],
       "net/minecraft/client/renderer/LevelRenderer": [
         "mekanism/neoshim/neoforge/client/extensions/ILevelRendererExtension"
@@ -210,9 +201,6 @@
       ],
       "net/minecraft/client/particle/TerrainParticle": [
         "mekanism/neoshim/neoforge/client/extensions/ITerrainParticleExtension"
-      ],
-      "net/minecraft/client/particle/ParticleEngine": [
-        "mekanism/neoshim/neoforge/client/extensions/IParticleEngineExtension"
       ],
       "net/minecraft/client/renderer/block/dispatch/BlockStateModel": [
         "mekanism/neoshim/neoforge/client/extensions/BlockStateModelExtension"
@@ -231,6 +219,9 @@
       ],
       "net/minecraft/client/resources/model/ModelBaker": [
         "mekanism/neoshim/neoforge/client/extensions/ModelBakerExtension"
+      ],
+      "net/minecraft/client/renderer/block/FluidModel": [
+        "mekanism/neoshim/neoforge/client/extensions/FluidModelExtension"
       ],
       "net/minecraft/client/resources/model/ModelBakery$BakingResult": [
         "mekanism/neoshim/neoforge/client/extensions/BakingResultExtension"

@@ -33,8 +33,7 @@ public class QuadBakingVertexConsumer implements VertexConsumer {
     private ChunkSectionLayer layer;
     @Nullable
     private RenderType itemRenderType;
-    @Nullable
-    private Material.Baked material;
+    private Material.@Nullable Baked material;
     @Nullable
     private Transparency transparency;
     private boolean shade = true;

@@ -28,7 +28,14 @@ Fixing the shim usually uncovers more errors in later javac phases, so the count
 - 26.1 phase 1: Curios override is a no-op stub (Trinkets impl is on main), JEI/EMI helpers removed from `IMekanismAccess`, CC/Gender hooks commented
   out in `MekanismHooks`/`ComputerCapabilityHelper`, Fabric compat for JEI/EMI/Trinkets/CC excluded in build.gradle.
 
+- Client shim partly moved to 26.1 (not compiled yet since these edits): GUI layers (`GuiLayer`), `ViewportEvent` fog events on `FogData` +
+  FogRendererMixin, `RenderLivingEvent` (render state + SubmitNodeCollector), `EntityRenderersEvent` (AvatarRenderer maps), tint source colour events,
+  particle provider registry, `IClientItemExtensions`/`IClientFluidTypeExtensions` 26.1 surfaces, `FluidTintSource(s)`, `RegisterFluidModelsEvent`,
+  `FluidModelExtension`, key mapping API rename; obsolete 1.21.1 shim classes removed.
+
 ## Next
+0. Recompile; still to do in the client shim: `PlaySoundEvent` (`getLocation` -> `getIdentifier`), delete `RegisterShadersEvent` and fix its use in
+   `ClientBridge`, then the `mekanism.fabric` glue (ClientBridge, ModBusLifecycle, drivers, mixins) and upstream errors.
 1. Work the remaining error list: shim common/client (`scripts/api_diff.py` against ref/neo/neoforge.jar), tile code, GUI (`GuiGraphicsExtractor`),
    fabric compat/mixins/bridge, datamaps.
 2. Still missing in the shim (see `scripts/shim_refs.py main api`): fluid models/tint sources, GuiLayer, outline renderer events,

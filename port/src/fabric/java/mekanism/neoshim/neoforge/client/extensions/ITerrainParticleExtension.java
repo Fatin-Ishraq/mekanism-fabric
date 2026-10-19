@@ -11,7 +11,7 @@ public interface ITerrainParticleExtension {
     default TerrainParticle updateSprite(BlockState state, BlockPos pos) {
         TerrainParticle self = (TerrainParticle) this;
         if (pos != null) {
-            self.setSprite(Minecraft.getInstance().getBlockRenderer().getBlockModelShaper().getParticleIcon(state));
+            self.setSprite(Minecraft.getInstance().getModelManager().getBlockStateModelSet().getParticleMaterial(state).sprite());
         }
         return self;
     }

@@ -1,23 +1,26 @@
 package mekanism.neoshim.neoforge.client.event;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 import mekanism.neoshim.bus.api.Event;
 import mekanism.neoshim.fml.event.IModBusEvent;
-import net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.ModelLayerRegistry;
+import net.minecraft.client.entity.ClientMannequin;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.model.geom.ModelLayerLocation;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
+import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderers;
-import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
-import net.minecraft.client.resources.PlayerSkin;
+import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.player.PlayerModelType;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import org.jetbrains.annotations.Nullable;
@@ -27,7 +30,7 @@ public abstract class EntityRenderersEvent extends Event implements IModBusEvent
     public static class RegisterLayerDefinitions extends EntityRenderersEvent {
 
         public void registerLayerDefinition(ModelLayerLocation layerLocation, Supplier<LayerDefinition> supplier) {
-            EntityModelLayerRegistry.registerModelLayer(layerLocation, supplier::get);
+            ModelLayerRegistry.registerModelLayer(layerLocation, supplier::get);
         }
     }
 
@@ -37,41 +40,53 @@ public abstract class EntityRenderersEvent extends Event implements IModBusEvent
             EntityRendererRegistry.register(entityType, entityRendererProvider);
         }
 
-        public <T extends BlockEntity> void registerBlockEntityRenderer(BlockEntityType<? extends T> blockEntityType,
-              BlockEntityRendererProvider<T> blockEntityRendererProvider) {
-            BlockEntityRenderers.register(blockEntityType, blockEntityRendererProvider);
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        public <T extends BlockEntity, S extends BlockEntityRenderState> void registerBlockEntityRenderer(BlockEntityType<? extends T> blockEntityType,
+              BlockEntityRendererProvider<T, S> blockEntityRendererProvider) {
+            BlockEntityRendererRegistry.register((BlockEntityType) blockEntityType, (BlockEntityRendererProvider) blockEntityRendererProvider);
         }
     }
 
-    /** Fired from Fabric's LivingEntityFeatureRendererRegistrationCallback-backed bridge after renderers are created. */
+    /** Fired by EntityRenderDispatcherMixin after the entity renderers are (re)created. */
     public static class AddLayers extends EntityRenderersEvent {
 
-        private final EntityRenderDispatcher dispatcher;
+        private final Map<EntityType<?>, EntityRenderer<?, ?>> renderers;
+        private final Map<PlayerModelType, AvatarRenderer<AbstractClientPlayer>> playerRenderers;
+        private final Map<PlayerModelType, AvatarRenderer<ClientMannequin>> mannequinRenderers;
         private final EntityRendererProvider.Context context;
 
-        public AddLayers(EntityRenderDispatcher dispatcher, EntityRendererProvider.Context context) {
-            this.dispatcher = dispatcher;
+        public AddLayers(Map<EntityType<?>, EntityRenderer<?, ?>> renderers, Map<PlayerModelType, AvatarRenderer<AbstractClientPlayer>> playerRenderers,
+              Map<PlayerModelType, AvatarRenderer<ClientMannequin>> mannequinRenderers, EntityRendererProvider.Context context) {
+            this.renderers = renderers;
+            this.playerRenderers = playerRenderers;
+            this.mannequinRenderers = mannequinRenderers;
             this.context = context;
         }
 
+        public Set<PlayerModelType> getSkins() {
+            return playerRenderers.keySet();
+        }
+
+        @Nullable
+        @SuppressWarnings("unchecked")
+        public <R extends AvatarRenderer<AbstractClientPlayer>> R getPlayerRenderer(PlayerModelType skin) {
+            return (R) playerRenderers.get(skin);
+        }
+
+        @Nullable
+        @SuppressWarnings("unchecked")
+        public <R extends AvatarRenderer<ClientMannequin>> R getMannequinRenderer(PlayerModelType skin) {
+            return (R) mannequinRenderers.get(skin);
+        }
+
         public Set<EntityType<?>> getEntityTypes() {
-            return dispatcher.renderers.keySet();
-        }
-
-        public Set<PlayerSkin.Model> getSkins() {
-            return dispatcher.getSkinMap().keySet();
+            return renderers.keySet();
         }
 
         @Nullable
         @SuppressWarnings("unchecked")
-        public <E extends Player, R extends EntityRenderer<E>> R getSkin(PlayerSkin.Model skinModel) {
-            return (R) dispatcher.getSkinMap().get(skinModel);
-        }
-
-        @Nullable
-        @SuppressWarnings("unchecked")
-        public <E extends Entity, R extends EntityRenderer<E>> R getRenderer(EntityType<? extends E> entityType) {
-            return (R) dispatcher.renderers.get(entityType);
+        public <T extends Entity, R extends EntityRenderer<T, ?>> R getRenderer(EntityType<? extends T> entityType) {
+            return (R) renderers.get(entityType);
         }
 
         public EntityModelSet getEntityModels() {

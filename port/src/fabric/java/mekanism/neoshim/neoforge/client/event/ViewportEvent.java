@@ -1,19 +1,22 @@
 package mekanism.neoshim.neoforge.client.event;
 
-import com.mojang.blaze3d.shaders.FogShape;
 import mekanism.neoshim.bus.api.Event;
-import mekanism.neoshim.bus.api.ICancellableEvent;
 import net.minecraft.client.Camera;
-import net.minecraft.client.renderer.FogRenderer;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.fog.FogData;
+import net.minecraft.client.renderer.fog.environment.FogEnvironment;
+import net.minecraft.world.level.material.FogType;
+import org.joml.Vector4f;
 
+/** Camera/fog events. The fog events are fired by FogRendererMixin from vanilla's FogRenderer#setupFog. */
 public abstract class ViewportEvent extends Event {
 
     private final GameRenderer renderer;
     private final Camera camera;
     private final double partialTick;
 
-    protected ViewportEvent(GameRenderer renderer, Camera camera, double partialTick) {
+    public ViewportEvent(GameRenderer renderer, Camera camera, double partialTick) {
         this.renderer = renderer;
         this.camera = camera;
         this.partialTick = partialTick;
@@ -31,99 +34,151 @@ public abstract class ViewportEvent extends Event {
         return partialTick;
     }
 
-    public static class RenderFog extends ViewportEvent implements ICancellableEvent {
+    /** Fired after the applicable fog environment set up the fog; near/far are the environmental fog start/end. */
+    public static class RenderFog extends ViewportEvent {
 
-        private final FogRenderer.FogMode mode;
-        private final net.minecraft.world.level.material.FogType type;
-        private float farPlaneDistance;
-        private float nearPlaneDistance;
-        private FogShape fogShape;
+        private final FogEnvironment environment;
+        private final FogType type;
+        private final FogData fogData;
 
-        public RenderFog(FogRenderer.FogMode mode, net.minecraft.world.level.material.FogType type, Camera camera, float partialTicks, float nearPlaneDistance, float farPlaneDistance, FogShape fogShape) {
-            super(net.minecraft.client.Minecraft.getInstance().gameRenderer, camera, partialTicks);
-            this.mode = mode;
+        public RenderFog(FogEnvironment environment, FogType type, Camera camera, float partialTick, FogData fogData) {
+            super(Minecraft.getInstance().gameRenderer, camera, partialTick);
+            this.environment = environment;
             this.type = type;
-            this.farPlaneDistance = farPlaneDistance;
-            this.nearPlaneDistance = nearPlaneDistance;
-            this.fogShape = fogShape;
+            this.fogData = fogData;
         }
 
-        public FogRenderer.FogMode getMode() {
-            return mode;
+        public FogEnvironment getEnvironment() {
+            return environment;
         }
 
-        public net.minecraft.world.level.material.FogType getType() {
+        public FogType getType() {
             return type;
         }
 
         public float getFarPlaneDistance() {
-            return farPlaneDistance;
+            return fogData.environmentalEnd;
         }
 
         public float getNearPlaneDistance() {
-            return nearPlaneDistance;
+            return fogData.environmentalStart;
         }
 
-        public FogShape getFogShape() {
-            return fogShape;
+        public FogData getFogData() {
+            return fogData;
         }
 
         public void setFarPlaneDistance(float distance) {
-            farPlaneDistance = distance;
+            fogData.environmentalEnd = distance;
         }
 
         public void setNearPlaneDistance(float distance) {
-            nearPlaneDistance = distance;
-        }
-
-        public void setFogShape(FogShape shape) {
-            fogShape = shape;
+            fogData.environmentalStart = distance;
         }
 
         public void scaleFarPlaneDistance(float factor) {
-            farPlaneDistance *= factor;
+            fogData.environmentalEnd *= factor;
         }
 
         public void scaleNearPlaneDistance(float factor) {
-            nearPlaneDistance *= factor;
+            fogData.environmentalStart *= factor;
         }
     }
 
+    /** Fired after vanilla computed the fog colour; changes write through to the fog colour. */
     public static class ComputeFogColor extends ViewportEvent {
 
-        private float red;
-        private float green;
-        private float blue;
+        private final Vector4f color;
 
-        public ComputeFogColor(Camera camera, float partialTicks, float red, float green, float blue) {
-            super(net.minecraft.client.Minecraft.getInstance().gameRenderer, camera, partialTicks);
-            this.red = red;
-            this.green = green;
-            this.blue = blue;
+        public ComputeFogColor(Camera camera, float partialTick, Vector4f color) {
+            super(Minecraft.getInstance().gameRenderer, camera, partialTick);
+            this.color = color;
         }
 
         public float getRed() {
-            return red;
+            return color.x();
         }
 
         public void setRed(float red) {
-            this.red = red;
+            color.x = red;
         }
 
         public float getGreen() {
-            return green;
+            return color.y();
         }
 
         public void setGreen(float green) {
-            this.green = green;
+            color.y = green;
         }
 
         public float getBlue() {
-            return blue;
+            return color.z();
         }
 
         public void setBlue(float blue) {
-            this.blue = blue;
+            color.z = blue;
+        }
+    }
+
+    public static class ComputeCameraAngles extends ViewportEvent {
+
+        private float yaw;
+        private float pitch;
+        private float roll;
+
+        public ComputeCameraAngles(Camera camera, double partialTick, float yaw, float pitch, float roll) {
+            super(Minecraft.getInstance().gameRenderer, camera, partialTick);
+            this.yaw = yaw;
+            this.pitch = pitch;
+            this.roll = roll;
+        }
+
+        public float getYaw() {
+            return yaw;
+        }
+
+        public void setYaw(float yaw) {
+            this.yaw = yaw;
+        }
+
+        public float getPitch() {
+            return pitch;
+        }
+
+        public void setPitch(float pitch) {
+            this.pitch = pitch;
+        }
+
+        public float getRoll() {
+            return roll;
+        }
+
+        public void setRoll(float roll) {
+            this.roll = roll;
+        }
+    }
+
+    public static class ComputeFov extends ViewportEvent {
+
+        private final boolean usedConfiguredFov;
+        private float fov;
+
+        public ComputeFov(GameRenderer renderer, Camera camera, float partialTick, float fov, boolean usedConfiguredFov) {
+            super(renderer, camera, partialTick);
+            this.usedConfiguredFov = usedConfiguredFov;
+            this.fov = fov;
+        }
+
+        public float getFOV() {
+            return fov;
+        }
+
+        public void setFOV(float fov) {
+            this.fov = fov;
+        }
+
+        public boolean usedConfiguredFov() {
+            return usedConfiguredFov;
         }
     }
 }

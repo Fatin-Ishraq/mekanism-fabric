@@ -57,6 +57,10 @@ public abstract class GuiElement extends AbstractWidget implements IFancyFontRen
 
     public static final Minecraft minecraft = Minecraft.getInstance();
 
+    //FABRIC: NeoForge adds these to AbstractWidget
+    public static final int UNSET_FG_COLOR = -1;
+    protected int packedFGColor = UNSET_FG_COLOR;
+
     protected ButtonBackground buttonBackground = ButtonBackground.NONE;
 
     private final List<GuiElement> children = new ArrayList<>();

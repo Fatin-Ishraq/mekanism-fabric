@@ -1,21 +1,20 @@
 package mekanism.neoshim.neoforge.client.extensions.common;
 
-import com.mojang.blaze3d.shaders.FogShape;
 import com.mojang.blaze3d.vertex.PoseStack;
-import mekanism.neoshim.neoforge.fluids.FluidStack;
 import mekanism.neoshim.neoforge.fluids.FluidType;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.FogRenderer;
-import net.minecraft.core.BlockPos;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.fog.FogData;
+import net.minecraft.client.renderer.fog.environment.FogEnvironment;
 import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Vector3f;
+import org.joml.Vector4f;
 
+/** Client-side fluid type behaviour (textures and tint live in vanilla's {@code FluidModel}s since 26.1). */
 public interface IClientFluidTypeExtensions {
 
     IClientFluidTypeExtensions DEFAULT = new IClientFluidTypeExtensions() {
@@ -30,24 +29,7 @@ public interface IClientFluidTypeExtensions {
     }
 
     static IClientFluidTypeExtensions of(FluidType type) {
-        return RegisterClientExtensionsEvent.FLUID_TYPES.getOrDefault(type, mekanism.fabric.client.VanillaFluidClientExtensions.get(type));
-    }
-
-    default int getTintColor() {
-        return 0xFFFFFFFF;
-    }
-
-    default Identifier getStillTexture() {
-        return null;
-    }
-
-    default Identifier getFlowingTexture() {
-        return null;
-    }
-
-    @Nullable
-    default Identifier getOverlayTexture() {
-        return null;
+        return RegisterClientExtensionsEvent.FLUID_TYPES.getOrDefault(type, DEFAULT);
     }
 
     @Nullable
@@ -55,47 +37,12 @@ public interface IClientFluidTypeExtensions {
         return null;
     }
 
-    default void renderOverlay(Minecraft mc, PoseStack poseStack) {
+    default void renderOverlay(Minecraft mc, PoseStack poseStack, MultiBufferSource buffers) {
     }
 
-    default Vector3f modifyFogColor(Camera camera, float partialTick, ClientLevel level, int renderDistance, float darkenWorldAmount, Vector3f fluidFogColor) {
-        return fluidFogColor;
+    default void modifyFogColor(Camera camera, float partialTick, ClientLevel level, int renderDistance, float darkenWorldAmount, Vector4f fluidFogColor) {
     }
 
-    default void modifyFogRender(Camera camera, FogRenderer.FogMode mode, float renderDistance, float partialTick, float nearDistance, float farDistance,
-          FogShape shape) {
-    }
-
-    default Identifier getStillTexture(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
-        return getStillTexture();
-    }
-
-    default Identifier getFlowingTexture(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
-        return getFlowingTexture();
-    }
-
-    @Nullable
-    default Identifier getOverlayTexture(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
-        return getOverlayTexture();
-    }
-
-    default int getTintColor(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
-        return getTintColor();
-    }
-
-    default Identifier getStillTexture(FluidStack stack) {
-        return getStillTexture();
-    }
-
-    default Identifier getFlowingTexture(FluidStack stack) {
-        return getFlowingTexture();
-    }
-
-    default Identifier getOverlayTexture(FluidStack stack) {
-        return getOverlayTexture();
-    }
-
-    default int getTintColor(FluidStack stack) {
-        return getTintColor();
+    default void modifyFogRender(Camera camera, @Nullable FogEnvironment environment, float renderDistance, float partialTick, FogData fog) {
     }
 }

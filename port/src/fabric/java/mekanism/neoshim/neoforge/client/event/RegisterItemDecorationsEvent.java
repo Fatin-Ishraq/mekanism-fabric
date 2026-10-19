@@ -10,7 +10,7 @@ import mekanism.neoshim.neoforge.client.IItemDecorator;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.ItemLike;
 
-/** Decorators are drawn by a mixin on GuiGraphics#renderItemDecorations (NOTES.md "Hook status"). */
+/** Decorators are drawn by a mixin on GuiGraphicsExtractor#renderItemDecorations (NOTES.md "Hook status"). */
 public class RegisterItemDecorationsEvent extends Event implements IModBusEvent {
 
     public static final Map<Item, List<IItemDecorator>> DECORATORS = new ConcurrentHashMap<>();

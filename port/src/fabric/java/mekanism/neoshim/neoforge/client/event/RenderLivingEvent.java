@@ -4,34 +4,33 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import mekanism.neoshim.bus.api.Event;
 import mekanism.neoshim.bus.api.ICancellableEvent;
 import net.minecraft.client.model.EntityModel;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.world.entity.LivingEntity;
 
-public abstract class RenderLivingEvent<T extends LivingEntity, M extends EntityModel<T>> extends Event {
+/** Fired around {@link LivingEntityRenderer#submit} by LivingEntityRendererMixin. */
+public abstract class RenderLivingEvent<T extends LivingEntity, S extends LivingEntityRenderState, M extends EntityModel<? super S>> extends Event {
 
-    private final LivingEntity entity;
-    private final LivingEntityRenderer<T, M> renderer;
+    private final S renderState;
+    private final LivingEntityRenderer<T, S, M> renderer;
     private final float partialTick;
     private final PoseStack poseStack;
-    private final MultiBufferSource multiBufferSource;
-    private final int packedLight;
+    private final SubmitNodeCollector submitNodeCollector;
 
-    protected RenderLivingEvent(LivingEntity entity, LivingEntityRenderer<T, M> renderer, float partialTick, PoseStack poseStack, MultiBufferSource multiBufferSource,
-          int packedLight) {
-        this.entity = entity;
+    protected RenderLivingEvent(S renderState, LivingEntityRenderer<T, S, M> renderer, float partialTick, PoseStack poseStack, SubmitNodeCollector submitNodeCollector) {
+        this.renderState = renderState;
         this.renderer = renderer;
         this.partialTick = partialTick;
         this.poseStack = poseStack;
-        this.multiBufferSource = multiBufferSource;
-        this.packedLight = packedLight;
+        this.submitNodeCollector = submitNodeCollector;
     }
 
-    public LivingEntity getEntity() {
-        return entity;
+    public S getRenderState() {
+        return renderState;
     }
 
-    public LivingEntityRenderer<T, M> getRenderer() {
+    public LivingEntityRenderer<T, S, M> getRenderer() {
         return renderer;
     }
 
@@ -43,25 +42,22 @@ public abstract class RenderLivingEvent<T extends LivingEntity, M extends Entity
         return poseStack;
     }
 
-    public MultiBufferSource getMultiBufferSource() {
-        return multiBufferSource;
+    public SubmitNodeCollector getSubmitNodeCollector() {
+        return submitNodeCollector;
     }
 
-    public int getPackedLight() {
-        return packedLight;
-    }
+    public static class Pre<T extends LivingEntity, S extends LivingEntityRenderState, M extends EntityModel<? super S>> extends RenderLivingEvent<T, S, M>
+          implements ICancellableEvent {
 
-    public static class Pre<T extends LivingEntity, M extends EntityModel<T>> extends RenderLivingEvent<T, M> implements ICancellableEvent {
-
-        public Pre(LivingEntity entity, LivingEntityRenderer<T, M> renderer, float partialTick, PoseStack poseStack, MultiBufferSource multiBufferSource, int packedLight) {
-            super(entity, renderer, partialTick, poseStack, multiBufferSource, packedLight);
+        public Pre(S renderState, LivingEntityRenderer<T, S, M> renderer, float partialTick, PoseStack poseStack, SubmitNodeCollector submitNodeCollector) {
+            super(renderState, renderer, partialTick, poseStack, submitNodeCollector);
         }
     }
 
-    public static class Post<T extends LivingEntity, M extends EntityModel<T>> extends RenderLivingEvent<T, M> {
+    public static class Post<T extends LivingEntity, S extends LivingEntityRenderState, M extends EntityModel<? super S>> extends RenderLivingEvent<T, S, M> {
 
-        public Post(LivingEntity entity, LivingEntityRenderer<T, M> renderer, float partialTick, PoseStack poseStack, MultiBufferSource multiBufferSource, int packedLight) {
-            super(entity, renderer, partialTick, poseStack, multiBufferSource, packedLight);
+        public Post(S renderState, LivingEntityRenderer<T, S, M> renderer, float partialTick, PoseStack poseStack, SubmitNodeCollector submitNodeCollector) {
+            super(renderState, renderer, partialTick, poseStack, submitNodeCollector);
         }
     }
 }

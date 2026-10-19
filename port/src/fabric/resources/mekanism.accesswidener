@@ -102,3 +102,6 @@ accessible method net/minecraft/world/level/block/FireBlock getBurnOdds (Lnet/mi
 accessible method net/minecraft/world/level/block/FireBlock getIgniteOdds (Lnet/minecraft/world/level/block/state/BlockState;)I
 accessible method net/minecraft/server/network/ServerConfigurationPacketListenerImpl finishCurrentTask (Lnet/minecraft/server/network/ConfigurationTask$Type;)V
 accessible field net/minecraft/util/random/WeightedList$Builder result Lcom/google/common/collect/ImmutableList$Builder;
+accessible class net/minecraft/client/particle/ParticleResources$SpriteParticleRegistration
+accessible method net/minecraft/client/particle/SingleQuadParticle setSprite (Lnet/minecraft/client/renderer/texture/TextureAtlasSprite;)V
+accessible field net/minecraft/client/renderer/LevelRenderer ticks I

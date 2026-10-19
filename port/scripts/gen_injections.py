@@ -62,22 +62,19 @@ SPEC = [
     # client
     ("net/minecraft/client/KeyMapping", False, "", [CEXT + "IKeyMappingExtension"], True, True),
     ("net/minecraft/client/gui/components/AbstractWidget", False, "", [CEXT + "IAbstractWidgetExtension"], True, True),
-    ("net/minecraft/client/gui/screens/Screen", False, "", [CEXT + "IScreenExtension"], True, False),
-    ("net/minecraft/client/gui/screens/inventory/AbstractContainerScreen", False, "T", [CEXT + "IAbstractContainerScreenExtension"], True, False),
     ("com/mojang/blaze3d/vertex/VertexConsumer", True, "", [CEXT + "IVertexConsumerExtension"], True, False),
     ("net/minecraft/client/resources/model/ModelManager", False, "", [CEXT + "IModelManagerExtension"], True, True),
-    ("net/minecraft/client/renderer/entity/EntityRenderDispatcher", False, "", [CEXT + "IEntityRenderDispatcherExtension"], True, False),
     ("net/minecraft/client/renderer/LevelRenderer", False, "", [CEXT + "ILevelRendererExtension"], True, False),
     ("net/minecraft/client/renderer/blockentity/BlockEntityRenderer", True, "T", [CEXT + "IBlockEntityRendererExtension<T>"], True, False),
     ("net/minecraft/client/particle/Particle", False, "", [CEXT + "IParticleExtension"], True, False),
     ("net/minecraft/client/particle/TerrainParticle", False, "", [CEXT + "ITerrainParticleExtension"], True, False),
-    ("net/minecraft/client/particle/ParticleEngine", False, "", [CEXT + "IParticleEngineExtension"], True, False),
     ("net/minecraft/client/renderer/block/dispatch/BlockStateModel", True, "", [CEXT + "BlockStateModelExtension"], True, False),
     ("net/minecraft/client/renderer/block/dispatch/BlockStateModelPart", True, "", [CEXT + "BlockStateModelPartExtension"], True, False),
     ("net/minecraft/client/resources/model/geometry/UnbakedGeometry", True, "", [CEXT + "UnbakedGeometryExtension"], True, False),
     ("net/minecraft/client/resources/model/UnbakedModel", True, "", [CEXT + "UnbakedModelExtension"], True, False),
     ("net/minecraft/client/resources/model/ResolvedModel", True, "", [CEXT + "ResolvedModelExtension"], True, False),
     ("net/minecraft/client/resources/model/ModelBaker", True, "", [CEXT + "ModelBakerExtension"], True, False),
+    ("net/minecraft/client/renderer/block/FluidModel", False, "", [CEXT + "FluidModelExtension"], True, False),
     ("net/minecraft/client/resources/model/ModelBakery$BakingResult", False, "", [CEXT + "BakingResultExtension"], True, False),
 ]
 
