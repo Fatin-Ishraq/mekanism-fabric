@@ -7,33 +7,28 @@ import mekanism.common.network.to_client.container.property.ItemStackPropertyDat
 import mekanism.common.network.to_client.container.property.PropertyData;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
 
-/**
- * Version of {@link net.minecraft.world.inventory.DataSlot} for handling item stacks
- */
+/// Version of [net.minecraft.world.inventory.DataSlot] for handling item stacks
 public class SyncableItemStack implements ISyncableData {
 
-    public static SyncableItemStack create(Supplier<@NotNull ItemStack> getter, Consumer<@NotNull ItemStack> setter) {
+    public static SyncableItemStack create(Supplier<ItemStack> getter, Consumer<ItemStack> setter) {
         return new SyncableItemStack(getter, setter);
     }
 
-    private final Supplier<@NotNull ItemStack> getter;
-    private final Consumer<@NotNull ItemStack> setter;
-    @NotNull
+    private final Supplier<ItemStack> getter;
+    private final Consumer<ItemStack> setter;
     private ItemStack lastKnownValue = ItemStack.EMPTY;
 
-    private SyncableItemStack(Supplier<@NotNull ItemStack> getter, Consumer<@NotNull ItemStack> setter) {
+    private SyncableItemStack(Supplier<ItemStack> getter, Consumer<ItemStack> setter) {
         this.getter = getter;
         this.setter = setter;
     }
 
-    @NotNull
     public ItemStack get() {
         return getter.get();
     }
 
-    public void set(@NotNull ItemStack value) {
+    public void set(ItemStack value) {
         setter.accept(value);
     }
 
@@ -54,7 +49,7 @@ public class SyncableItemStack implements ISyncableData {
             return DirtyType.CLEAN;
         }
         boolean sameItem = ItemStack.isSameItemSameComponents(value, this.lastKnownValue);
-        if (!sameItem || value.getCount() != this.lastKnownValue.getCount()) {
+        if (!sameItem || value.count() != this.lastKnownValue.count()) {
             //Make sure to copy it in case our item stack object is the same object so would be getting modified
             // only do so though if it is dirty, as we don't need to spam object creation
             this.lastKnownValue = value.copy();
@@ -67,7 +62,7 @@ public class SyncableItemStack implements ISyncableData {
     public PropertyData getPropertyData(RegistryAccess registryAccess, short property, DirtyType dirtyType) {
         if (dirtyType == DirtyType.SIZE) {
             //If only the size changed, don't bother re-syncing the type
-            return new IntPropertyData(property, get().getCount());
+            return new IntPropertyData(property, get().count());
         }
         //Note: While this copy operation isn't strictly necessary, it allows for simplifying the logic and ensuring we don't have the actual stack object
         // leak from one side to another when in single player. Given copying is rather cheap, and we only need to do this on change/when the data is dirty

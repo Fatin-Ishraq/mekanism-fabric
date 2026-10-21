@@ -15,18 +15,25 @@ import mekanism.common.tags.MekanismTags;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.LayeredDraw;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.ARGB;
+import net.minecraft.util.CommonColors;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import mekanism.neoshim.neoforge.items.IItemHandler;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.client.gui.GuiLayer;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
+import org.joml.Matrix3x2f;
+import org.joml.Matrix3x2fStack;
 import org.joml.Matrix4f;
 
-public class MekanismHUD implements LayeredDraw.Layer {
+public class MekanismHUD implements GuiLayer {
 
     public static final MekanismHUD INSTANCE = new MekanismHUD();
     private static final EquipmentSlot[] EQUIPMENT_ORDER = {EquipmentSlot.OFFHAND, EquipmentSlot.MAINHAND, EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS,
@@ -38,21 +45,25 @@ public class MekanismHUD implements LayeredDraw.Layer {
     }
 
     @Nullable
-    private IItemHUDProvider getHudProvider(ItemStack stack) {
-        if (stack.getItem() instanceof IItemHUDProvider hudProvider) {
+    private <ITEM extends TypedInstance<Item> & DataComponentGetter> IItemHUDProvider getHudProvider(ITEM instance) {
+        if (instance.typeHolder().value() instanceof IItemHUDProvider hudProvider) {
             //mekanism does this
             return hudProvider;
         }
-        return (list, player, s, slotType) -> {
-            IModuleContainer container = IModuleHelper.INSTANCE.getModuleContainer(s);
-            if (container != null) {
+        IModuleContainer container = IModuleHelper.INSTANCE.getModuleContainer(instance);
+        if (container == null) {
+            return null;
+        }
+        return new IItemHUDProvider() {
+            @Override
+            public <I extends TypedInstance<Item> & DataComponentGetter> void addHUDStrings(List<Component> list, Player player, I s, EquipmentSlot slotType) {
                 list.addAll(container.getHUDStrings(player, s));
             }
         };
     }
 
     @Override
-    public void render(@NotNull GuiGraphics graphics, @NotNull DeltaTracker delta) {
+    public void render(GuiGraphicsExtractor graphics, DeltaTracker delta) {
         Minecraft minecraft = Minecraft.getInstance();
         Player player = minecraft.player;
         if (player != null && !player.isSpectator() && !minecraft.options.hideGui && MekanismConfig.client.enableHUD.get()) {
@@ -66,14 +77,14 @@ public class MekanismHUD implements LayeredDraw.Layer {
                 }
             }
             if (Mekanism.hooks.curios.isLoaded()) {
-                IItemHandler inv = CuriosIntegration.getCuriosInventory(player);
+                ResourceHandler<ItemResource> inv = CuriosIntegration.getCuriosInventory(player);
                 if (inv != null) {
-                    for (int i = 0, slots = inv.getSlots(); i < slots; i++) {
-                        ItemStack stack = inv.getStackInSlot(i);
+                    for (int i = 0, slots = inv.size(); i < slots; i++) {
+                        ItemResource stack = inv.getResource(i);
                         IItemHUDProvider hudProvider = getHudProvider(stack);
                         if (hudProvider != null) {
-                            count += makeComponent(hudProvider, player, stack, null, renderStrings,
-                                  (provider, l, plyr, s, ignored) -> provider.addCurioHUDStrings(l, plyr, s));
+                            count += makeComponent(hudProvider, player, stack.toStack(), null, renderStrings,
+                                  (provider, l, plyr, s, _) -> provider.addCurioHUDStrings(l, plyr, s));
                         }
                     }
                 }
@@ -91,9 +102,9 @@ public class MekanismHUD implements LayeredDraw.Layer {
                 int start = (renderStrings.size() * 2) + (count * 9);
                 int y = yScale - start;
                 maxTextHeight = (int) (y * hudScale);
-                PoseStack pose = graphics.pose();
-                pose.pushPose();
-                pose.scale(hudScale, hudScale, hudScale);
+                Matrix3x2fStack pose = graphics.pose();
+                pose.pushMatrix();
+                pose.scale(hudScale, hudScale);
 
                 int backgroundColor = minecraft.options.getBackgroundColor(0.0F);
                 if (backgroundColor != 0) {
@@ -109,22 +120,23 @@ public class MekanismHUD implements LayeredDraw.Layer {
                         }
                     }
                     int x = reverseHud ? xScale - maxTextWidth - 2 : 2;
-                    GuiUtils.drawBackdrop(graphics, Minecraft.getInstance(), x, y, maxTextWidth, maxTextHeight, 0xFFFFFFFF);
+                    GuiUtils.drawBackdrop(graphics, Minecraft.getInstance(), x, y, maxTextWidth, maxTextHeight, CommonColors.WHITE);
                 }
 
-                Matrix4f matrix = new Matrix4f(pose.last().pose());
+                Matrix3x2f matrix = new Matrix3x2f(pose);
                 for (List<Component> group : renderStrings) {
                     for (Component text : group) {
                         int textWidth = font.width(text);
                         //Align text to right if hud is reversed, otherwise align to the left
                         //Note: that we always offset by 2 pixels from the edge of the screen regardless of how it is aligned
                         int x = reverseHud ? xScale - textWidth - 2 : 2;
-                        delayedDraws.add(new DelayedString(matrix, text, x, y, 0xFFC8C8C8, true));
+                        //TODO - 26.1: rendering
+                        //delayedDraws.add(new DelayedString(matrix, text, x, y, 0xFFC8C8C8, true));
                         y += 9;
                     }
                     y += 2;
                 }
-                pose.popPose();
+                pose.popMatrix();
             }
 
             if (player.getItemBySlot(EquipmentSlot.HEAD).is(MekanismTags.Items.MEKASUIT_HUD_RENDERER)) {
@@ -139,7 +151,8 @@ public class MekanismHUD implements LayeredDraw.Layer {
                     delayedDraw.draw(graphics, font);
                 }
                 //Flush once at the end of the draws
-                graphics.flush();
+                //TODO - 26.1: rendering
+                //graphics.flush();
             }
         }
     }
@@ -162,12 +175,19 @@ public class MekanismHUD implements LayeredDraw.Layer {
 
     public record DelayedString(Matrix4f matrix, Component component, float x, float y, int color, boolean dropShadow) {
 
+        public DelayedString {
+            if (ARGB.alpha(color) == 0) {
+                Mekanism.logger.warn("Possible missed alpha?", new Exception());
+            }
+        }
+
         public DelayedString(PoseStack pose, Component component, float x, float y, int color, boolean dropShadow) {
             this(new Matrix4f(pose.last().pose()), component, x, y, color, dropShadow);
         }
 
-        public void draw(GuiGraphics graphics, Font font) {
-            GuiUtils.drawStringNoFlush(graphics, matrix, font, component, x, y, color, dropShadow);
+        public void draw(GuiGraphicsExtractor graphics, Font font) {
+            //TODO - 26.1: use the matrix? yeet Delayed String completely?
+            graphics.text(font, component, (int) x, (int) y, color, dropShadow);
         }
     }
 }

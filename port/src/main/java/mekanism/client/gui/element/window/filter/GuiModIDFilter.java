@@ -2,26 +2,26 @@ package mekanism.client.gui.element.window.filter;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.function.IntPredicate;
 import mekanism.api.chemical.ChemicalStack;
-import mekanism.api.functions.CharPredicate;
 import mekanism.api.text.ILangEntry;
+import mekanism.client.MekanismClient;
 import mekanism.client.gui.IGuiWrapper;
+import mekanism.client.gui.element.text.GuiTextField;
 import mekanism.client.recipe_viewer.interfaces.IRecipeViewerGhostTarget.IGhostIngredientConsumer;
 import mekanism.common.MekanismLang;
 import mekanism.common.base.TagCache;
 import mekanism.common.content.filter.IModIDFilter;
 import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.tile.interfaces.ITileFilterHolder;
-import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.RegistryUtils;
 import mekanism.common.util.text.InputValidator;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.TypedInstance;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public abstract class GuiModIDFilter<FILTER extends IModIDFilter<FILTER>, TILE extends TileEntityMekanism & ITileFilterHolder<? super FILTER>>
       extends GuiTextFilter<FILTER, TILE> {
@@ -31,7 +31,7 @@ public abstract class GuiModIDFilter<FILTER extends IModIDFilter<FILTER>, TILE e
     }
 
     @Override
-    protected CharPredicate getInputValidator() {
+    protected IntPredicate getInputValidator() {
         return InputValidator.RL_NAMESPACE.or(InputValidator.WILDCARD_CHARS);
     }
 
@@ -48,15 +48,14 @@ public abstract class GuiModIDFilter<FILTER extends IModIDFilter<FILTER>, TILE e
     }
 
     @Override
-    protected boolean setText() {
+    protected boolean setText(GuiTextField text) {
         return setFilterName(text.getText(), false);
     }
 
-    @NotNull
     @Override
     protected List<ItemStack> getRenderStacks() {
         if (filter.hasFilter()) {
-            return TagCache.getItemModIDStacks(filter.getModID());
+            return TagCache.getItemModIDStacks(gui().registryAccess(), filter.getModID());
         }
         return Collections.emptyList();
     }
@@ -67,22 +66,17 @@ public abstract class GuiModIDFilter<FILTER extends IModIDFilter<FILTER>, TILE e
         return new IGhostIngredientConsumer() {
             @Nullable
             @Override
-            public String supportedTarget(Object ingredient) {
+            public String supportedTarget(@Nullable Object ingredient) {
                 if (ingredient instanceof ItemStack stack) {
-                    return stack.isEmpty() ? null : MekanismUtils.getModId(stack);
+                    return stack.isEmpty() ? null : MekanismClient.getModId(stack);
                 }
-                ResourceLocation registryName = null;
-                if (ingredient instanceof FluidStack stack) {
-                    if (!stack.isEmpty()) {
-                        registryName = RegistryUtils.getName(stack.getFluidHolder());
-                    }
-                } else if (ingredient instanceof ChemicalStack stack) {
-                    if (!stack.isEmpty()) {
-                        registryName = RegistryUtils.getName(stack.getChemicalHolder());
-                    }
-                } else {
-                    registryName = RegistryUtils.getNameGeneric(ingredient);
-                }
+                Identifier registryName = switch (ingredient) {
+                    case FluidStack stack -> stack.isEmpty() ? null : RegistryUtils.getName(stack.typeHolder());
+                    case ChemicalStack stack -> stack.isEmpty() ? null : RegistryUtils.getName(stack.typeHolder());
+                    case TypedInstance<?> instance -> RegistryUtils.getName(instance.typeHolder());
+                    case null -> null;
+                    default -> RegistryUtils.getNameGeneric(ingredient);
+                };
                 return registryName == null ? null : registryName.getNamespace();
             }
 
@@ -98,11 +92,11 @@ public abstract class GuiModIDFilter<FILTER extends IModIDFilter<FILTER>, TILE e
     @Nullable
     @Override
     protected IClickable getSlotClickHandler() {
-        return (element, mouseX, mouseY) -> {
-            if (!Screen.hasShiftDown()) {
+        return (element, event, _) -> {
+            if (!event.hasShiftDown()) {
                 ItemStack stack = element.gui().getCarriedItem();
                 if (!stack.isEmpty()) {
-                    setFilterName(MekanismUtils.getModId(stack.copyWithCount(1)), false);
+                    setFilterName(MekanismClient.getModId(stack.copyWithCount(1)), false);
                     return true;
                 }
             }
@@ -112,7 +106,7 @@ public abstract class GuiModIDFilter<FILTER extends IModIDFilter<FILTER>, TILE e
 
     private boolean setFilterName(String name, boolean click) {
         boolean success = false;
-        if (name.isEmpty()) {
+        if (name.isEmpty() || text == null) {
             filterSaveFailed(getNoFilterSaveError());
         } else if (name.equals(filter.getModID())) {
             filterSaveFailed(MekanismLang.MODID_FILTER_SAME_ID);
@@ -134,6 +128,6 @@ public abstract class GuiModIDFilter<FILTER extends IModIDFilter<FILTER>, TILE e
     }
 
     protected boolean hasMatchingTargets(String name) {
-        return !TagCache.getItemModIDStacks(name).isEmpty();
+        return !TagCache.getItemModIDStacks(gui().registryAccess(), name).isEmpty();
     }
 }

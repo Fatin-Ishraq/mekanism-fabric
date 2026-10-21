@@ -9,7 +9,6 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.world.phys.BlockHitResult;
 import mekanism.neoshim.neoforge.network.handling.IPayloadContext;
-import org.jetbrains.annotations.NotNull;
 
 public record PacketHitBlockEffect(BlockHitResult result) implements IMekanismPacket {
 
@@ -18,7 +17,6 @@ public record PacketHitBlockEffect(BlockHitResult result) implements IMekanismPa
           PacketHitBlockEffect::new, PacketHitBlockEffect::result
     );
 
-    @NotNull
     @Override
     public CustomPacketPayload.Type<PacketHitBlockEffect> type() {
         return TYPE;
@@ -26,6 +24,7 @@ public record PacketHitBlockEffect(BlockHitResult result) implements IMekanismPa
 
     @Override
     public void handle(IPayloadContext context) {
-        Minecraft.getInstance().particleEngine.addBlockHitEffects(result.getBlockPos(), result);
+        //TODO - 26.1: Can we grab the level from the context, or would that require a cast that then might crash on the server?
+        Minecraft.getInstance().level.addBreakingBlockEffect(result.getBlockPos(), result.getDirection());//FABRIC: 26.1 drops the hit result parameter
     }
 }

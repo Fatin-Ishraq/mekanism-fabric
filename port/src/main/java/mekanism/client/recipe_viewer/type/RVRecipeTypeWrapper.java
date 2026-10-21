@@ -2,22 +2,20 @@ package mekanism.client.recipe_viewer.type;
 
 import java.util.List;
 import java.util.stream.Stream;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.recipes.MekanismRecipe;
 import mekanism.api.text.TextComponentUtil;
 import mekanism.common.recipe.IMekanismRecipeTypeProvider;
 import mekanism.common.recipe.MekanismRecipeType;
 import mekanism.common.recipe.lookup.cache.IInputRecipeCache;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeInput;
 import net.minecraft.world.level.ItemLike;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public record RVRecipeTypeWrapper<VANILLA_INPUT extends RecipeInput, RECIPE extends MekanismRecipe<VANILLA_INPUT>, INPUT_CACHE extends IInputRecipeCache>(
-      ResourceLocation id, ItemLike item, Class<? extends RECIPE> recipeClass, IMekanismRecipeTypeProvider<VANILLA_INPUT, RECIPE, INPUT_CACHE> vanillaProvider,
+      Identifier id, ItemLike item, Class<? extends RECIPE> recipeClass, IMekanismRecipeTypeProvider<VANILLA_INPUT, RECIPE, INPUT_CACHE> vanillaProvider,
       int xOffset, int yOffset, int width, int height, List<ItemLike> workstations
 ) implements IRecipeViewerRecipeType<RECIPE>, IMekanismRecipeTypeProvider<VANILLA_INPUT, RECIPE, INPUT_CACHE> {
 
@@ -51,7 +49,7 @@ public record RVRecipeTypeWrapper<VANILLA_INPUT extends RecipeInput, RECIPE exte
 
     @Nullable
     @Override
-    public ResourceLocation icon() {
+    public Identifier icon() {
         //Handled by the icon stack
         return null;
     }

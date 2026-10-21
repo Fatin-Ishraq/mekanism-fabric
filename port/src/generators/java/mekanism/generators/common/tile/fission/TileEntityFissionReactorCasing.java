@@ -3,20 +3,19 @@ package mekanism.generators.common.tile.fission;
 import mekanism.api.SerializationConstants;
 import mekanism.api.text.EnumColor;
 import mekanism.common.MekanismLang;
-import mekanism.common.lib.multiblock.MultiblockManager;
+import mekanism.common.lib.multiblock.MultiblockType;
 import mekanism.common.tile.prefab.TileEntityMultiblock;
-import mekanism.common.util.NBTUtils;
-import mekanism.generators.common.MekanismGenerators;
+import mekanism.generators.common.content.MekanismGeneratorsMultiblocks;
 import mekanism.generators.common.content.fission.FissionReactorMultiblockData;
 import mekanism.generators.common.registries.GeneratorsBlocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
 public class TileEntityFissionReactorCasing extends TileEntityMultiblock<FissionReactorMultiblockData> {
 
@@ -32,8 +31,8 @@ public class TileEntityFissionReactorCasing extends TileEntityMultiblock<Fission
     }
 
     @Override
-    protected boolean onUpdateServer(FissionReactorMultiblockData multiblock) {
-        boolean needsPacket = super.onUpdateServer(multiblock);
+    protected boolean onUpdateServer(ServerLevel level, FissionReactorMultiblockData multiblock) {
+        boolean needsPacket = super.onUpdateServer(level, multiblock);
         boolean burning = multiblock.isFormed() && multiblock.handlesSound(this) && multiblock.isBurning();
         if (burning != prevBurning) {
             prevBurning = burning;
@@ -75,8 +74,8 @@ public class TileEntityFissionReactorCasing extends TileEntityMultiblock<Fission
     }
 
     @Override
-    public MultiblockManager<FissionReactorMultiblockData> getManager() {
-        return MekanismGenerators.fissionReactorManager;
+    public MultiblockType<FissionReactorMultiblockData> getMultiblockType() {
+        return MekanismGeneratorsMultiblocks.FISSION_REACTOR;
     }
 
     @Override
@@ -85,31 +84,29 @@ public class TileEntityFissionReactorCasing extends TileEntityMultiblock<Fission
         return multiblock.isFormed() && multiblock.isBurning() && handleSound;
     }
 
-    @NotNull
     @Override
-    public CompoundTag getReducedUpdateTag(@NotNull HolderLookup.Provider provider) {
-        CompoundTag updateTag = super.getReducedUpdateTag(provider);
+    public void writeReducedUpdatedTag(ValueOutput output) {
+        super.writeReducedUpdatedTag(output);
         FissionReactorMultiblockData multiblock = getMultiblock();
-        updateTag.putBoolean(SerializationConstants.HANDLE_SOUND, multiblock.isFormed() && multiblock.handlesSound(this));
+        output.putBoolean(SerializationConstants.HANDLE_SOUND, multiblock.isFormed() && multiblock.handlesSound(this));
         if (multiblock.isFormed()) {
-            updateTag.putDouble(SerializationConstants.BURNING, multiblock.lastBurnRate);
+            output.putDouble(SerializationConstants.BURNING, multiblock.lastBurnRate);
         }
-        return updateTag;
     }
 
     @Override
-    public void handleUpdateTag(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider provider) {
+    public void handleUpdateTag(ValueInput input) {
         FissionReactorMultiblockData multiblock = getMultiblock();
         //boolean prevFormedMaster = isMaster() && multiblock.isFormed();
         //UUID previousID = multiblock.inventoryID;
-        super.handleUpdateTag(tag, provider);
-        NBTUtils.setBooleanIfPresent(tag, SerializationConstants.HANDLE_SOUND, value -> handleSound = value);
+        super.handleUpdateTag(input);
+        handleSound = input.getBooleanOr(SerializationConstants.HANDLE_SOUND, handleSound);
         //boolean formedMaster = false;
         //boolean wasBurning = false;
         if (multiblock.isFormed()) {
             //formedMaster = isMaster();
             //wasBurning = multiblock.isBurning();
-            NBTUtils.setDoubleIfPresent(tag, SerializationConstants.BURNING, value -> multiblock.lastBurnRate = value);
+            multiblock.lastBurnRate = input.getDoubleOr(SerializationConstants.BURNING, multiblock.lastBurnRate);
         }
         //TODO: At some point make use of this if we are able to use the FuelAssemblyBakedModel?
         /*boolean sameID = Objects.equals(previousID, multiblock.inventoryID);

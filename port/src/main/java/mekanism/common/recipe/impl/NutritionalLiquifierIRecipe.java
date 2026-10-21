@@ -1,20 +1,25 @@
 package mekanism.common.recipe.impl;
 
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.recipes.ItemStackToFluidRecipe;
 import mekanism.api.recipes.basic.BasicItemStackToFluidOptionalItemRecipe;
 import mekanism.api.recipes.ingredients.ItemStackIngredient;
 import mekanism.common.registries.MekanismBlocks;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.RecipeType;
-import mekanism.neoshim.neoforge.fluids.FluidStack;
+import mekanism.neoshim.neoforge.fluids.FluidStackTemplate;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public class NutritionalLiquifierIRecipe extends BasicItemStackToFluidOptionalItemRecipe {
 
-    public NutritionalLiquifierIRecipe(ItemStackIngredient input, FluidStack output, ItemStack emptyContainer) {
-        super(input, new FluidOptionalItemOutput(output, emptyContainer));
+    public NutritionalLiquifierIRecipe(ItemStackIngredient input, FluidStackTemplate output, @Nullable ItemStackTemplate emptyContainer) {
+        this(input, new FluidOptionalItemOutput(output, emptyContainer));
+
+    }
+
+    public NutritionalLiquifierIRecipe(ItemStackIngredient input, FluidOptionalItemOutput output) {
+        super(input, output);
         //TODO - V11: Make the recipe system support a concept similar to vanilla's "special recipe". The backend already exists
         // but we don't currently have a way for it to get registered and added to the list. getType and getSerializer are nonnull,
         // but return a null value due to us not having a good way to handle this. It doesn't matter as they don't get synced across
@@ -29,11 +34,6 @@ public class NutritionalLiquifierIRecipe extends BasicItemStackToFluidOptionalIt
     @Override
     public RecipeSerializer<ItemStackToFluidRecipe> getSerializer() {
         return null;
-    }
-
-    @Override
-    public String getGroup() {
-        return "nutritional_liquifier";
     }
 
     @Override

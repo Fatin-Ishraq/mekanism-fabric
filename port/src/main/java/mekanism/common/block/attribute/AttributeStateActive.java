@@ -7,11 +7,10 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.Property;
-import org.jetbrains.annotations.NotNull;
 
 public class AttributeStateActive implements AttributeState {
 
-    private static final BooleanProperty activeProperty = BooleanProperty.create("active");
+    public static final BooleanProperty activeProperty = BooleanProperty.create("active");
 
     private final int ambientLight;
 
@@ -23,7 +22,7 @@ public class AttributeStateActive implements AttributeState {
         return state.getValue(activeProperty);
     }
 
-    public BlockState setActive(@NotNull BlockState state, boolean active) {
+    public BlockState setActive(BlockState state, boolean active) {
         return state.setValue(activeProperty, active);
     }
 
@@ -36,7 +35,7 @@ public class AttributeStateActive implements AttributeState {
     }
 
     @Override
-    public BlockState getDefaultState(@NotNull BlockState state) {
+    public BlockState getDefaultState(BlockState state) {
         return state.setValue(activeProperty, false);
     }
 

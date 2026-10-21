@@ -15,16 +15,24 @@ import mekanism.additions.common.registries.AdditionsDataComponents;
 import mekanism.common.Mekanism;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import mekanism.neoshim.neoforge.server.ServerLifecycleHooks;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.item.PlayerInventoryWrapper;
+import org.jspecify.annotations.Nullable;
 
 public class VoiceConnection extends Thread {
 
     private final MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+    @Nullable
     private DataOutputStream output;
+    @Nullable
     private DataInputStream input;
     private boolean open = true;
     private final Socket socket;
+    @Nullable
     private UUID uuid;
 
     VoiceConnection(Socket s) {
@@ -57,7 +65,7 @@ public class VoiceConnection extends Thread {
                             }
                             retryCount++;
                             sleep(50);
-                        } catch (Exception ignored) {
+                        } catch (Exception _) {
                         }
                     }
 
@@ -78,14 +86,18 @@ public class VoiceConnection extends Thread {
         // Main client listen thread (set to daemon because the voice connection is a daemon)
         new Thread(() -> {
             while (open) {
-                try {
-                    short byteCount = this.input.readShort();
-                    byte[] audioData = new byte[byteCount];
-                    this.input.readFully(audioData);
-                    if (byteCount > 0) {
-                        MekanismAdditions.voiceManager.sendToPlayers(byteCount, audioData, this);
+                if (this.input != null && MekanismAdditions.voiceManager != null) {
+                    try {
+                        short byteCount = this.input.readShort();
+                        byte[] audioData = new byte[byteCount];
+                        this.input.readFully(audioData);
+                        if (byteCount > 0) {
+                            MekanismAdditions.voiceManager.sendToPlayers(byteCount, audioData, this);
+                        }
+                    } catch (Exception e) {
+                        open = false;
                     }
-                } catch (Exception e) {
+                } else {
                     open = false;
                 }
             }
@@ -105,7 +117,9 @@ public class VoiceConnection extends Thread {
             if (socket != null) {
                 socket.close();
             }
-            MekanismAdditions.voiceManager.removeConnection(this);
+            if (MekanismAdditions.voiceManager != null) {//Should never be null
+                MekanismAdditions.voiceManager.removeConnection(this);
+            }
         } catch (Exception e) {
             Mekanism.logger.error("VoiceServer: Error while stopping server-based connection.", e);
         }
@@ -114,6 +128,10 @@ public class VoiceConnection extends Thread {
     public void sendToPlayer(short byteCount, byte[] audioData, VoiceConnection connection) {
         if (!open) {
             kill();
+            return;
+        } else if (output == null) {
+            Mekanism.logger.error("VoiceServer: Error while sending data to player.");
+            return;
         }
         try {
             output.writeShort(byteCount);
@@ -125,22 +143,29 @@ public class VoiceConnection extends Thread {
     }
 
     public boolean canListen(int channel) {
-        ServerPlayer player = getPlayer();
-        for (ItemStack itemStack : player.getInventory().items) {
-            if (canListen(channel, itemStack)) {
-                return true;
-            }
-        }
-        return canListen(channel, player.getOffhandItem());
+        PlayerInventoryWrapper playerInv = PlayerInventoryWrapper.of(getPlayer());
+        //TODO: Should we just check the entire inventory and maybe curios as well?
+        return canListen(playerInv.getMainSlots(), channel) || canListen(playerInv.getHandSlot(InteractionHand.OFF_HAND), channel);
     }
 
-    private boolean canListen(int channel, ItemStack stack) {
-        WalkieData data = stack.getOrDefault(AdditionsDataComponents.WALKIE_DATA, WalkieData.DEFAULT);
-        return data.running() && data.channel() == channel;
+    private boolean canListen(ResourceHandler<ItemResource> itemHandler, int channel) {
+        for (int slot = 0, size = itemHandler.size(); slot < size; slot++) {
+            ItemResource itemType = itemHandler.getResource(slot);
+            if (!itemType.isEmpty()) {
+                WalkieData data = itemType.getOrDefault(AdditionsDataComponents.WALKIE_DATA, WalkieData.DEFAULT);
+                if (data.running() && data.channel() == channel) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public int getCurrentChannel() {
         ServerPlayer player = getPlayer();
+        if (player == null) {
+            return 0;
+        }
         int channel = getCurrentChannel(player.getMainHandItem());
         if (channel == 0) {
             channel = getCurrentChannel(player.getOffhandItem());
@@ -153,7 +178,8 @@ public class VoiceConnection extends Thread {
         return data.running() ? data.channel() : 0;
     }
 
+    @Nullable
     public ServerPlayer getPlayer() {
-        return server.getPlayerList().getPlayer(uuid);
+        return uuid == null ? null : server.getPlayerList().getPlayer(uuid);
     }
 }

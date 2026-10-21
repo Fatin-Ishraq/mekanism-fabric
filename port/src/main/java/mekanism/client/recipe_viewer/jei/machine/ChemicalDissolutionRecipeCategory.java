@@ -20,8 +20,8 @@ import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.helpers.IGuiHelper;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.RecipeIngredientRole;
+import net.minecraft.util.context.ContextMap;
 import net.minecraft.world.item.crafting.RecipeHolder;
-import org.jetbrains.annotations.NotNull;
 
 public class ChemicalDissolutionRecipeCategory extends HolderRecipeCategory<ChemicalDissolutionRecipe> {
 
@@ -44,17 +44,18 @@ public class ChemicalDissolutionRecipeCategory extends HolderRecipeCategory<Chem
     }
 
     @Override
-    public void setRecipe(@NotNull IRecipeLayoutBuilder builder, RecipeHolder<ChemicalDissolutionRecipe> recipeHolder, @NotNull IFocusGroup focusGroup) {
+    public void setRecipe(IRecipeLayoutBuilder builder, RecipeHolder<ChemicalDissolutionRecipe> recipeHolder, IFocusGroup focusGroup) {
         ChemicalDissolutionRecipe recipe = recipeHolder.value();
-        initItem(builder, RecipeIngredientRole.INPUT, inputSlot, recipe.getItemInput().getRepresentations());
-        List<ChemicalStack> scaledChemicals = recipe.getChemicalInput().getRepresentations();
+        ContextMap slotDisplayContext = getSlotDisplayContext();
+        initItem(builder, RecipeIngredientRole.INPUT, inputSlot, recipe.getItemInput().getRepresentations(slotDisplayContext));
+        List<ChemicalStack> scaledChemicals = recipe.getChemicalInput().getRepresentations(slotDisplayContext);
         if (recipe.perTickUsage()) {
             scaledChemicals = scaledChemicals.stream()
-                  .map(chemical -> chemical.copyWithAmount(chemical.getAmount() * TileEntityChemicalDissolutionChamber.BASE_TICKS_REQUIRED))
+                  .map(chemical -> chemical.copyWithAmount(chemical.amount() * TileEntityChemicalDissolutionChamber.BASE_TICKS_REQUIRED))
                   .toList();
         }
         initChemical(builder, RecipeIngredientRole.INPUT, inputGauge, scaledChemicals);
-        initChemical(builder, RecipeIngredientRole.OUTPUT, outputGauge, recipe.getOutputDefinition());
+        initChemical(builder, outputGauge, recipe.getOutputDefinition());
     }
 
 }

@@ -7,15 +7,22 @@ import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.tile.interfaces.ISideConfiguration;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
+import org.jetbrains.annotations.UnknownNullability;
 
 public abstract class GuiConfigurableTile<TILE extends TileEntityMekanism & ISideConfiguration, CONTAINER extends MekanismTileContainer<TILE>>
       extends GuiMekanismTile<TILE, CONTAINER> {
 
+    @UnknownNullability//Initialized in #addGuiElements
     private GuiSideConfigurationTab<TILE> sideConfigTab;
+    @UnknownNullability//Initialized in #addGuiElements
     private GuiTransporterConfigTab<TILE> transporterConfigTab;
 
+    protected GuiConfigurableTile(CONTAINER container, Inventory inv, Component title, int imageWidth, int imageHeight) {
+        super(container, inv, title, imageWidth, imageHeight);
+    }
+
     protected GuiConfigurableTile(CONTAINER container, Inventory inv, Component title) {
-        super(container, inv, title);
+        this(container, inv, title, DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT);
     }
 
     @Override

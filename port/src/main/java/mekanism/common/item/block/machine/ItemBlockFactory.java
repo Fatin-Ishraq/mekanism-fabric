@@ -1,14 +1,14 @@
 package mekanism.common.item.block.machine;
 
-import java.util.List;
+import java.util.function.Consumer;
 import mekanism.api.text.EnumColor;
 import mekanism.common.MekanismLang;
-import mekanism.common.attachments.component.AttachedEjector;
-import mekanism.common.attachments.component.AttachedSideConfig;
 import mekanism.common.block.attribute.Attribute;
 import mekanism.common.block.attribute.AttributeFactoryType;
 import mekanism.common.block.prefab.BlockFactoryMachine.BlockFactory;
 import mekanism.common.block.prefab.BlockTile;
+import mekanism.common.component.component.AttachedEjector;
+import mekanism.common.component.component.AttachedSideConfig;
 import mekanism.common.item.block.ItemBlockTooltip;
 import mekanism.common.registries.MekanismDataComponents;
 import mekanism.common.tier.FactoryTier;
@@ -16,7 +16,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.item.component.TooltipDisplay;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
 
 public class ItemBlockFactory extends ItemBlockTooltip<BlockTile<?, ?>> {
 
@@ -29,7 +30,10 @@ public class ItemBlockFactory extends ItemBlockTooltip<BlockTile<?, ?>> {
         };
     }
 
+    private final FactoryTier tier;
+
     public ItemBlockFactory(BlockFactory<?> block, Properties properties) {
+        tier = Attribute.getTierNN(block, FactoryTier.class);
         super(block, true, properties
               .component(MekanismDataComponents.SORTING, false)
               .component(MekanismDataComponents.EJECTOR, AttachedEjector.DEFAULT)
@@ -39,16 +43,17 @@ public class ItemBlockFactory extends ItemBlockTooltip<BlockTile<?, ?>> {
 
     @Override
     public FactoryTier getTier() {
-        return Attribute.getTier(getBlock(), FactoryTier.class);
+        return tier;
     }
 
     @Override
-    protected void addTypeDetails(@NotNull ItemStack stack, @NotNull Item.TooltipContext context, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
+    protected void addTypeDetails(ItemStack stack, ItemAccess itemAccess, Item.TooltipContext context, TooltipDisplay tooltipDisplay,
+          Consumer<Component> tooltipAdder, TooltipFlag flag) {
         //Should always be present but validate it just in case
         AttributeFactoryType factoryType = Attribute.get(getBlock(), AttributeFactoryType.class);
         if (factoryType != null) {
-            tooltip.add(MekanismLang.FACTORY_TYPE.translateColored(EnumColor.INDIGO, EnumColor.GRAY, factoryType.getFactoryType()));
+            tooltipAdder.accept(MekanismLang.FACTORY_TYPE.translateColored(EnumColor.INDIGO, EnumColor.GRAY, factoryType.getFactoryType()));
         }
-        super.addTypeDetails(stack, context, tooltip, flag);
+        super.addTypeDetails(stack, itemAccess, context, tooltipDisplay, tooltipAdder, flag);
     }
 }

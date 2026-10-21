@@ -18,16 +18,15 @@ import mekanism.common.config.IMekanismConfig;
 import mekanism.common.registration.impl.BlockRegistryObject;
 import mekanism.common.registration.impl.FluidRegistryObject;
 import mekanism.common.registration.impl.MekanismDamageType;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.core.Holder;
 import net.minecraft.data.CachedOutput;
 import net.minecraft.data.PackOutput;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.entity.EntityType;
 import mekanism.neoshim.neoforge.common.Tags;
 import mekanism.neoshim.neoforge.common.data.LanguageProvider;
-import org.jetbrains.annotations.NotNull;
 
 public abstract class BaseLanguageProvider extends LanguageProvider {
 
@@ -52,7 +51,8 @@ public abstract class BaseLanguageProvider extends LanguageProvider {
         altProviders = new ConvertibleLanguageProvider[]{
               new UpsideDownLanguageProvider(output, modid),
               new NonAmericanLanguageProvider(output, modid, "en_au"),
-              new NonAmericanLanguageProvider(output, modid, "en_gb")
+              new NonAmericanLanguageProvider(output, modid, "en_gb"),
+              new NonAmericanLanguageProvider(output, modid, "en_ca")
         };
     }
 
@@ -69,7 +69,7 @@ public abstract class BaseLanguageProvider extends LanguageProvider {
         add(key.value().getDescriptionId(), value);
     }
 
-    protected void addModuleConfig(ResourceLocation configKey, String value) {
+    protected void addModuleConfig(Identifier configKey, String value) {
         add(configKey.toLanguageKey("module"), value);
     }
 
@@ -150,11 +150,11 @@ public abstract class BaseLanguageProvider extends LanguageProvider {
     }
 
     protected void addAlias(String path, String translation) {
-        add(Util.makeDescriptionId("alias", ResourceLocation.fromNamespaceAndPath(modid, path)), translation);
+        add(Util.makeDescriptionId("alias", Identifier.fromNamespaceAndPath(modid, path)), translation);
     }
 
     @Override
-    public void add(@NotNull String key, @NotNull String value) {
+    public void add(String key, String value) {
         if (value.contains("%s")) {
             throw new IllegalArgumentException("Values containing substitutions should use explicit numbered indices: " + key + " - " + value);
         }
@@ -167,9 +167,8 @@ public abstract class BaseLanguageProvider extends LanguageProvider {
         }
     }
 
-    @NotNull
     @Override
-    public CompletableFuture<?> run(@NotNull CachedOutput cache) {
+    public CompletableFuture<?> run(CachedOutput cache) {
         CompletableFuture<?> future = super.run(cache);
         if (altProviders.length > 0) {
             CompletableFuture<?>[] futures = new CompletableFuture[altProviders.length + 1];

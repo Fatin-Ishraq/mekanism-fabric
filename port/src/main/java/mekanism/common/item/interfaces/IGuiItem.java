@@ -2,12 +2,12 @@ package mekanism.common.item.interfaces;
 
 import mekanism.common.registration.impl.ContainerTypeRegistryObject;
 import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.world.item.ItemStack;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
 
 public interface IGuiItem {
 
     ContainerTypeRegistryObject<?> getContainerType();
 
-    default void encodeContainerData(RegistryFriendlyByteBuf buf, ItemStack stack) {
+    default void encodeContainerData(RegistryFriendlyByteBuf buf, ItemResource itemType) {
     }
 }

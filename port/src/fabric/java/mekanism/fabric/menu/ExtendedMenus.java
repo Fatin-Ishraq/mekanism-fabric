@@ -10,7 +10,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Player;
@@ -34,7 +34,7 @@ public final class ExtendedMenus {
 
     public record MenuDataPayload(byte[] data) implements CustomPacketPayload {
 
-        public static final Type<MenuDataPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("mekanism_fabric", "menu_data"));
+        public static final Type<MenuDataPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath("mekanism_fabric", "menu_data"));
         public static final StreamCodec<RegistryFriendlyByteBuf, MenuDataPayload> STREAM_CODEC = ByteBufCodecs.BYTE_ARRAY.<RegistryFriendlyByteBuf>cast()
               .map(MenuDataPayload::new, MenuDataPayload::data);
 
@@ -45,7 +45,7 @@ public final class ExtendedMenus {
     }
 
     public static void init() {
-        PayloadTypeRegistry.playS2C().register(MenuDataPayload.TYPE, MenuDataPayload.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(MenuDataPayload.TYPE, MenuDataPayload.STREAM_CODEC);
     }
 
     /** Client: called by the payload receiver. */

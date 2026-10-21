@@ -15,25 +15,34 @@ import mekanism.common.resource.PrimaryResource;
 import mekanism.common.resource.ResourceType;
 import mekanism.common.tags.MekanismTags;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 
 class ControlCircuitRecipeProvider implements ISubRecipeProvider {
 
     private static final RecipePattern circuitPattern = RecipePattern.createPattern(TripleLine.of(Pattern.ALLOY, Pattern.CIRCUIT, Pattern.ALLOY));
 
+    private final HolderGetter<Item> items;
+    private final HolderGetter<Chemical> chemicals;
+
+    public ControlCircuitRecipeProvider(HolderGetter<Item> items, HolderGetter<Chemical> chemicals) {
+        this.items = items;
+        this.chemicals = chemicals;
+    }
+
     @Override
     public void addRecipes(RecipeOutput consumer, HolderLookup.Provider registries) {
         String basePath = "control_circuit/";
         ItemStackChemicalToItemStackRecipeBuilder.metallurgicInfusing(
-              IngredientCreatorAccess.item().from(MekanismTags.Items.PROCESSED_RESOURCES.get(ResourceType.INGOT, PrimaryResource.OSMIUM)),
-              IngredientCreatorAccess.chemicalStack().from(MekanismAPITags.Chemicals.REDSTONE, 20),
-              MekanismItems.BASIC_CONTROL_CIRCUIT.asStack(),
+              IngredientCreatorAccess.item().from(this.items, MekanismTags.Items.getProcessedResource(ResourceType.INGOT, PrimaryResource.OSMIUM)),
+              IngredientCreatorAccess.chemicalStack().from(this.chemicals, MekanismAPITags.Chemicals.REDSTONE, 20),
+              MekanismItems.BASIC_CONTROL_CIRCUIT.asTemplate(),
               false
-        ).build(consumer, Mekanism.rl(basePath + "basic"));
+        ).save(consumer, Mekanism.rl(basePath + "basic"));
         addCircuitUpgradeRecipe(consumer, MekanismItems.ADVANCED_CONTROL_CIRCUIT, MekanismTags.Items.CIRCUITS_BASIC, MekanismTags.Items.ALLOYS_INFUSED, basePath, "advanced");
         addCircuitUpgradeRecipe(consumer, MekanismItems.ELITE_CONTROL_CIRCUIT, MekanismTags.Items.CIRCUITS_ADVANCED, MekanismTags.Items.ALLOYS_REINFORCED, basePath, "elite");
         addCircuitUpgradeRecipe(consumer, MekanismItems.ULTIMATE_CONTROL_CIRCUIT, MekanismTags.Items.CIRCUITS_ELITE, MekanismTags.Items.ALLOYS_ATOMIC, basePath, "ultimate");
@@ -48,17 +57,17 @@ class ControlCircuitRecipeProvider implements ISubRecipeProvider {
           String name) {
         ExtendedShapedRecipeBuilder.shapedRecipe(output)
               .pattern(circuitPattern)
-              .key(Pattern.CIRCUIT, circuitTag)
-              .key(Pattern.ALLOY, alloyTag)
-              .build(consumer, Mekanism.rl(basePath + name));
+              .key(Pattern.CIRCUIT, this.items, circuitTag)
+              .key(Pattern.ALLOY, this.items, alloyTag)
+              .save(consumer, Mekanism.rl(basePath + name));
     }
 
     private void addCircuitInfusionUpgrade(RecipeOutput consumer, Holder<Item> output, TagKey<Item> circuitTag, TagKey<Chemical> infusionType, int singleAlloyAmount, String basePath, String name) {
         ItemStackChemicalToItemStackRecipeBuilder.metallurgicInfusing(
-              IngredientCreatorAccess.item().from(circuitTag),
-              IngredientCreatorAccess.chemicalStack().from(infusionType, singleAlloyAmount * 6), /* 3x 2 alloys */
-              new ItemStack(output),
+              IngredientCreatorAccess.item().from(this.items, circuitTag),
+              IngredientCreatorAccess.chemicalStack().from(this.chemicals, infusionType, singleAlloyAmount * 6), /* 3x 2 alloys */
+              new ItemStackTemplate(output),
               false
-        ).build(consumer, Mekanism.rl(basePath + "infused_" + name));
+        ).save(consumer, Mekanism.rl(basePath + "infused_" + name));
     }
 }

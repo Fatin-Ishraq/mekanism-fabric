@@ -2,7 +2,7 @@ package mekanism.neoshim.neoforge.client.event;
 
 import mekanism.neoshim.bus.api.Event;
 import mekanism.neoshim.bus.api.ICancellableEvent;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import org.jetbrains.annotations.Nullable;
 
@@ -46,12 +46,12 @@ public abstract class ScreenEvent extends Event {
 
     public abstract static class Render extends ScreenEvent {
 
-        private final GuiGraphics guiGraphics;
+        private final GuiGraphicsExtractor guiGraphics;
         private final int mouseX;
         private final int mouseY;
         private final float partialTick;
 
-        protected Render(Screen screen, GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        protected Render(Screen screen, GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
             super(screen);
             this.guiGraphics = guiGraphics;
             this.mouseX = mouseX;
@@ -59,7 +59,7 @@ public abstract class ScreenEvent extends Event {
             this.partialTick = partialTick;
         }
 
-        public GuiGraphics getGuiGraphics() {
+        public GuiGraphicsExtractor getGuiGraphics() {
             return guiGraphics;
         }
 
@@ -77,14 +77,14 @@ public abstract class ScreenEvent extends Event {
 
         public static class Pre extends Render implements ICancellableEvent {
 
-            public Pre(Screen screen, GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+            public Pre(Screen screen, GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
                 super(screen, guiGraphics, mouseX, mouseY, partialTick);
             }
         }
 
         public static class Post extends Render {
 
-            public Post(Screen screen, GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+            public Post(Screen screen, GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
                 super(screen, guiGraphics, mouseX, mouseY, partialTick);
             }
         }

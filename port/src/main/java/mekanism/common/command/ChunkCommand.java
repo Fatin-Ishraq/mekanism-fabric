@@ -22,11 +22,12 @@ import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.chunk.LevelChunk;
 import mekanism.neoshim.bus.api.SubscribeEvent;
 import mekanism.neoshim.neoforge.common.NeoForge;
 import mekanism.neoshim.neoforge.event.level.ChunkEvent;
 import mekanism.neoshim.neoforge.event.level.ChunkTicketLevelUpdatedEvent;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class ChunkCommand {
 
@@ -75,11 +76,11 @@ public class ChunkCommand {
             if (positionFromArgument) {
                 chunkPos = ColumnPosArgument.getColumnPos(ctx, POS_PARAM).toChunkPos();
             } else {
-                chunkPos = new ChunkPos(BlockPos.containing(ctx.getSource().getPosition()));
+                chunkPos = ChunkPos.containing(BlockPos.containing(ctx.getSource().getPosition()));
             }
             String name = hasName ? StringArgumentType.getString(ctx, NAME_PARAM) : null;
             ChunkWatchSettings settings = new ChunkWatchSettings(name, chunkPos);
-            chunkWatchers.put(ChunkPos.asLong(chunkPos.x, chunkPos.z), settings);
+            chunkWatchers.put(chunkPos.pack(), settings);
             ctx.getSource().sendSuccess(() -> settings.translate(WATCH), true);
             return Command.SINGLE_SUCCESS;
         }
@@ -92,7 +93,7 @@ public class ChunkCommand {
                   .requires(MekanismPermissions.COMMAND_CHUNK_UNWATCH)
                   .executes(ctx -> {
                       CommandSourceStack source = ctx.getSource();
-                      return unwatch(source, new ChunkPos(BlockPos.containing(source.getPosition())));
+                      return unwatch(source, ChunkPos.containing(BlockPos.containing(source.getPosition())));
                   }).then(Commands.argument(POS_PARAM, ColumnPosArgument.columnPos())
                         .executes(ctx -> {
                             ColumnPos column = ColumnPosArgument.getColumnPos(ctx, POS_PARAM);
@@ -101,9 +102,9 @@ public class ChunkCommand {
         }
 
         private static int unwatch(CommandSourceStack source, ChunkPos chunkPos) {
-            ChunkWatchSettings settings = chunkWatchers.remove(ChunkPos.asLong(chunkPos.x, chunkPos.z));
+            ChunkWatchSettings settings = chunkWatchers.remove(chunkPos.pack());
             if (settings == null) {
-                source.sendFailure(MekanismLang.COMMAND_ERROR_NOT_WATCHED.translate(MekanismLang.GENERIC_WITH_COMMA.translate(chunkPos.x, chunkPos.z)));
+                source.sendFailure(MekanismLang.COMMAND_ERROR_NOT_WATCHED.translate(MekanismLang.GENERIC_WITH_COMMA.translate(chunkPos.x(), chunkPos.z())));
                 return 0;
             }
             source.sendSuccess(() -> settings.translate(UNWATCH), true);
@@ -167,13 +168,13 @@ public class ChunkCommand {
         }
     }
 
-    private static void handleChunkEvent(ChunkEvent event, LangData direction) {
+    private static void handleChunkEvent(ChunkEvent<LevelChunk> event, LangData direction) {
         LevelAccessor level = event.getLevel();
-        if (level != null && !level.isClientSide()) {
+        if (!level.isClientSide()) {
             if (chunkWatchers.isEmpty() || level.players().isEmpty()) {
                 return;
             }
-            ChunkWatchSettings settings = chunkWatchers.get(event.getChunk().getPos().toLong());
+            ChunkWatchSettings settings = chunkWatchers.get(event.getChunk().getPos().pack());
             if (settings != null) {
                 Component message = settings.translate(direction);
                 for (Player player : level.players()) {
@@ -189,7 +190,7 @@ public class ChunkCommand {
     private record ChunkWatchSettings(Component name, Component position) {
 
         private ChunkWatchSettings(@Nullable String name, ChunkPos pos) {
-            this(name == null ? CommonComponents.EMPTY : TextComponentUtil.getString(name), MekanismLang.GENERIC_WITH_COMMA.translate(pos.x, pos.z));
+            this(name == null ? CommonComponents.EMPTY : TextComponentUtil.getString(name), MekanismLang.GENERIC_WITH_COMMA.translate(pos.x(), pos.z()));
         }
 
         public Component translate(LangData langData) {

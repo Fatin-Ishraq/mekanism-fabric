@@ -8,18 +8,18 @@ import com.blamejared.crafttweaker.api.ingredient.IIngredient;
 import com.blamejared.crafttweaker.api.item.IItemStack;
 import com.blamejared.crafttweaker.api.recipe.manager.base.IRecipeManager;
 import java.util.List;
-import mekanism.api.chemical.ChemicalStack;
+import mekanism.api.chemical.ChemicalStackTemplate;
 import mekanism.api.recipes.MekanismRecipe;
 import mekanism.common.Mekanism;
 import mekanism.common.integration.crafttweaker.CrTConstants;
 import mekanism.common.integration.crafttweaker.chemical.ICrTChemicalStack;
 import mekanism.common.recipe.IMekanismRecipeTypeProvider;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeInput;
 import net.minecraft.world.item.crafting.RecipeType;
-import mekanism.neoshim.neoforge.fluids.FluidStack;
+import mekanism.neoshim.neoforge.fluids.FluidStackTemplate;
 import org.openzen.zencode.java.ZenCodeType;
 
 @ZenRegister
@@ -45,7 +45,7 @@ public abstract class MekanismRecipeManager<INPUT extends RecipeInput, RECIPE ex
     }
 
     @Override
-    public ResourceLocation getBracketResourceLocation() {
+    public Identifier getBracketResourceLocation() {
         //Short circuit reverse lookup and just grab it from our recipe type
         return recipeType.getRegistryName();
     }
@@ -62,24 +62,24 @@ public abstract class MekanismRecipeManager<INPUT extends RecipeInput, RECIPE ex
         throw new UnsupportedOperationException("Mekanism's recipe managers don't support removal by output, please remove by recipe name.");
     }
 
-    protected ItemStack getAndValidateNotEmpty(IItemStack stack) {
+    protected ItemStackTemplate getAndValidateNotEmpty(IItemStack stack) {
         if (stack.isEmpty()) {
             throw new IllegalArgumentException("Output stack cannot be empty.");
         }
-        return stack.getImmutableInternal();
+        return ItemStackTemplate.fromNonEmptyStack(stack.getImmutableInternal());
     }
 
-    protected FluidStack getAndValidateNotEmpty(IFluidStack stack) {
+    protected FluidStackTemplate getAndValidateNotEmpty(IFluidStack stack) {
         if (stack.isEmpty()) {
             throw new IllegalArgumentException("Output stack cannot be empty.");
         }
-        return stack.getImmutableInternal();
+        return FluidStackTemplate.fromNonEmptyStack(stack.getImmutableInternal());
     }
 
-    protected ChemicalStack getAndValidateNotEmpty(ICrTChemicalStack stack) {
+    protected ChemicalStackTemplate getAndValidateNotEmpty(ICrTChemicalStack stack) {
         if (stack.isEmpty()) {
             throw new IllegalArgumentException("Output stack cannot be empty.");
         }
-        return stack.getImmutableInternal();
+        return ChemicalStackTemplate.fromNonEmptyStack(stack.getImmutableInternal());
     }
 }

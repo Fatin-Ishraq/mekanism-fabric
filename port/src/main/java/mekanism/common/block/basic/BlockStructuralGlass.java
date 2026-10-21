@@ -8,45 +8,42 @@ import mekanism.common.util.WorldUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
-import org.jetbrains.annotations.NotNull;
 
 public class BlockStructuralGlass<TILE extends TileEntityStructuralMultiblock> extends BlockTileGlass<TILE, BlockTypeTile<TILE>> {
 
-    public BlockStructuralGlass(BlockTypeTile<TILE> type) {
-        super(type);
+    public BlockStructuralGlass(BlockTypeTile<TILE> type, BlockBehaviour.Properties properties) {
+        super(type, properties);
     }
 
-    @NotNull
     @Override
-    protected ItemInteractionResult useItemOn(@NotNull ItemStack stack, @NotNull BlockState state, @NotNull Level world, @NotNull BlockPos pos, @NotNull Player player,
-          @NotNull InteractionHand hand, @NotNull BlockHitResult hit) {
+    protected InteractionResult useItemOn(ItemStack stack, BlockState state, Level world, BlockPos pos, Player player,
+          InteractionHand hand, BlockHitResult hit) {
         TileEntityStructuralMultiblock tile = WorldUtils.getTileEntity(TileEntityStructuralMultiblock.class, world, pos);
         if (tile == null) {
-            return ItemInteractionResult.SKIP_DEFAULT_BLOCK_INTERACTION;
-        } else if (world.isClientSide) {
+            return InteractionResult.FAIL;
+        } else if (world.isClientSide()) {
             if (!MekanismUtils.canUseAsWrench(stack) && !tile.structuralGuiAccessAllowed()) {
                 //If the block's multiblock doesn't allow gui access via structural multiblocks (for example the evaporation plant),
                 // or if the multiblock is not formed then pass
-                return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+                return InteractionResult.TRY_WITH_EMPTY_HAND;
             }
-            return ItemInteractionResult.SUCCESS;
+            return InteractionResult.SUCCESS;
         }
-        ItemInteractionResult wrenchResult = tile.tryWrench(state, player, stack).getInteractionResult();
-        if (wrenchResult.result() != InteractionResult.PASS) {
+        InteractionResult wrenchResult = tile.tryWrench(world, state, player, stack).getInteractionResult();
+        if (wrenchResult != InteractionResult.PASS) {
             return wrenchResult;
         }
-        return tile.onActivate(player, hand, stack);
+        return tile.onActivate(world, player, hand);
     }
 
-    @NotNull
     @Override
-    protected InteractionResult useWithoutItem(@NotNull BlockState state, @NotNull Level world, @NotNull BlockPos pos, @NotNull Player player, @NotNull BlockHitResult hit) {
+    protected InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult hit) {
         //We handle opening the gui via useItemOn
         return InteractionResult.PASS;
     }

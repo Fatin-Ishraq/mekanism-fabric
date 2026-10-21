@@ -14,7 +14,7 @@ public interface ICreativeModeTabBuilderExtension {
     }
 
     /** Tab ordering hints: Fabric orders modded tabs by registration (Mekanism core registers first), so these are no-ops. */
-    default CreativeModeTab.Builder withTabsBefore(net.minecraft.resources.ResourceLocation... tabs) {
+    default CreativeModeTab.Builder withTabsBefore(net.minecraft.resources.Identifier... tabs) {
         return (CreativeModeTab.Builder) this;
     }
 
@@ -23,7 +23,7 @@ public interface ICreativeModeTabBuilderExtension {
         return (CreativeModeTab.Builder) this;
     }
 
-    default CreativeModeTab.Builder withTabsAfter(net.minecraft.resources.ResourceLocation... tabs) {
+    default CreativeModeTab.Builder withTabsAfter(net.minecraft.resources.Identifier... tabs) {
         return (CreativeModeTab.Builder) this;
     }
 

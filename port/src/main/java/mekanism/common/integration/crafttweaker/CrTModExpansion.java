@@ -21,39 +21,33 @@ import org.openzen.zencode.java.ZenCodeType;
 @TypedExpansion(Mod.class)
 public class CrTModExpansion {
 
-    /**
-     * Gets the chemicals that are registered under this mod's ID.
-     *
-     * @return A list of chemicals that were registered under this mod's ID.
-     */
+    /// Gets the chemicals that are registered under this mod's ID.
+    ///
+    /// @return A list of chemicals that were registered under this mod's ID.
     @ZenCodeType.Method
     @ZenCodeType.Getter("chemicals")
     public static Collection<Chemical> getChemicals(Mod _this) {
         return getModSpecific(_this, MekanismAPI.CHEMICAL_REGISTRY);
     }
 
-    /**
-     * Gets the module types that are registered under this mod's ID.
-     *
-     * @return A list of module types that were registered under this mod's ID.
-     */
+    /// Gets the module types that are registered under this mod's ID.
+    ///
+    /// @return A list of module types that were registered under this mod's ID.
     @ZenCodeType.Method
     @ZenCodeType.Getter("modules")
     public static Collection<ModuleData<?>> getModules(Mod _this) {
         return getModSpecific(_this, MekanismAPI.MODULE_REGISTRY);
     }
 
-    /**
-     * Gets the robit skins that are registered under this mod's ID.
-     *
-     * @return A list of robit skins that were registered under this mod's ID.
-     */
+    /// Gets the robit skins that are registered under this mod's ID.
+    ///
+    /// @return A list of robit skins that were registered under this mod's ID.
     @ZenCodeType.Method
     @ZenCodeType.Getter("robitSkins")
     public static Collection<RobitSkin> getRobitSkins(Mod _this) {
         return getModSpecific(_this, CraftTweakerAPI.getAccessibleElementsProvider()
               .registryAccess()
-              .registryOrThrow(MekanismAPI.ROBIT_SKIN_REGISTRY_NAME)
+              .lookupOrThrow(MekanismAPI.ROBIT_SKIN_REGISTRY_NAME)
               .entrySet());
     }
 
@@ -64,7 +58,7 @@ public class CrTModExpansion {
     private static <TYPE> Collection<TYPE> getModSpecific(Mod mod, Set<Entry<ResourceKey<TYPE>, TYPE>> allElements) {
         List<TYPE> list = new ArrayList<>();
         for (Entry<ResourceKey<TYPE>, TYPE> entry : allElements) {
-            if (entry.getKey().location().getNamespace().equals(mod.id())) {
+            if (entry.getKey().identifier().getNamespace().equals(mod.id())) {
                 list.add(entry.getValue());
             }
         }

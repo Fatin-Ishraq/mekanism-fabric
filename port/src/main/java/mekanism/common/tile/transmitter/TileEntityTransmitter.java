@@ -1,8 +1,8 @@
 package mekanism.common.tile.transmitter;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.function.Predicate;
 import mekanism.api.IAlloyInteraction;
 import mekanism.api.IConfigurable;
 import mekanism.api.text.EnumColor;
@@ -18,12 +18,14 @@ import mekanism.common.block.states.TransmitterType.Size;
 import mekanism.common.block.transmitter.BlockLargeTransmitter;
 import mekanism.common.block.transmitter.BlockSmallTransmitter;
 import mekanism.common.capabilities.Capabilities;
+import mekanism.common.capabilities.holder.IHolder;
 import mekanism.common.capabilities.proxy.ProxyConfigurable;
 import mekanism.common.capabilities.proxy.ProxyConfigurable.ISidedConfigurable;
 import mekanism.common.capabilities.resolver.BasicSidedCapabilityResolver;
 import mekanism.common.content.network.transmitter.BufferedTransmitter;
 import mekanism.common.content.network.transmitter.IUpgradeableTransmitter;
 import mekanism.common.content.network.transmitter.Transmitter;
+import mekanism.common.lib.transaction.TransactionHelper;
 import mekanism.common.lib.transmitter.ConnectionType;
 import mekanism.common.lib.transmitter.DynamicBufferedNetwork;
 import mekanism.common.lib.transmitter.DynamicNetwork;
@@ -37,8 +39,6 @@ import mekanism.common.util.WorldUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
@@ -47,17 +47,20 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import mekanism.neoshim.neoforge.capabilities.ICapabilityProvider;
-import mekanism.neoshim.neoforge.client.model.data.ModelData;
-import mekanism.neoshim.neoforge.client.model.data.ModelProperty;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.model.data.ModelData;
+import mekanism.neoshim.neoforge.model.data.ModelProperty;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-public abstract class TileEntityTransmitter extends CapabilityTileEntity implements ISidedConfigurable, IAlloyInteraction {
+public abstract class TileEntityTransmitter extends CapabilityTileEntity implements ISidedConfigurable, IAlloyInteraction, IHolder {
 
-    public static final ICapabilityProvider<TileEntityTransmitter, @Nullable Direction, IConfigurable> CONFIGURABLE_PROVIDER =
-          capabilityProvider(Capabilities.CONFIGURABLE, (tile, cap) -> new BasicSidedCapabilityResolver<>(tile, cap, ProxyConfigurable::new));
+    public static final ICapabilityProvider<TileEntityTransmitter, @Nullable Direction, IConfigurable> CONFIGURABLE_PROVIDER = capabilityProvider(Capabilities.CONFIGURABLE,
+          (tile, cap) -> new BasicSidedCapabilityResolver<>(tile, cap, ProxyConfigurable::new));
 
     public static final ModelProperty<TransmitterModelData> TRANSMITTER_PROPERTY = new ModelProperty<>();
 
@@ -79,7 +82,7 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
     }
 
     @Override
-    public void setLevel(@NotNull Level level) {
+    public void setLevel(Level level) {
         super.setLevel(level);
         if (level instanceof ServerLevel serverLevel) {
             getTransmitter().getAcceptorCache().initializeCache(serverLevel);
@@ -92,9 +95,9 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
 
     public abstract TransmitterType getTransmitterType();
 
-    protected void onUpdateServer() {
+    protected void onUpdateServer(ServerLevel level) {
         if (markJoined) {
-            onWorldJoin(false);
+            onWorldJoin(level, false);
             markJoined = false;
         }
         if (forceUpdate) {
@@ -104,45 +107,45 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
     }
 
     public static void tickServer(Level level, BlockPos pos, BlockState state, TileEntityTransmitter transmitter) {
-        transmitter.onUpdateServer();
-    }
-
-    @NotNull
-    @Override
-    public CompoundTag getReducedUpdateTag(@NotNull HolderLookup.Provider provider) {
-        return getTransmitter().getReducedUpdateTag(provider, super.getReducedUpdateTag(provider));
+        transmitter.onUpdateServer((ServerLevel) level);
     }
 
     @Override
-    public void handleUpdateTag(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider provider) {
-        super.handleUpdateTag(tag, provider);
-        if (getTransmitter().handleUpdateTag(tag, provider)) {
+    public void writeReducedUpdatedTag(ValueOutput output) {
+        super.writeReducedUpdatedTag(output);
+        getTransmitter().writeReducedUpdatedTag(output);
+    }
+
+    @Override
+    public void handleUpdateTag(ValueInput input) {
+        super.loadAdditional(input);//we do NOT call super directly, as it will call a load and the below check never sees the changes
+        if (getTransmitter().handleUpdateTag(input)) {
             //Only update the model data if something got updated that caused the model data to change
             updateModelData();
         }
     }
 
     @Override
-    public void loadAdditional(@NotNull CompoundTag nbt, @NotNull HolderLookup.Provider provider) {
-        super.loadAdditional(nbt, provider);
-        getTransmitter().read(provider, nbt);
+    public void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
+        getTransmitter().read(input);
     }
 
     @Override
-    public void saveAdditional(@NotNull CompoundTag nbtTags, @NotNull HolderLookup.Provider provider) {
-        super.saveAdditional(nbtTags, provider);
-        getTransmitter().write(provider, nbtTags);
+    public void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
+        getTransmitter().write(output);
     }
 
-    public void onNeighborBlockChange(Direction side) {
+    public void onNeighborBlockChange(@Nullable Direction side) {
         getTransmitter().onNeighborBlockChange(side);
     }
 
     @Override
     public void clearRemoved() {
         super.clearRemoved();
-        if (isRemote()) {
-            onWorldJoin(false);
+        if (level != null && level.isClientSide()) {
+            onWorldJoin(level, false);
         } else {
             markJoined = true;
         }
@@ -152,7 +155,7 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
     public void onChunkUnloaded() {
         if (!isRemote()) {
             //Only take the transmitter's share if it was unloaded and not if we are being removed
-            getTransmitter().validateAndTakeShare();
+            getTransmitter().validateAndTakeShare(null);
         }
         super.onChunkUnloaded();
     }
@@ -165,14 +168,14 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
     }
 
     @Override
-    public void onAdded() {
-        super.onAdded();
-        onWorldJoin(false);
+    public void onAdded(Level level) {
+        super.onAdded(level);
+        onWorldJoin(level, false);
         getTransmitter().refreshConnections();
     }
 
-    private void onWorldJoin(boolean wasPresent) {
-        if (!isRemote() && !wasPresent) {
+    private void onWorldJoin(Level level, boolean wasPresent) {
+        if (!level.isClientSide() && !wasPresent) {
             //If we weren't already present, and we are on the server, track this transmitter
             TransmitterNetworkRegistry.trackTransmitter(getTransmitter());
         }
@@ -205,10 +208,10 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
     public void chunkAccessibilityChange(boolean loaded) {
         if (loaded) {
             //Chunk went from "unloaded" to loaded
-            onWorldJoin(true);
+            onWorldJoin(level, true);
         } else {
             //Chunk went from loaded to "unloaded", need to take the share first like normally happens when it unloads
-            getTransmitter().validateAndTakeShare();
+            getTransmitter().validateAndTakeShare(null);
             onWorldSeparate(true);
         }
     }
@@ -233,7 +236,7 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
                     list.add(dir);
                 }
             }
-            int boxIndex = result.subHit + 1;
+            int boxIndex = result.subHit() + 1;
             if (boxIndex < list.size()) {
                 return list.get(boxIndex);
             }
@@ -241,10 +244,9 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
         return null;
     }
 
-    @NotNull
     @Override
-    public InteractionResult onSneakRightClick(@NotNull Player player, @NotNull Direction side) {
-        if (!isRemote()) {
+    public InteractionResult onSneakRightClick(Level level, Player player, Direction side) {
+        if (!level.isClientSide()) {
             Direction hitSide = getSideLookingAt(player);
             if (hitSide == null) {
                 if (transmitter.getConnectionTypeRaw(side) != ConnectionType.NONE) {
@@ -264,7 +266,7 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
             getTransmitter().onModeChange(Direction.from3DDataValue(hitSide.ordinal()));
             getTransmitter().refreshConnections();
             getTransmitter().notifyTileChange();
-            player.displayClientMessage(MekanismLang.CONNECTION_TYPE.translateColored(EnumColor.GRAY, transmitter.getConnectionTypeRaw(hitSide)), true);
+            player.sendOverlayMessage(MekanismLang.CONNECTION_TYPE.translateColored(EnumColor.GRAY, transmitter.getConnectionTypeRaw(hitSide)));
             sendUpdatePacket();
         }
         return InteractionResult.SUCCESS;
@@ -275,10 +277,9 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
         return getTransmitter().onConfigure(player, side);
     }
 
-    @NotNull
     @Override
-    public InteractionResult onRightClick(@NotNull Player player, @NotNull Direction side) {
-        return getTransmitter().onRightClick(player, side);
+    public InteractionResult onRightClick(Level level, Player player, Direction side) {
+        return getTransmitter().onRightClick(level, player, side);
     }
 
     public List<VoxelShape> getCollisionBoxes() {
@@ -299,7 +300,6 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
         return list;
     }
 
-    @NotNull
     @Override
     public ModelData getModelData() {
         TransmitterModelData data = initModelData();
@@ -308,28 +308,25 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
     }
 
     protected void updateModelData(TransmitterModelData modelData) {
+        Transmitter<?, ?, ?> myTransmitter = getTransmitter();
         //Update the data, using information about if there is actually a connection on a given side
+        ConnectionType[] connections = new ConnectionType[EnumUtils.DIRECTIONS.length];
         for (Direction side : EnumUtils.DIRECTIONS) {
-            modelData.setConnectionData(side, getTransmitter().getConnectionType(side));
+            connections[side.ordinal()] = myTransmitter.getConnectionType(side);
         }
+        modelData.setConnectionData(connections);
     }
 
-    @NotNull
     protected TransmitterModelData initModelData() {
         return new TransmitterModelData();
     }
 
     @Override
-    public void onAlloyInteraction(Player player, ItemStack stack, @NotNull IAlloyTier tier) {
-        if (getLevel() != null && getTransmitter().hasTransmitterNetwork()) {
-            DynamicNetwork<?, ?, ?> transmitterNetwork = getTransmitter().getTransmitterNetwork();
+    public void onAlloyInteraction(Level level, BlockPos pos, Player player, ItemStack stack, IAlloyTier tier) {
+        if (getTransmitter().hasTransmitterNetwork()) {
+            DynamicNetwork<?, ?, ?> transmitterNetwork = getTransmitter().getTransmitterNetworkNN();
             List<Transmitter<?, ?, ?>> list = new ArrayList<>(transmitterNetwork.getTransmitters());
-            list.sort((o1, o2) -> {
-                if (o1 != null && o2 != null) {
-                    return Double.compare(o1.getBlockPos().distSqr(worldPosition), o2.getBlockPos().distSqr(worldPosition));
-                }
-                return 0;
-            });
+            list.sort(Comparator.comparingDouble(transmitter -> transmitter.getBlockPos().distSqr(pos)));
             boolean sharesSet = false;
             int upgraded = 0;
             for (Transmitter<?, ?, ?> transmitter : list) {
@@ -344,26 +341,31 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
                     if (!sharesSet) {
                         if (transmitterNetwork instanceof DynamicBufferedNetwork dynamicNetwork) {
                             //Ensure we save the shares to the tiles so that they can properly take them, and they don't get voided
-                            dynamicNetwork.validateSaveShares((BufferedTransmitter<?, ?, ?, ?>) transmitter);
+                            try (Transaction transaction = TransactionHelper.openTransactionSafe()) {
+                                dynamicNetwork.validateSaveShares((BufferedTransmitter<?, ?, ?, ?>) transmitter, transaction);
+                                transaction.commit();
+                            }
                         }
                         sharesSet = true;
                     }
                     transmitter.startUpgrading();
                     TransmitterUpgradeData upgradeData = upgradeableTransmitter.getUpgradeData();
                     BlockPos transmitterPos = transmitter.getBlockPos();
-                    Level transmitterWorld = transmitter.getLevel();
                     if (upgradeData == null) {
                         Mekanism.logger.warn("Got no upgrade data for transmitter at position: {} in {} but it said it would be able to provide some.",
-                              transmitterPos, transmitterWorld);
+                              transmitterPos, level);
                     } else {
-                        transmitterWorld.setBlockAndUpdate(transmitterPos, upgradeState);
-                        TileEntityTransmitter upgradedTile = WorldUtils.getTileEntity(TileEntityTransmitter.class, transmitterWorld, transmitterPos);
+                        level.setBlockAndUpdate(transmitterPos, upgradeState);
+                        TileEntityTransmitter upgradedTile = WorldUtils.getTileEntity(TileEntityTransmitter.class, level, transmitterPos);
                         if (upgradedTile == null) {
-                            Mekanism.logger.warn("Error upgrading transmitter at position: {} in {}.", transmitterPos, transmitterWorld);
+                            Mekanism.logger.warn("Error upgrading transmitter at position: {} in {}.", transmitterPos, level);
                         } else {
                             Transmitter<?, ?, ?> upgradedTransmitter = upgradedTile.getTransmitter();
                             if (upgradedTransmitter instanceof IUpgradeableTransmitter) {
-                                transferUpgradeData((IUpgradeableTransmitter<?>) upgradedTransmitter, upgradeData);
+                                try (Transaction transaction = TransactionHelper.openTransactionSafe()) {
+                                    transferUpgradeData((IUpgradeableTransmitter<?>) upgradedTransmitter, upgradeData, transaction);
+                                    transaction.commit();
+                                }
                             } else {
                                 Mekanism.logger.warn("Unhandled upgrade data.", new IllegalStateException());
                             }
@@ -378,9 +380,8 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
             if (upgraded > 0) {
                 //Invalidate the network so that it properly has new references to everything
                 transmitterNetwork.invalidate(null);
-                if (!player.isCreative()) {
-                    stack.shrink(1);
-                }
+                //TODO - 26.1: Figure out what other uses of ItemStack#shrink should be replaced with ItemStack#consume
+                stack.consume(1, player);
                 if (player instanceof ServerPlayer serverPlayer) {
                     MekanismCriteriaTriggers.ALLOY_UPGRADE.value().trigger(serverPlayer);
                 }
@@ -388,16 +389,15 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
         }
     }
 
-    private <DATA extends TransmitterUpgradeData> void transferUpgradeData(IUpgradeableTransmitter<DATA> upgradeableTransmitter, TransmitterUpgradeData data) {
+    private <DATA extends TransmitterUpgradeData> void transferUpgradeData(IUpgradeableTransmitter<DATA> upgradeableTransmitter, TransmitterUpgradeData data, TransactionContext transaction) {
         if (upgradeableTransmitter.dataTypeMatches(data)) {
-            upgradeableTransmitter.parseUpgradeData((DATA) data);
+            upgradeableTransmitter.parseUpgradeData((DATA) data, transaction);
         } else {
             Mekanism.logger.warn("Unhandled upgrade data.", new IllegalStateException());
         }
     }
 
-    @NotNull
-    protected BlockState upgradeResult(@NotNull BlockState current, int tierLevel) {
+    protected BlockState upgradeResult(BlockState current, int tierLevel) {
         BaseTier tier = BaseTier.getTier(tierLevel);
         if (tier == null) {
             return current;
@@ -405,39 +405,34 @@ public abstract class TileEntityTransmitter extends CapabilityTileEntity impleme
         return upgradeResult(current, tier);
     }
 
-    @NotNull
-    protected BlockState upgradeResult(@NotNull BlockState current, @NotNull BaseTier tier) {
+    protected BlockState upgradeResult(BlockState current, BaseTier tier) {
         return current;
     }
 
-    public void sideChanged(@NotNull Direction side, @NotNull ConnectionType old, @NotNull ConnectionType type) {
+    public void sideChanged(Direction side, ConnectionType old, ConnectionType type) {
     }
 
-    /**
-     * Called if the transmitter handles redstone and the redstone activity state has changed.
-     */
+    /// Called if the transmitter handles redstone and the redstone activity state has changed.
     public void redstoneChanged(boolean powered) {
     }
 
-    protected Predicate<@Nullable Direction> getExtractPredicate() {
-        return side -> {
-            if (side == null) {
-                //Note: We return true here, but extraction isn't actually allowed and gets blocked by the read only handler
-                return true;
-            }
-            //If we have a side only allow extracting if our connection allows it
-            return getTransmitter().getConnectionType(side).canSendTo();
-        };
+    @Override
+    public boolean canExtract(@Nullable Direction side) {
+        if (side == null) {
+            //Note: We return true here, but extraction isn't actually allowed and gets blocked by the read only handler
+            return true;
+        }
+        //If we have a side only allow extracting if our connection allows it
+        return getTransmitter().getConnectionType(side).canSendTo();
     }
 
-    protected Predicate<@Nullable Direction> getInsertPredicate() {
-        return side -> {
-            if (side == null) {
-                //Note: We return true here, but insertion isn't actually allowed and gets blocked by the read only handler
-                return true;
-            }
-            //If we have a side only allow inserting if our connection allows it
-            return getTransmitter().getConnectionType(side).canAccept();
-        };
+    @Override
+    public boolean canInsert(@Nullable Direction side) {
+        if (side == null) {
+            //Note: We return true here, but insertion isn't actually allowed and gets blocked by the read only handler
+            return true;
+        }
+        //If we have a side only allow inserting if our connection allows it
+        return getTransmitter().getConnectionType(side).canAccept();
     }
 }

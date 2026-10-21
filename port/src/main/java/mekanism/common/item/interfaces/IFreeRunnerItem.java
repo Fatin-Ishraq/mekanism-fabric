@@ -6,14 +6,16 @@ import java.util.Locale;
 import java.util.function.IntFunction;
 import java.util.function.Predicate;
 import mekanism.api.IIncrementalEnum;
-import mekanism.api.annotations.NothingNullByDefault;
-import mekanism.api.energy.IEnergyContainer;
 import mekanism.api.text.EnumColor;
 import mekanism.api.text.IHasTextComponent.IHasEnumNameTextComponent;
 import mekanism.api.text.ILangEntry;
 import mekanism.common.Mekanism;
 import mekanism.common.MekanismLang;
+import mekanism.common.capabilities.Capabilities;
 import mekanism.common.integration.curios.CuriosIntegration;
+import mekanism.common.util.ItemAccessUtils;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -21,18 +23,16 @@ import net.minecraft.util.ByIdMap;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.item.Item;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.energy.EnergyHandler;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public interface IFreeRunnerItem {
 
-    FreeRunnerMode getFreeRunnerMode(ItemStack stack);
+    <ITEM extends TypedInstance<Item> & DataComponentGetter> FreeRunnerMode getFreeRunnerMode(ITEM instance);
 
-    @Nullable
-    IEnergyContainer getRunnerEnergyContainer(ItemStack stack);
-
-    @NothingNullByDefault
     enum FreeRunnerMode implements IIncrementalEnum<FreeRunnerMode>, IHasEnumNameTextComponent, StringRepresentable {
         NORMAL(MekanismLang.FREE_RUNNER_NORMAL, EnumColor.DARK_GREEN, true, true),
         SAFETY(MekanismLang.FREE_RUNNER_SAFETY, EnumColor.ORANGE, true, false),
@@ -80,47 +80,44 @@ public interface IFreeRunnerItem {
         }
     }
 
-    /**
-     * Gets the first found active pair (pair with energy) of free runners for an entity, if any are worn.
-     * <br>
-     * If Curios is loaded, the curio slots will be checked as well.
-     *
-     * @param entity the entity on which to look for the free runners
-     *
-     * @return the free runners stack if present, otherwise an empty stack
-     */
-    @NotNull
-    static ItemStack getActiveFreeRunners(LivingEntity entity) {
-        return getFreeRunners(entity, stack -> {
-            if (stack.getItem() instanceof IFreeRunnerItem freeRunners) {
-                IEnergyContainer energyContainer = freeRunners.getRunnerEnergyContainer(stack);
-                return energyContainer != null && !energyContainer.isEmpty();
+    /// Gets the first found active pair (pair with energy) of free runners for an entity, if any are worn.
+    ///
+    /// If Curios is loaded, the curio slots will be checked as well.
+    ///
+    /// @param entity the entity on which to look for the free runners
+    ///
+    /// @return the free runners stack if present, otherwise an empty stack
+    @Nullable
+    static ItemAccess getActiveFreeRunners(LivingEntity entity) {
+        return getFreeRunners(entity, itemAccess -> {
+            if (itemAccess.getResource().getItem() instanceof IFreeRunnerItem) {
+                EnergyHandler energyHandler = Capabilities.ENERGY.getCapability(itemAccess);
+                return energyHandler != null && energyHandler.getAmountAsLong() > 0;
             }
             return false;
         });
     }
 
-    /**
-     * Gets the first found free runners from an entity, if one is worn. Purpose of this is to get the correct free runner mode to use.
-     * <br>
-     * If Curios is loaded, the curio slots will be checked as well.
-     *
-     * @param entity the entity on which to look for the free runners
-     *
-     * @return the free runners stack if present, otherwise an empty stack
-     */
-    @NotNull
-    static ItemStack getPrimaryFreeRunners(LivingEntity entity) {
-        return getFreeRunners(entity, stack -> stack.getItem() instanceof IFreeRunnerItem);
+    /// Gets the first found free runners from an entity, if one is worn. Purpose of this is to get the correct free runner mode to use.
+    ///
+    /// If Curios is loaded, the curio slots will be checked as well.
+    ///
+    /// @param entity the entity on which to look for the free runners
+    ///
+    /// @return the free runners stack if present, otherwise an empty stack
+    static ItemResource getPrimaryFreeRunners(LivingEntity entity) {
+        ItemAccess freeRunners = getFreeRunners(entity, itemAccess -> itemAccess.getResource().getItem() instanceof IFreeRunnerItem);
+        return freeRunners == null ? ItemResource.EMPTY : freeRunners.getResource();
     }
 
-    private static ItemStack getFreeRunners(LivingEntity entity, Predicate<ItemStack> matcher) {
-        ItemStack feet = entity.getItemBySlot(EquipmentSlot.FEET);
+    @Nullable
+    private static ItemAccess getFreeRunners(LivingEntity entity, Predicate<ItemAccess> matcher) {
+        ItemAccess feet = ItemAccessUtils.forEntitySlot(entity, EquipmentSlot.FEET);
         if (matcher.test(feet)) {
             return feet;
         } else if (Mekanism.hooks.curios.isLoaded()) {
             return CuriosIntegration.findFirstCurio(entity, matcher);
         }
-        return ItemStack.EMPTY;
+        return null;
     }
 }

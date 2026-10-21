@@ -4,27 +4,26 @@ import mekanism.common.Mekanism;
 import mekanism.common.base.IModModule;
 import mekanism.common.lib.Version;
 import mekanism.tools.common.config.MekanismToolsConfig;
-import mekanism.tools.common.registries.ToolsArmorMaterials;
 import mekanism.tools.common.registries.ToolsCreativeTabs;
 import mekanism.tools.common.registries.ToolsItems;
 import mekanism.tools.common.registries.ToolsRecipeSerializers;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import mekanism.neoshim.bus.api.IEventBus;
 import mekanism.neoshim.fml.ModContainer;
 import mekanism.neoshim.fml.common.Mod;
 import mekanism.neoshim.fml.event.lifecycle.FMLCommonSetupEvent;
 import mekanism.neoshim.neoforge.common.NeoForge;
+import org.jspecify.annotations.Nullable;
 
 @Mod(MekanismTools.MODID)
 public class MekanismTools implements IModModule {
 
     public static final String MODID = "mekanismtools";
 
+    @Nullable
     public static MekanismTools instance;
 
-    /**
-     * MekanismTools version number
-     */
+    /// MekanismTools version number
     public final Version versionNumber;
 
     public MekanismTools(ModContainer modContainer, IEventBus modEventBus) {
@@ -37,14 +36,13 @@ public class MekanismTools implements IModModule {
 
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(MekanismToolsConfig::onConfigLoad);
-        ToolsArmorMaterials.ARMOR_MATERIALS.register(modEventBus);
         ToolsItems.ITEMS.register(modEventBus);
         ToolsCreativeTabs.CREATIVE_TABS.register(modEventBus);
         ToolsRecipeSerializers.RECIPE_SERIALIZERS.register(modEventBus);
     }
 
-    public static ResourceLocation rl(String path) {
-        return ResourceLocation.fromNamespaceAndPath(MODID, path);
+    public static Identifier rl(String path) {
+        return Identifier.fromNamespaceAndPath(MODID, path);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {

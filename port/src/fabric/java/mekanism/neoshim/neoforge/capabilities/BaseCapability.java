@@ -1,20 +1,20 @@
 package mekanism.neoshim.neoforge.capabilities;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public abstract class BaseCapability<T, C> {
 
-    private final ResourceLocation name;
+    private final Identifier name;
     private final Class<T> typeClass;
     private final Class<C> contextClass;
 
-    protected BaseCapability(ResourceLocation name, Class<T> typeClass, Class<C> contextClass) {
+    protected BaseCapability(Identifier name, Class<T> typeClass, Class<C> contextClass) {
         this.name = name;
         this.typeClass = typeClass;
         this.contextClass = contextClass;
     }
 
-    public final ResourceLocation name() {
+    public final Identifier name() {
         return name;
     }
 

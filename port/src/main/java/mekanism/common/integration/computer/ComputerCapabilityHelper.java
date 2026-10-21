@@ -14,7 +14,6 @@ public class ComputerCapabilityHelper {
             //If ComputerCraft is loaded add the capability for it
             CCCapabilityHelper.addCapability(builder, supportsComputer);
         }
-        //FABRIC: OpenComputers2 does not exist on Fabric
     }
 
     public static void addBoundingComputerCapabilities(RegisterCapabilitiesEvent event) {
@@ -22,6 +21,5 @@ public class ComputerCapabilityHelper {
             //If ComputerCraft is loaded add the capability for it
             CCCapabilityHelper.addBoundingComputerCapabilities(event);
         }
-        //FABRIC: OpenComputers2 does not exist on Fabric
     }
 }

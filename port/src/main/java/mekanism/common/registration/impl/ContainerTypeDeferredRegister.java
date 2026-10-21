@@ -1,5 +1,6 @@
 package mekanism.common.registration.impl;
 
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import mekanism.common.entity.EntityRobit;
 import mekanism.common.inventory.container.entity.IEntityContainer;
@@ -14,7 +15,7 @@ import mekanism.common.registration.INamedEntry;
 import mekanism.common.registration.MekanismDeferredRegister;
 import mekanism.common.tile.base.TileEntityMekanism;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.flag.FeatureFlags;
@@ -23,7 +24,6 @@ import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.MenuType.MenuSupplier;
 import net.minecraft.world.item.Item;
 import mekanism.neoshim.neoforge.network.IContainerFactory;
-import org.jetbrains.annotations.NotNull;
 
 public class ContainerTypeDeferredRegister extends MekanismDeferredRegister<MenuType<?>> {
 
@@ -32,7 +32,7 @@ public class ContainerTypeDeferredRegister extends MekanismDeferredRegister<Menu
     }
 
     private <CONTAINER extends AbstractContainerMenu> ContainerTypeRegistryObject<CONTAINER> createHolder(String name) {
-        return new ContainerTypeRegistryObject<>(ResourceLocation.fromNamespaceAndPath(getNamespace(), name));
+        return new ContainerTypeRegistryObject<>(Identifier.fromNamespaceAndPath(getNamespace(), name));
     }
 
     public <TILE extends TileEntityMekanism> ContainerTypeRegistryObject<MekanismTileContainer<TILE>> register(INamedEntry nameProvider, Class<TILE> tileClass) {
@@ -79,14 +79,14 @@ public class ContainerTypeDeferredRegister extends MekanismDeferredRegister<Menu
         return registryObject;
     }
 
-    public <ITEM extends Item, CONTAINER extends AbstractContainerMenu> ContainerTypeRegistryObject<CONTAINER> register(INamedEntry nameProvider, Class<ITEM> itemClass,
-          IMekanismItemContainerFactory<ITEM, CONTAINER> factory) {
-        return register(nameProvider.getName(), itemClass, factory);
+    public <CONTAINER extends AbstractContainerMenu> ContainerTypeRegistryObject<CONTAINER> register(ItemRegistryObject<?> itemType,
+          IMekanismItemContainerFactory<CONTAINER> factory) {
+        return register(itemType.getName(), itemType::is, factory);
     }
 
-    public <ITEM extends Item, CONTAINER extends AbstractContainerMenu> ContainerTypeRegistryObject<CONTAINER> register(String name, Class<ITEM> itemClass,
-          IMekanismItemContainerFactory<ITEM, CONTAINER> factory) {
-        return registerMenu(name, () -> MekanismItemContainerType.item(itemClass, factory));
+    public <CONTAINER extends AbstractContainerMenu> ContainerTypeRegistryObject<CONTAINER> register(String name, Predicate<Item> typeValidator,
+          IMekanismItemContainerFactory<CONTAINER> factory) {
+        return registerMenu(name, () -> MekanismItemContainerType.item(typeValidator, factory));
     }
 
     public <CONTAINER extends AbstractContainerMenu> ContainerTypeRegistryObject<CONTAINER> register(String name, MenuSupplier<CONTAINER> factory) {
@@ -160,7 +160,7 @@ public class ContainerTypeDeferredRegister extends MekanismDeferredRegister<Menu
                 }
 
                 @Override
-                protected void addInventorySlots(@NotNull Inventory inv) {
+                protected void addInventorySlots(Inventory inv) {
                     super.addInventorySlots(inv);
                     if (armorSlotsX != -1 && armorSlotsY != -1) {
                         addArmorSlots(inv, armorSlotsX, armorSlotsY, offhandOffset);

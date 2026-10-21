@@ -3,7 +3,7 @@ package mekanism.api.text;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import mekanism.api.inventory.IHashedItem;
+import mekanism.api.MekanismAPI;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
@@ -17,10 +17,16 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
+import mekanism.neoshim.fml.loading.FMLEnvironment;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
+import mekanism.neoshim.neoforge.fluids.FluidStackTemplate;
+import mekanism.neoshim.neoforge.transfer.fluid.FluidResource;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public class TextComponentUtil {
 
@@ -29,28 +35,24 @@ public class TextComponentUtil {
     private TextComponentUtil() {
     }
 
-    /**
-     * Helper to apply an integer color style to a given text component.
-     *
-     * @param component Component to color.
-     * @param color     RGB color to apply.
-     *
-     * @return Colored component.
-     */
+    /// Helper to apply an integer color style to a given text component.
+    ///
+    /// @param component Component to color.
+    /// @param color     RGB color to apply.
+    ///
+    /// @return Colored component.
     public static MutableComponent color(MutableComponent component, int color) {
         return component.setStyle(component.getStyle()
               .withColor(TextColor.fromRgb(color)));
     }
 
-    /**
-     * Builds a formattable text component out of a list of components using a "smart" combination system to allow for automatic replacements, and coloring to take
-     * place.
-     *
-     * @param components Argument components.
-     *
-     * @return Formattable Text Component.
-     */
-    public static MutableComponent build(Object... components) {
+    /// Builds a formattable text component out of a list of components using a "smart" combination system to allow for automatic replacements, and coloring to take
+    /// place.
+    ///
+    /// @param components Argument components.
+    ///
+    /// @return Formattable Text Component.
+    public static MutableComponent build(@Nullable Object... components) {
         //TODO: Verify that just appending them to the first text component works properly.
         // My suspicion is we will need to chain downwards and append it that way so that the formatting matches
         // from call to call without resetting back to
@@ -76,10 +78,13 @@ public class TextComponentUtil {
                 case ClickEvent event -> cachedStyle = cachedStyle.withClickEvent(event);
                 case HoverEvent event -> cachedStyle = cachedStyle.withHoverEvent(event);
                 case Block block -> current = block.getName().copy();
-                case Item item -> current = item.getDescription().copy();
+                case Item item -> current = logLiteralItemUsage(item);
                 case ItemStack stack -> current = stack.getHoverName().copy();
-                case IHashedItem item -> current = item.getInternalStack().getHoverName().copy();
+                case ItemStackTemplate template -> current = template.create().getHoverName().copy();
+                case ItemResource resource -> current = resource.getHoverName().copy();
                 case FluidStack stack -> current = stack.getHoverName().copy();
+                case FluidStackTemplate template -> current = template.create().getHoverName().copy();
+                case FluidResource resource -> current = resource.getHoverName().copy();
                 case Fluid fluid -> current = fluid.getFluidType().getDescription().copy();
                 case EntityType<?> entityType -> current = entityType.getDescription().copy();
                 case Level level -> current = level.getDescription().copy();
@@ -107,7 +112,7 @@ public class TextComponentUtil {
         //TODO: Make this more like smartTranslate? Including back to back formatting where we already have that type of formatting set
         // then convert that
         //Ignores any trailing formatting
-        return result;
+        return result == null ? Component.empty() : result;
     }
 
     private static MutableComponent getTranslatedBoolean(boolean bool) {
@@ -125,62 +130,52 @@ public class TextComponentUtil {
         }).translate();
     }
 
-    /**
-     * Helper to call the constructor for string text components and also convert any non-breaking spaces to spaces so that they render properly.
-     *
-     * @param component String
-     *
-     * @return String Text Component.
-     */
+    /// Helper to call the constructor for string text components and also convert any non-breaking spaces to spaces so that they render properly.
+    ///
+    /// @param component String
+    ///
+    /// @return String Text Component.
     public static MutableComponent getString(String component) {
         return Component.literal(cleanString(component));
     }
 
-    /**
-     * Helper to clean up strings and convert any non-breaking spaces to spaces so that they render properly.
-     *
-     * @param component String
-     *
-     * @return Cleaned string
-     */
+    /// Helper to clean up strings and convert any non-breaking spaces to spaces so that they render properly.
+    ///
+    /// @param component String
+    ///
+    /// @return Cleaned string
     private static String cleanString(String component) {
         return component.replace("\u00A0", " ")//non-breaking space
               .replace("\u202f", " ");//narrow non-breaking space
     }
 
-    /**
-     * Helper to call the constructor for translation text components in case we end up ever needing to do any extra processing.
-     *
-     * @param key  Translation Key.
-     *
-     * @return Translation Text Component.
-     */
+    /// Helper to call the constructor for translation text components in case we end up ever needing to do any extra processing.
+    ///
+    /// @param key Translation Key.
+    ///
+    /// @return Translation Text Component.
     public static MutableComponent translate(String key) {
         return Component.translatable(key);
     }
 
-    /**
-     * Helper to call the constructor for translation text components in case we end up ever needing to do any extra processing.
-     *
-     * @param key  Translation Key.
-     * @param args Arguments.
-     *
-     * @return Translation Text Component.
-     */
+    /// Helper to call the constructor for translation text components in case we end up ever needing to do any extra processing.
+    ///
+    /// @param key  Translation Key.
+    /// @param args Arguments.
+    ///
+    /// @return Translation Text Component.
     public static MutableComponent translate(String key, Object... args) {
         return Component.translatable(key, args);
     }
 
-    /**
-     * Smarter version of {@link #translate(String, Object...)} that uses a "smart" replacement scheme for parameters to allow for automatic replacements, and coloring to
-     * take place.
-     *
-     * @param key        Translation Key.
-     * @param components Argument components.
-     *
-     * @return Translation Text Component.
-     */
-    public static MutableComponent smartTranslate(String key, Object... components) {
+    /// Smarter version of [#translate(String, Object...)] that uses a "smart" replacement scheme for parameters to allow for automatic replacements, and coloring to take
+    /// place.
+    ///
+    /// @param key        Translation Key.
+    /// @param components Argument components.
+    ///
+    /// @return Translation Text Component.
+    public static MutableComponent smartTranslate(String key, @Nullable Object... components) {
         if (components.length == 0) {
             //If we don't have any args just short circuit to creating the translation key
             return translate(key);
@@ -209,13 +204,19 @@ public class TextComponentUtil {
             } else if (component instanceof Block block) {
                 current = block.getName().copy();
             } else if (component instanceof Item item) {
-                current = item.getDescription().copy();
+                current = logLiteralItemUsage(item);
             } else if (component instanceof ItemStack stack) {
                 current = stack.getHoverName().copy();
-            } else if (component instanceof IHashedItem item) {
-                current = item.getInternalStack().getHoverName().copy();
+            } else if (component instanceof ItemStackTemplate template) {
+                current = template.create().getHoverName().copy();
+            } else if (component instanceof ItemResource resource) {
+                current = resource.getHoverName().copy();
             } else if (component instanceof FluidStack stack) {
                 current = stack.getHoverName().copy();
+            } else if (component instanceof FluidStackTemplate template) {
+                current = template.create().getHoverName().copy();
+            } else if (component instanceof FluidResource resource) {
+                current = resource.getHoverName().copy();
             } else if (component instanceof Fluid fluid) {
                 current = fluid.getFluidType().getDescription().copy();
             } else if (component instanceof EntityType<?> entityType) {
@@ -314,5 +315,13 @@ public class TextComponentUtil {
             case RESET -> current.isEmpty();
             default -> current.getColor() != null;
         };
+    }
+
+    //TODO - 26.1: find and remove these?
+    private static MutableComponent logLiteralItemUsage(Item item) {
+        if (!FMLEnvironment.isProduction()) {
+            MekanismAPI.logger.error("Item instance ({}) passed directly to translate method", item, new Exception());
+        }
+        return item.getName(new ItemStack(item)).copy();
     }
 }

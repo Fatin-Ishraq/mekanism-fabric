@@ -3,104 +3,105 @@ package mekanism.common.item.gear;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
-import javax.annotation.Nullable;
-import mekanism.api.Action;
-import mekanism.api.AutomationType;
-import mekanism.api.energy.IEnergyContainer;
 import mekanism.api.text.EnumColor;
 import mekanism.common.MekanismLang;
+import mekanism.common.component.containers.type.ContainerType;
+import mekanism.common.capabilities.Capabilities;
+import mekanism.common.capabilities.proxy.AutomatedEnergyHandler;
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.item.interfaces.IItemHUDProvider;
 import mekanism.common.item.interfaces.IModeItem.IAttachmentBasedModeItem;
+import mekanism.common.lib.transaction.TransactionHelper;
 import mekanism.common.registration.impl.CreativeTabDeferredRegister.ICustomCreativeTabContents;
 import mekanism.common.registries.MekanismDataComponents;
+import mekanism.common.util.ItemAccessUtils;
 import mekanism.common.util.StorageUtils;
 import mekanism.common.util.text.BooleanStateDisplay.OnOff;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Holder.Reference;
 import net.minecraft.core.HolderLookup.RegistryLookup;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemInstance;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.level.Level;
-import org.jetbrains.annotations.NotNull;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.energy.EnergyHandler;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
 
 public class ItemElectricBow extends BowItem implements IItemHUDProvider, ICustomCreativeTabContents, IAttachmentBasedModeItem<Boolean> {
 
     public ItemElectricBow(Properties properties) {
-        super(properties.rarity(Rarity.RARE).setNoRepair().stacksTo(1).component(MekanismDataComponents.ELECTRIC_BOW_MODE, false));
+        super(properties.rarity(Rarity.RARE).setNoCombineRepair().stacksTo(1).component(MekanismDataComponents.ELECTRIC_BOW_MODE, false));
     }
 
     @Override
-    public void appendHoverText(@NotNull ItemStack stack, @NotNull Item.TooltipContext context, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        StorageUtils.addStoredEnergy(stack, tooltip, true);
-        tooltip.add(MekanismLang.FIRE_MODE.translateColored(EnumColor.PINK, OnOff.of(getMode(stack))));
+    @Deprecated
+    public void appendHoverText(ItemStack stack, Item.TooltipContext context, TooltipDisplay tooltipDisplay, Consumer<Component> tooltipAdder, TooltipFlag flag) {
+        super.appendHoverText(stack, context, tooltipDisplay, tooltipAdder, flag);
+        StorageUtils.addStoredEnergy(ItemAccessUtils.sideEffectFreeAccess(stack), tooltipAdder, true);
+        tooltipAdder.accept(MekanismLang.FIRE_MODE.translateColored(EnumColor.PINK, OnOff.of(getMode(stack))));
     }
 
     @Override
-    public void releaseUsing(@NotNull ItemStack bow, @NotNull Level world, @NotNull LivingEntity entity, int timeLeft) {
-        if (entity instanceof Player player && !player.isCreative()) {
-            IEnergyContainer energyContainer = StorageUtils.getEnergyContainer(bow, 0);
-            long energyNeeded = getMode(bow) ? MekanismConfig.gear.electricBowEnergyUsageFire.get() : MekanismConfig.gear.electricBowEnergyUsage.get();
-            if (energyContainer == null || energyContainer.extract(energyNeeded, Action.SIMULATE, AutomationType.MANUAL) < energyNeeded) {
-                return;
-            }
+    public boolean releaseUsing(ItemStack bow, Level world, LivingEntity entity, int timeLeft) {
+        if (!(entity instanceof Player player) || player.isCreative()) {
+            return super.releaseUsing(bow, world, entity, timeLeft);
         }
-        super.releaseUsing(bow, world, entity, timeLeft);
-    }
-
-    @Override
-    protected void shoot(@NotNull ServerLevel world, @NotNull LivingEntity entity, @NotNull InteractionHand hand, @NotNull ItemStack bow,
-          @NotNull List<ItemStack> potentialAmmo, float velocity, float inaccuracy, boolean critical, @Nullable LivingEntity target) {
-        super.shoot(world, entity, hand, bow, potentialAmmo, velocity, inaccuracy, critical, target);
-        if (entity instanceof Player player && !player.isCreative() && !potentialAmmo.isEmpty()) {
-            IEnergyContainer energyContainer = StorageUtils.getEnergyContainer(bow, 0);
-            if (energyContainer != null) {
-                //Use energy
-                long energyNeeded = getMode(bow) ? MekanismConfig.gear.electricBowEnergyUsageFire.get() : MekanismConfig.gear.electricBowEnergyUsage.get();
-                energyContainer.extract(energyNeeded, Action.EXECUTE, AutomationType.MANUAL);
+        EnergyHandler energyHandler = AutomatedEnergyHandler.manual(Capabilities.ENERGY.getCapability(ItemAccess.forStack(bow)));
+        if (energyHandler == null) {
+            return false;
+        }
+        //Protect against any mods that might be doing transactional logic, such as if an auto clicker validates it has enough energy before calling this method
+        try (Transaction transaction = TransactionHelper.openTransactionSafe()) {
+            int energyNeeded = getMode(bow) ? MekanismConfig.gear.electricBowEnergyUsageFire.get() : MekanismConfig.gear.electricBowEnergyUsage.get();
+            if (energyHandler.extract(energyNeeded, transaction) == energyNeeded && super.releaseUsing(bow, world, entity, timeLeft)) {
+                //If we could use the energy, and we actually had a projectile to fire
+                // commit the transaction and return that we successfully released
+                transaction.commit();
+                return true;
             }
+            return false;
         }
     }
 
     @Override
-    public boolean isPrimaryItemFor(@NotNull ItemStack stack, @NotNull Holder<Enchantment> enchantment) {
+    public boolean isPrimaryItemFor(ItemStack stack, Holder<Enchantment> enchantment) {
         //Note: This stops application of it via enchanted books while in survival. We don't override isBookEnchantable as we don't care
         // if someone enchants it in creative and would rather not stop players from enchanting with books that have flame and power on them
         return !enchantment.is(Enchantments.FLAME) && super.isPrimaryItemFor(stack, enchantment);
     }
 
     @Override
-    public int getEnchantmentLevel(@NotNull ItemStack stack, @NotNull Holder<Enchantment> enchantment) {
-        if (stack.isEmpty()) {
-            return 0;
-        } else if (enchantment.is(Enchantments.FLAME) && getMode(stack)) {
-            return Math.max(1, super.getEnchantmentLevel(stack, enchantment));
+    public int getEnchantmentLevel(ItemInstance instance, Holder<Enchantment> enchantment) {
+        if (enchantment.is(Enchantments.FLAME) && getMode(instance)) {
+            return Math.max(1, super.getEnchantmentLevel(instance, enchantment));
         }
-        return super.getEnchantmentLevel(stack, enchantment);
+        return super.getEnchantmentLevel(instance, enchantment);
     }
 
-    @NotNull
     @Override
-    public ItemEnchantments getAllEnchantments(@NotNull ItemStack stack, @NotNull RegistryLookup<Enchantment> lookup) {
+    public ItemEnchantments getAllEnchantments(ItemStack stack, RegistryLookup<Enchantment> lookup) {
         ItemEnchantments enchantments = super.getAllEnchantments(stack, lookup);
         if (getMode(stack)) {
             Optional<Reference<Enchantment>> enchantment = lookup.get(Enchantments.FLAME);
             if (enchantment.isPresent()) {
                 Holder<Enchantment> flame = enchantment.get();
-                if (enchantments.getLevel(flame) == 0){
+                if (enchantments.getLevel(flame) == 0) {
                     ItemEnchantments.Mutable mutable = new ItemEnchantments.Mutable(enchantments);
                     mutable.set(flame, 1);
                     return mutable.toImmutable();
@@ -121,44 +122,44 @@ public class ItemElectricBow extends BowItem implements IItemHUDProvider, ICusto
     }
 
     @Override
-    public void addHUDStrings(List<Component> list, Player player, ItemStack stack, EquipmentSlot slotType) {
-        list.add(MekanismLang.FIRE_MODE.translateColored(EnumColor.PINK, OnOff.of(getMode(stack))));
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter> void addHUDStrings(List<Component> list, Player player, ITEM instance, EquipmentSlot slotType) {
+        list.add(MekanismLang.FIRE_MODE.translateColored(EnumColor.PINK, OnOff.of(getMode(instance))));
     }
 
     @Override
-    public boolean isBarVisible(@NotNull ItemStack stack) {
-        return true;
+    public boolean isBarVisible(ItemStack stack) {
+        return StorageUtils.isBarVisible(stack);
     }
 
     @Override
-    public int getBarWidth(@NotNull ItemStack stack) {
+    public int getBarWidth(ItemStack stack) {
         return StorageUtils.getEnergyBarWidth(stack);
     }
 
     @Override
-    public int getBarColor(@NotNull ItemStack stack) {
+    public int getBarColor(ItemStack stack) {
         return MekanismConfig.client.energyColor.get();
     }
 
     @Override
     public void addItems(Holder<Item> item, Consumer<ItemStack> tabOutput) {
-        tabOutput.accept(StorageUtils.getFilledEnergyVariant(item));
+        tabOutput.accept(ContainerType.ENERGY.getFilledVariant(item, null));
     }
 
     @Override
-    public void changeMode(@NotNull Player player, @NotNull ItemStack stack, int shift, DisplayChange displayChange) {
+    public void changeMode(Player player, ItemAccess itemAccess, int shift, DisplayChange displayChange, TransactionContext transaction) {
         if (Math.abs(shift) % 2 == 1) {
             //We are changing by an odd amount, so toggle the mode
-            boolean newState = !getMode(stack);
-            setMode(stack, player, newState);
-            displayChange.sendMessage(player, newState, s -> MekanismLang.FIRE_MODE.translate(OnOff.of(s, true)));
+            boolean newState = !getMode(itemAccess);
+            if (setMode(itemAccess, player, newState, transaction)) {
+                displayChange.sendMessage(player, newState, s -> MekanismLang.FIRE_MODE.translate(OnOff.of(s, true)));
+            }
         }
     }
 
-    @NotNull
     @Override
-    public Component getScrollTextComponent(@NotNull ItemStack stack) {
-        return MekanismLang.FIRE_MODE.translateColored(EnumColor.PINK, OnOff.of(getMode(stack), true));
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter> Component getScrollTextComponent(ITEM instance) {
+        return MekanismLang.FIRE_MODE.translateColored(EnumColor.PINK, OnOff.of(getMode(instance), true));
     }
 
     @Override

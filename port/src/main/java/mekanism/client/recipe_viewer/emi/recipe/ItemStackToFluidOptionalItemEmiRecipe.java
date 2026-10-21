@@ -2,9 +2,7 @@ package mekanism.client.recipe_viewer.emi.recipe;
 
 import dev.emi.emi.api.widget.WidgetHolder;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import mekanism.api.functions.ConstantPredicates;
 import mekanism.api.recipes.ItemStackToFluidOptionalItemRecipe.FluidOptionalItemOutput;
 import mekanism.api.recipes.basic.BasicItemStackToFluidOptionalItemRecipe;
 import mekanism.client.gui.element.gauge.GaugeType;
@@ -13,31 +11,30 @@ import mekanism.client.gui.element.progress.ProgressType;
 import mekanism.client.gui.element.slot.SlotType;
 import mekanism.client.recipe_viewer.emi.MekanismEmiRecipeCategory;
 import mekanism.common.tile.component.config.DataType;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
-import mekanism.neoshim.neoforge.fluids.FluidStack;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.ItemStackTemplate;
+import mekanism.neoshim.neoforge.fluids.FluidStackTemplate;
 
 public class ItemStackToFluidOptionalItemEmiRecipe extends MekanismEmiRecipe<BasicItemStackToFluidOptionalItemRecipe> {
 
     private final int processTime;
 
-    public ItemStackToFluidOptionalItemEmiRecipe(MekanismEmiRecipeCategory category, ResourceLocation id, BasicItemStackToFluidOptionalItemRecipe recipe, int processTime) {
+    public ItemStackToFluidOptionalItemEmiRecipe(MekanismEmiRecipeCategory category, Identifier id, BasicItemStackToFluidOptionalItemRecipe recipe, int processTime) {
         super(category, id, recipe);
         this.processTime = processTime;
         addInputDefinition(recipe.getInput());
         List<FluidOptionalItemOutput> outputDefinition = recipe.getOutputDefinition();
-        List<FluidStack> fluidOutputs = new ArrayList<>(outputDefinition.size());
-        List<ItemStack> itemOutputs = new ArrayList<>();
+        List<FluidStackTemplate> fluidOutputs = new ArrayList<>(outputDefinition.size());
+        List<ItemStackTemplate> itemOutputs = new ArrayList<>();
         for (FluidOptionalItemOutput output : outputDefinition) {
             fluidOutputs.add(output.fluid());
-            itemOutputs.add(output.optionalItem());
+            ItemStackTemplate optionalItem = output.optionalItem();
+            if (optionalItem != null) {
+                itemOutputs.add(optionalItem);
+            }
         }
         addFluidOutputDefinition(fluidOutputs);
-        if (itemOutputs.stream().allMatch(ConstantPredicates.ITEM_EMPTY)) {
-            addOutputDefinition(Collections.emptyList());
-        } else {
-            addItemOutputDefinition(itemOutputs);
-        }
+        addItemOutputDefinition(itemOutputs);
     }
 
     @Override

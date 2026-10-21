@@ -6,18 +6,22 @@ import mekanism.client.gui.tooltip.TooltipUtils;
 import mekanism.client.render.MekanismRenderer;
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.config.value.CachedBooleanValue;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
 public class GuiToggleClientConfigTab extends GuiInsetToggleElement<IGuiWrapper> {
 
+    @Nullable
     private final Tooltip falseTooltip;
+    @Nullable
     private final Tooltip trueTooltip;
     private final CachedBooleanValue config;
 
-    public GuiToggleClientConfigTab(IGuiWrapper gui, int y, boolean left, ResourceLocation overlay, ResourceLocation flipped, CachedBooleanValue config,
+    public GuiToggleClientConfigTab(IGuiWrapper gui, int y, boolean left, Identifier overlay, Identifier flipped, CachedBooleanValue config,
           Component trueTooltip, Component falseTooltip) {
         super(gui, gui, left ? -26 : gui.getXSize(), y, 26, 18, left, overlay, flipped, config);
         this.config = config;
@@ -31,12 +35,12 @@ public class GuiToggleClientConfigTab extends GuiInsetToggleElement<IGuiWrapper>
     }
 
     @Override
-    protected void colorTab(GuiGraphics guiGraphics) {
-        MekanismRenderer.color(guiGraphics, SpecialColors.TAB_JEI_REJECTS_TARGET);
+    protected int getTabColor(GuiGraphicsExtractor guiGraphics) {
+        return MekanismRenderer.color(SpecialColors.TAB_JEI_REJECTS_TARGET);
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY, int button) {
+    public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
         config.set(!config.get());
         MekanismConfig.client.save();
     }

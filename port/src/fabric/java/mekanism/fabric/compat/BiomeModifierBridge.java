@@ -23,7 +23,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
@@ -71,7 +71,7 @@ public final class BiomeModifierBridge {
         }
         String type = json.get("type").getAsString();
         String name = file.getFileName().toString().replace(".json", "");
-        ResourceLocation id = ResourceLocation.fromNamespaceAndPath(namespace, name);
+        Identifier id = Identifier.fromNamespaceAndPath(namespace, name);
         if (!type.equals("neoforge:add_features")) {
             applyCustom(id, type, json);
             return;
@@ -82,10 +82,10 @@ public final class BiomeModifierBridge {
         JsonElement featureElement = json.get("features");
         if (featureElement.isJsonArray()) {
             for (JsonElement element : featureElement.getAsJsonArray()) {
-                features.add(ResourceKey.create(Registries.PLACED_FEATURE, ResourceLocation.parse(element.getAsString())));
+                features.add(ResourceKey.create(Registries.PLACED_FEATURE, Identifier.parse(element.getAsString())));
             }
         } else {
-            features.add(ResourceKey.create(Registries.PLACED_FEATURE, ResourceLocation.parse(featureElement.getAsString())));
+            features.add(ResourceKey.create(Registries.PLACED_FEATURE, Identifier.parse(featureElement.getAsString())));
         }
         BiomeModifications.create(id).add(ModificationPhase.ADDITIONS, biomes, (BiomeModificationContext context) -> {
             for (ResourceKey<PlacedFeature> feature : features) {
@@ -95,9 +95,9 @@ public final class BiomeModifierBridge {
         Mekanism.logger.debug("[Fabric port] Applied biome modifier {} ({} features)", id, features.size());
     }
 
-    private static void applyCustom(ResourceLocation id, String type, JsonObject json) {
+    private static void applyCustom(Identifier id, String type, JsonObject json) {
         com.mojang.serialization.MapCodec<? extends mekanism.neoshim.neoforge.common.world.BiomeModifier> codec =
-              mekanism.neoshim.neoforge.registries.NeoForgeRegistries.BIOME_MODIFIER_SERIALIZERS.get(ResourceLocation.parse(type));
+              mekanism.neoshim.neoforge.registries.NeoForgeRegistries.BIOME_MODIFIER_SERIALIZERS.getValue(Identifier.parse(type));
         if (codec == null) {
             Mekanism.logger.warn("[Fabric port] Unsupported biome modifier type {} in {}", type, id);
             return;
@@ -114,10 +114,11 @@ public final class BiomeModifierBridge {
             BiomeModifications.create(id.withSuffix("/" + phase.name().toLowerCase(Locale.ROOT))).add(fabricPhase, BiomeSelectors.all(), (selection, context) -> {
                 mekanism.neoshim.neoforge.common.world.MobSpawnSettingsBuilder spawns =
                       new mekanism.neoshim.neoforge.common.world.MobSpawnSettingsBuilder(selection.getBiome().getMobSettings());
-                modifier.modify(selection.getBiomeRegistryEntry(), phase, new mekanism.neoshim.neoforge.common.world.ModifiableBiomeInfo.BiomeInfo.Builder(
+                modifier.modify(selection.getBiomeHolder(), phase, new mekanism.neoshim.neoforge.common.world.ModifiableBiomeInfo.BiomeInfo.Builder(
                       new net.minecraft.world.level.biome.BiomeGenerationSettings.PlainBuilder(), spawns));
-                spawns.getAddedSpawners().forEach((category, added) -> added.forEach(spawner -> context.getSpawnSettings().addSpawn(category, spawner)));
-                spawns.getAddedCosts().forEach((entityType, cost) -> context.getSpawnSettings().setSpawnCost(entityType, cost.charge(), cost.energyBudget()));
+                spawns.getAddedSpawners().forEach((category, added) -> added.forEach(spawner ->
+                      context.getMobSpawnSettings().addSpawn(category, spawner.value(), spawner.weight())));
+                spawns.getAddedCosts().forEach((entityType, cost) -> context.getMobSpawnSettings().addMobCharge(entityType, cost.charge(), cost.energyBudget()));
             });
         }
         Mekanism.logger.debug("[Fabric port] Applied biome modifier {} ({})", id, type);
@@ -127,14 +128,14 @@ public final class BiomeModifierBridge {
         if (biomes.isJsonPrimitive()) {
             String value = biomes.getAsString();
             if (value.startsWith("#")) {
-                return BiomeSelectors.tag(TagKey.create(Registries.BIOME, ResourceLocation.parse(value.substring(1))));
+                return BiomeSelectors.tag(TagKey.create(Registries.BIOME, Identifier.parse(value.substring(1))));
             }
-            return BiomeSelectors.includeByKey(ResourceKey.create(Registries.BIOME, ResourceLocation.parse(value)));
+            return BiomeSelectors.includeByKey(ResourceKey.create(Registries.BIOME, Identifier.parse(value)));
         }
         JsonArray array = biomes.getAsJsonArray();
         List<ResourceKey<net.minecraft.world.level.biome.Biome>> keys = new ArrayList<>();
         for (JsonElement element : array) {
-            keys.add(ResourceKey.create(Registries.BIOME, ResourceLocation.parse(element.getAsString())));
+            keys.add(ResourceKey.create(Registries.BIOME, Identifier.parse(element.getAsString())));
         }
         return BiomeSelectors.includeByKey(keys);
     }

@@ -12,8 +12,11 @@ import mekanism.api.text.EnumColor;
 import mekanism.common.content.filter.FilterType;
 import mekanism.common.content.filter.IModIDFilter;
 import mekanism.common.lib.inventory.Finder;
+import net.minecraft.core.HolderLookup.Provider;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public class SorterModIDFilter extends SorterFilter<SorterModIDFilter> implements IModIDFilter<SorterModIDFilter> {
 
@@ -32,6 +35,7 @@ public class SorterModIDFilter extends SorterFilter<SorterModIDFilter> implement
     private String modID;
 
     public SorterModIDFilter() {
+        modID = "";
     }
 
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
@@ -46,8 +50,9 @@ public class SorterModIDFilter extends SorterFilter<SorterModIDFilter> implement
     }
 
     @Override
-    public Finder getFinder() {
-        return Finder.modID(modID);
+    public boolean test(ItemResource toCheck) {
+        Provider registries = Objects.requireNonNull(this.registryAccess.get(), "Registry access not supplied");
+        return Finder.modID(modID, registries, toCheck);
     }
 
     @Override
@@ -56,7 +61,7 @@ public class SorterModIDFilter extends SorterFilter<SorterModIDFilter> implement
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) {
             return true;
         } else if (o == null || getClass() != o.getClass() || !super.equals(o)) {

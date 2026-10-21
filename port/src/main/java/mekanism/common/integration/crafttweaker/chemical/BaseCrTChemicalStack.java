@@ -20,15 +20,15 @@ public abstract class BaseCrTChemicalStack implements ICrTChemicalStack {
         return new StringBuilder().append('<')
               .append(CrTConstants.BRACKET_CHEMICAL)
               .append(':')
-              .append(RegistryUtils.getName(stack.getChemicalHolder(), MekanismAPI.CHEMICAL_REGISTRY))
+              .append(RegistryUtils.getName(stack.typeHolder(), MekanismAPI.CHEMICAL_REGISTRY))
               .append('>');
     }
 
     @Override
     public String getCommandString() {
         StringBuilder builder = getBracket();
-        if (!stack.isEmpty() && stack.getAmount() != 1) {
-            builder.append(" * ").append(stack.getAmount());
+        if (!stack.isEmpty() && stack.amount() != 1) {
+            builder.append(" * ").append(stack.amount());
         }
         return builder.toString();
     }
@@ -50,7 +50,7 @@ public abstract class BaseCrTChemicalStack implements ICrTChemicalStack {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) {
             return true;
         }

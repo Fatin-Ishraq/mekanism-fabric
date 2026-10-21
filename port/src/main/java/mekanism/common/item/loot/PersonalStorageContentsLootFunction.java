@@ -1,31 +1,31 @@
 package mekanism.common.item.loot;
 
+import com.mojang.serialization.MapCodec;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
-import mekanism.api.annotations.ParametersAreNotNullByDefault;
 import mekanism.api.inventory.IInventorySlot;
+import mekanism.common.component.containers.type.ContainerType;
 import mekanism.common.lib.inventory.personalstorage.AbstractPersonalStorageItemInventory;
 import mekanism.common.lib.inventory.personalstorage.ClientSidePersonalStorageInventory;
 import mekanism.common.lib.inventory.personalstorage.PersonalStorageManager;
+import mekanism.common.lib.transaction.TransactionHelper;
 import mekanism.common.tile.TileEntityPersonalStorage;
-import net.minecraft.MethodsReturnNonnullByDefault;
+import net.minecraft.util.context.ContextKey;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.storage.loot.LootContext;
 import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
-import net.minecraft.world.level.storage.loot.functions.LootItemFunctionType;
-import net.minecraft.world.level.storage.loot.parameters.LootContextParam;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import mekanism.neoshim.fml.util.thread.EffectiveSide;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
 
-/**
- * Loot function which copies the Personal Storage inventory to the saved data and adds an inv id to the stack
- */
-@MethodsReturnNonnullByDefault
-@ParametersAreNotNullByDefault
+/// Loot function which copies the Personal Storage inventory to the saved data and adds an inv id to the stack
 public class PersonalStorageContentsLootFunction implements LootItemFunction {
 
     public static final PersonalStorageContentsLootFunction INSTANCE = new PersonalStorageContentsLootFunction();
+    public static final MapCodec<PersonalStorageContentsLootFunction> MAP_CODEC = MapCodec.unit(INSTANCE);
 
     private PersonalStorageContentsLootFunction() {
     }
@@ -35,25 +35,35 @@ public class PersonalStorageContentsLootFunction implements LootItemFunction {
     }
 
     @Override
-    public LootItemFunctionType<PersonalStorageContentsLootFunction> getType() {
-        return MekanismLootFunctions.PERSONAL_STORAGE.get();
+    public MapCodec<? extends LootItemFunction> codec() {
+        return MAP_CODEC;
     }
 
     @Override
     public ItemStack apply(ItemStack stack, LootContext lootContext) {
-        BlockEntity blockEntity = lootContext.getParam(LootContextParams.BLOCK_ENTITY);
-        if (blockEntity instanceof TileEntityPersonalStorage personalStorage && !personalStorage.isInventoryEmpty()) {
-            List<IInventorySlot> tileSlots = personalStorage.getInventorySlots(null);
-            AbstractPersonalStorageItemInventory destInv;
-            if (EffectiveSide.get().isClient()) {
-                destInv = new ClientSidePersonalStorageInventory();
-            } else {
-                destInv = PersonalStorageManager.getInventoryFor(stack).orElseThrow(() -> new IllegalStateException("Inventory not available?!"));
-            }
-            for (int i = 0; i < tileSlots.size(); i++) {
-                IInventorySlot tileSlot = tileSlots.get(i);
-                if (!tileSlot.isEmpty()) {
-                    destInv.setStackInSlot(i, tileSlot.getStack().copy());
+        BlockEntity blockEntity = lootContext.getParameter(LootContextParams.BLOCK_ENTITY);
+        if (blockEntity instanceof TileEntityPersonalStorage personalStorage) {
+            List<IInventorySlot> tileSlots = personalStorage.getInventorySlots();
+            //Validate that at least one slot has something stored
+            if (!ContainerType.ITEM.areContainersEmpty(tileSlots)) {
+                try (Transaction transaction = TransactionHelper.openTransactionSafe()) {
+                    AbstractPersonalStorageItemInventory destInv;
+                    if (EffectiveSide.get().isClient()) {
+                        destInv = new ClientSidePersonalStorageInventory();
+                    } else {
+                        destInv = Objects.requireNonNull(PersonalStorageManager.getInventoryFor(ItemAccess.forStack(stack), transaction), "Inventory not available?!");
+                    }
+                    int size = tileSlots.size();
+                    List<IInventorySlot> containers = destInv.getContainers();
+                    if (containers.size() == size) {//TODO - 26.1: If they don't match how should we handle it?
+                        for (int i = 0; i < size; i++) {
+                            IInventorySlot tileSlot = tileSlots.get(i);
+                            if (!tileSlot.isEmpty()) {
+                                containers.get(i).copyContents(tileSlot, transaction);
+                            }
+                        }
+                    }
+                    transaction.commit();
                 }
             }
         }
@@ -61,7 +71,7 @@ public class PersonalStorageContentsLootFunction implements LootItemFunction {
     }
 
     @Override
-    public Set<LootContextParam<?>> getReferencedContextParams() {
+    public Set<ContextKey<?>> getReferencedContextParams() {
         return MekanismLootFunctions.BLOCK_ENTITY_LOOT_CONTEXT;
     }
 }

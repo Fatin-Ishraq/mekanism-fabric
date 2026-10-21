@@ -25,9 +25,8 @@ import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.IRecipeManager;
 import mezz.jei.api.recipe.RecipeIngredientRole;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
 public class SPSRecipeCategory extends BaseRecipeCategory<SPSRecipeViewerRecipe> {
 
@@ -51,20 +50,19 @@ public class SPSRecipeCategory extends BaseRecipeCategory<SPSRecipeViewerRecipe>
     }
 
     @Override
-    public void setRecipe(@NotNull IRecipeLayoutBuilder builder, SPSRecipeViewerRecipe recipe, @NotNull IFocusGroup focusGroup) {
-        initChemical(builder, RecipeIngredientRole.INPUT, input, recipe.input().getRepresentations());
-        initChemical(builder, RecipeIngredientRole.OUTPUT, output, Collections.singletonList(recipe.output()));
+    public void setRecipe(IRecipeLayoutBuilder builder, SPSRecipeViewerRecipe recipe, IFocusGroup focusGroup) {
+        initChemical(builder, RecipeIngredientRole.INPUT, input, recipe.input().getRepresentations(getSlotDisplayContext()));
+        initChemical(builder, output, Collections.singletonList(recipe.output()));
     }
 
     @Nullable
     @Override
-    public ResourceLocation getRegistryName(@NotNull SPSRecipeViewerRecipe recipe) {
+    public Identifier getIdentifier(SPSRecipeViewerRecipe recipe) {
         return recipe.id();
     }
 
-    @NotNull
     @Override
-    public Codec<SPSRecipeViewerRecipe> getCodec(@NotNull ICodecHelper codecHelper, @NotNull IRecipeManager recipeManager) {
+    public Codec<SPSRecipeViewerRecipe> getCodec(ICodecHelper codecHelper, IRecipeManager recipeManager) {
         return SPSRecipeViewerRecipe.CODEC;
     }
 }

@@ -3,7 +3,7 @@ package mekanism.fabric.compat.computer;
 import dan200.computercraft.api.peripheral.IPeripheral;
 import mekanism.neoshim.neoforge.capabilities.BlockCapability;
 import net.minecraft.core.Direction;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -14,7 +14,7 @@ import org.jetbrains.annotations.Nullable;
 public final class PeripheralLookupCapability {
 
     public static final BlockCapability<IPeripheral, @Nullable Direction> PERIPHERAL = BlockCapability.createSided(
-          ResourceLocation.fromNamespaceAndPath("computercraft", "peripheral"), IPeripheral.class);
+          Identifier.fromNamespaceAndPath("computercraft", "peripheral"), IPeripheral.class);
 
     private PeripheralLookupCapability() {
     }

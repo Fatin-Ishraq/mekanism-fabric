@@ -11,28 +11,30 @@ import mcjty.theoneprobe.api.IProbeInfo;
 import mcjty.theoneprobe.api.IProbeInfoProvider;
 import mcjty.theoneprobe.api.ITheOneProbe;
 import mcjty.theoneprobe.api.ProbeMode;
+import mekanism.api.functions.ConstantPredicates;
 import mekanism.common.Mekanism;
 import mekanism.common.integration.lookingat.ChemicalElement;
 import mekanism.common.integration.lookingat.EnergyElement;
 import mekanism.common.integration.lookingat.FluidElement;
 import mekanism.common.integration.lookingat.LookingAtHelper;
 import mekanism.common.integration.lookingat.LookingAtUtils;
-import mekanism.common.integration.lookingat.theoneprobe.TOPChemicalElement.ChemicalElementFactory;
 import mekanism.common.util.WorldUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import org.jspecify.annotations.Nullable;
 
 //Registered via IMC
-public class TOPProvider implements IProbeInfoProvider, Function<ITheOneProbe, Void> {
+public class TOPProvider implements IProbeInfoProvider, Function<ITheOneProbe, @Nullable Void> {
 
-    private BooleanSupplier displayFluidTanks;
+    private BooleanSupplier displayFluidTanks = ConstantPredicates.ALWAYS_TRUE;
     private Supplier<ConfigMode> tankMode = () -> ConfigMode.EXTENDED;
 
+    @Nullable
     @Override
     public Void apply(ITheOneProbe probe) {
         probe.registerProvider(this);
@@ -40,7 +42,7 @@ public class TOPProvider implements IProbeInfoProvider, Function<ITheOneProbe, V
         probe.registerProbeConfigProvider(ProbeConfigProvider.INSTANCE);
         probe.registerElementFactory(new TOPEnergyElement.Factory());
         probe.registerElementFactory(new TOPFluidElement.Factory());
-        probe.registerElementFactory(new ChemicalElementFactory());
+        probe.registerElementFactory(new TOPChemicalElement.ChemicalElementFactory());
         //Grab the default view settings
         IProbeConfig probeConfig = probe.createProbeConfig();
         displayFluidTanks = () -> probeConfig.getTankMode() > 0;
@@ -49,7 +51,7 @@ public class TOPProvider implements IProbeInfoProvider, Function<ITheOneProbe, V
     }
 
     @Override
-    public ResourceLocation getID() {
+    public Identifier getID() {
         return Mekanism.rl("data");
     }
 

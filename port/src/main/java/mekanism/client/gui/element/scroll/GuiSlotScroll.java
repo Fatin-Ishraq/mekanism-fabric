@@ -1,6 +1,5 @@
 package mekanism.client.gui.element.scroll;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -12,7 +11,6 @@ import mekanism.client.gui.element.GuiElement;
 import mekanism.client.gui.element.slot.GuiSlot;
 import mekanism.client.recipe_viewer.interfaces.IRecipeViewerIngredientHelper;
 import mekanism.common.MekanismLang;
-import mekanism.common.annotations.GLFWMouseButtons;
 import mekanism.common.inventory.ISlotClickHandler;
 import mekanism.common.inventory.ISlotClickHandler.IScrollableSlot;
 import mekanism.common.util.MekanismUtils;
@@ -20,29 +18,30 @@ import mekanism.common.util.MekanismUtils.ResourceType;
 import mekanism.common.util.UnitDisplayUtils;
 import mekanism.common.util.text.TextUtils;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.Rect2i;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.CommonColors;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
 public class GuiSlotScroll extends GuiElement implements IRecipeViewerIngredientHelper {
 
-    private static final ResourceLocation SLOTS = MekanismUtils.getResource(ResourceType.GUI_SLOT, "slots.png");
-    private static final ResourceLocation SLOTS_DARK = MekanismUtils.getResource(ResourceType.GUI_SLOT, "slots_dark.png");
+    private static final Identifier SLOTS = MekanismUtils.getResource(ResourceType.GUI_SLOT, "slots.png");
+    private static final Identifier SLOTS_DARK = MekanismUtils.getResource(ResourceType.GUI_SLOT, "slots_dark.png");
     private static final Component ZERO = TextComponentUtil.build(ChatFormatting.YELLOW, 0);
 
     private final GuiScrollBar scrollBar;
 
     private final int xSlots, ySlots;
-    private final Supplier<@NotNull List<IScrollableSlot>> slotList;
+    private final Supplier<List<IScrollableSlot>> slotList;
     private final ISlotClickHandler clickHandler;
 
-    public GuiSlotScroll(IGuiWrapper gui, int x, int y, int xSlots, int ySlots, Supplier<@NotNull List<IScrollableSlot>> slotList, ISlotClickHandler clickHandler) {
+    public GuiSlotScroll(IGuiWrapper gui, int x, int y, int xSlots, int ySlots, Supplier<List<IScrollableSlot>> slotList, ISlotClickHandler clickHandler) {
         super(gui, x, y, xSlots * 18 + 18, ySlots * 18);
         this.xSlots = xSlots;
         this.ySlots = ySlots;
@@ -53,10 +52,10 @@ public class GuiSlotScroll extends GuiElement implements IRecipeViewerIngredient
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
         List<IScrollableSlot> list = getSlotList();
-        guiGraphics.blit(list.isEmpty() ? SLOTS_DARK : SLOTS, relativeX, relativeY, 0, 0, xSlots * 18, ySlots * 18, 288, 288);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, list.isEmpty() ? SLOTS_DARK : SLOTS, relativeX, relativeY, 0, 0, xSlots * 18, ySlots * 18, 288, 288);
         if (!list.isEmpty()) {
             int slotStart = scrollBar.getCurrentSelection() * xSlots, max = xSlots * ySlots;
             for (int i = 0; i < max; i++) {
@@ -71,20 +70,20 @@ public class GuiSlotScroll extends GuiElement implements IRecipeViewerIngredient
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         int xAxis = mouseX - getGuiLeft(), yAxis = mouseY - getGuiTop();
         int slotX = (xAxis - relativeX) / 18, slotY = (yAxis - relativeY) / 18;
         if (slotX >= 0 && slotY >= 0 && slotX < xSlots && slotY < ySlots) {
             int slotStartX = relativeX + slotX * 18 + 1, slotStartY = relativeY + slotY * 18 + 1;
             if (xAxis >= slotStartX && xAxis < slotStartX + 16 && yAxis >= slotStartY && yAxis < slotStartY + 16 && checkWindows(mouseX, mouseY)) {
-                guiGraphics.fill(RenderType.guiOverlay(), slotStartX, slotStartY, slotStartX + 16, slotStartY + 16, GuiSlot.DEFAULT_HOVER_COLOR);
+                guiGraphics.fill(slotStartX, slotStartY, slotStartX + 16, slotStartY + 16, GuiSlot.DEFAULT_HOVER_COLOR);
             }
         }
     }
 
     @Override
-    public void renderToolTip(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderToolTip(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderToolTip(guiGraphics, mouseX, mouseY);
         IScrollableSlot slot = getSlot(mouseX, mouseY);
         if (slot != null) {
@@ -98,16 +97,18 @@ public class GuiSlotScroll extends GuiElement implements IRecipeViewerIngredient
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, @GLFWMouseButtons int button) {
+    public boolean mouseReleased(MouseButtonEvent event) {
         if (gui().currentlyQuickCrafting()) {
             //If the player is currently quick crafting don't do any special handling for as if they clicked in the screen
-            return super.mouseReleased(mouseX, mouseY, button);
+            return super.mouseReleased(event);
         }
-        super.mouseReleased(mouseX, mouseY, button);
-        clickHandler.onClick(() -> getSlot(mouseX, mouseY), button, Screen.hasShiftDown(), gui().getCarriedItem());
+        super.mouseReleased(event);
+        //TODO - 26.1: Evaluate if we just want to pass the mouse button event directly?
+        clickHandler.onClick(() -> getSlot(event.x(), event.y()), event.button(), event.hasShiftDown(), gui().getCarriedItem());
         return true;
     }
 
+    @Nullable
     private IScrollableSlot getSlot(double mouseX, double mouseY) {
         List<IScrollableSlot> list = getSlotList();
         if (list.isEmpty()) {
@@ -131,8 +132,8 @@ public class GuiSlotScroll extends GuiElement implements IRecipeViewerIngredient
         return list.get(slot);
     }
 
-    private void renderSlot(GuiGraphics guiGraphics, IScrollableSlot slot, int slotX, int slotY) {
-        ItemStack stack = slot.getInternalStack();
+    private void renderSlot(GuiGraphicsExtractor guiGraphics, IScrollableSlot slot, int slotX, int slotY) {
+        ItemStack stack = slot.itemType().toStack();
         if (stack.isEmpty()) {//Sanity check
             return;
         }
@@ -141,7 +142,7 @@ public class GuiSlotScroll extends GuiElement implements IRecipeViewerIngredient
         Component text = null;
         if (count == 0) {
             //If there is no items stored, display the text in yellow, similar to what mojang does when it has to display a zero count
-            // See: AbstractContainerScreen#render(GuiGraphics, int, int, float) and rendering the dragging item
+            // See: AbstractContainerScreen#render(GuiGraphicsExtractor, int, int, float) and rendering the dragging item
             text = ZERO;
         } else if (count > 1) {
             //Note: For cases like 9,999,999 we intentionally display as 9999.9K instead of 10M so that people
@@ -157,14 +158,14 @@ public class GuiSlotScroll extends GuiElement implements IRecipeViewerIngredient
         }
     }
 
-    private void renderSlotTooltip(GuiGraphics guiGraphics, IScrollableSlot slot, int slotX, int slotY) {
-        ItemStack stack = slot.getInternalStack();
+    private void renderSlotTooltip(GuiGraphicsExtractor guiGraphics, IScrollableSlot slot, int slotX, int slotY) {
+        ItemStack stack = slot.itemType().toStack();
         if (stack.isEmpty()) {//Sanity check
             return;
         }
         long count = slot.count();
         if (count < 10_000) {
-            guiGraphics.renderTooltip(font(), stack, slotX, slotY);
+            guiGraphics.setTooltipForNextFrame(font(), stack, slotX, slotY);
         } else {
             //If the slot's displayed count is truncated, make sure we also add the actual amount to the tooltip
             gui().renderItemTooltipWithExtra(guiGraphics, stack, slotX, slotY, Collections.singletonList(MekanismLang.QIO_STORED_COUNT.translateColored(EnumColor.GRAY,
@@ -172,7 +173,7 @@ public class GuiSlotScroll extends GuiElement implements IRecipeViewerIngredient
         }
     }
 
-    private void renderSlotText(GuiGraphics guiGraphics, Component text, int x, int y) {
+    private void renderSlotText(GuiGraphicsExtractor guiGraphics, Component text, int x, int y) {
         float scale = 0.6F;
         float scaledWidth = font().width(text) * scale;
         if (scaledWidth >= 16) {
@@ -180,14 +181,14 @@ public class GuiSlotScroll extends GuiElement implements IRecipeViewerIngredient
             //Note: If it would still overflow, then we just let the scrolling text handle it
             scale = 0.5F;
         }
-        PoseStack pose = guiGraphics.pose();
-        pose.pushPose();
-        pose.translate(0, 0, 200);
-        drawScaledScrollingString(guiGraphics, text, x, y + 9, TextAlignment.RIGHT, 0xFFFFFF, 16, 0, true, scale);
-        pose.popPose();
+        //TODO - 26.1: gui zindex
+        //PoseStack pose = guiGraphics.pose();
+        //pose.pushPose();
+        //pose.translate(0, 0, 200);
+        drawScaledScrollingString(guiGraphics, text, x, y + 9, TextAlignment.RIGHT, CommonColors.WHITE, 16, 0, true, scale);
+        //pose.popPose();
     }
 
-    @NotNull
     private List<IScrollableSlot> getSlotList() {
         return slotList.get();
     }
@@ -195,7 +196,7 @@ public class GuiSlotScroll extends GuiElement implements IRecipeViewerIngredient
     @Override
     public Optional<?> getIngredient(double mouseX, double mouseY) {
         IScrollableSlot slot = getSlot(mouseX, mouseY);
-        return slot == null ? Optional.empty() : Optional.of(slot.getInternalStack());
+        return slot == null ? Optional.empty() : Optional.of(slot.itemType().toStack());
     }
 
     @Override

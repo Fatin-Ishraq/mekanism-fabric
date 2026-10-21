@@ -16,6 +16,7 @@ import mekanism.common.resource.ResourceType;
 import mekanism.common.tags.MekanismTags;
 import mekanism.common.tier.FactoryTier;
 import mekanism.common.util.EnumUtils;
+import net.minecraft.core.HolderGetter;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.tags.TagKey;
@@ -24,6 +25,12 @@ import mekanism.neoshim.neoforge.common.Tags;
 
 class FactoryRecipeProvider implements ISubRecipeProvider {
 
+    private final HolderGetter<Item> items;
+
+    public FactoryRecipeProvider(HolderGetter<Item> items) {
+        this.items = items;
+    }
+
     @Override
     public void addRecipes(RecipeOutput consumer, HolderLookup.Provider registries) {
         String basePath = "factory/";
@@ -31,7 +38,7 @@ class FactoryRecipeProvider implements ISubRecipeProvider {
         String advancedPath = basePath + "advanced/";
         String elitePath = basePath + "elite/";
         String ultimatePath = basePath + "ultimate/";
-        TagKey<Item> osmiumIngot = MekanismTags.Items.PROCESSED_RESOURCES.get(ResourceType.INGOT, PrimaryResource.OSMIUM);
+        TagKey<Item> osmiumIngot = MekanismTags.Items.getProcessedResource(ResourceType.INGOT, PrimaryResource.OSMIUM);
         for (FactoryType type : EnumUtils.FACTORY_TYPES) {
             BlockRegistryObject<BlockFactory<?>, ItemBlockFactory> basicFactory = MekanismBlocks.getFactory(FactoryTier.BASIC, type);
             BlockRegistryObject<BlockFactory<?>, ItemBlockFactory> advancedFactory = MekanismBlocks.getFactory(FactoryTier.ADVANCED, type);
@@ -48,9 +55,9 @@ class FactoryRecipeProvider implements ISubRecipeProvider {
         MekDataShapedRecipeBuilder.shapedRecipe(factory)
               .pattern(MekanismRecipeProvider.TIER_PATTERN)
               .key(Pattern.PREVIOUS, toUpgrade)
-              .key(Pattern.CIRCUIT, circuitTag)
-              .key(Pattern.INGOT, ingotTag)
-              .key(Pattern.ALLOY, alloyTag)
-              .build(consumer, Mekanism.rl(basePath + Attribute.getOrThrow(factory, AttributeFactoryType.class).getFactoryType().getRegistryNameComponent()));
+              .key(Pattern.CIRCUIT, this.items, circuitTag)
+              .key(Pattern.INGOT, this.items, ingotTag)
+              .key(Pattern.ALLOY, this.items, alloyTag)
+              .save(consumer, Mekanism.rl(basePath + Attribute.getOrThrow(factory, AttributeFactoryType.class).getFactoryType().getRegistryNameComponent()));
     }
 }

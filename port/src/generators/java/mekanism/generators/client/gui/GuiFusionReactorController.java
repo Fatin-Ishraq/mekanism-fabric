@@ -16,17 +16,15 @@ import mekanism.generators.client.gui.element.GuiFusionReactorTab.FusionReactorT
 import mekanism.generators.common.GeneratorsLang;
 import mekanism.generators.common.content.fusion.FusionReactorMultiblockData;
 import mekanism.generators.common.tile.fusion.TileEntityFusionReactorController;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
 
 public class GuiFusionReactorController extends GuiMekanismTile<TileEntityFusionReactorController, MekanismTileContainer<TileEntityFusionReactorController>> {
 
     public GuiFusionReactorController(MekanismTileContainer<TileEntityFusionReactorController> container, Inventory inv, Component title) {
-        super(container, inv, title);
+        super(container, inv, title, DEFAULT_IMAGE_WIDTH + 10, DEFAULT_IMAGE_HEIGHT);
         dynamicSlots = true;
-        imageWidth += 10;
         inventoryLabelX += 5;
         titleLabelY = 5;
     }
@@ -37,7 +35,7 @@ public class GuiFusionReactorController extends GuiMekanismTile<TileEntityFusion
         if (tile.getMultiblock().isFormed()) {
             addRenderableWidget(new GuiEnergyTab(this, () -> {
                 FusionReactorMultiblockData multiblock = tile.getMultiblock();
-                return List.of(MekanismLang.STORING.translate(EnergyDisplay.of(multiblock.energyContainer)),
+                return List.of(MekanismLang.STORING.translate(EnergyDisplay.of(multiblock.energyContainer())),
                       GeneratorsLang.PRODUCING_AMOUNT.translate(EnergyDisplay.of(multiblock.getPassiveGeneration(false, true))));
             }));
             addRenderableWidget(new GuiHeatTab(this, () -> {
@@ -54,7 +52,7 @@ public class GuiFusionReactorController extends GuiMekanismTile<TileEntityFusion
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         renderTitleText(guiGraphics);
         renderInventoryText(guiGraphics);
         drawScrollingString(guiGraphics, MekanismLang.MULTIBLOCK_FORMED.translate(), 0, 16, TextAlignment.LEFT, titleTextColor(), 13, false);

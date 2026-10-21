@@ -1,26 +1,30 @@
 package mekanism.neoshim.neoforge.common.crafting;
 
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.MapCodec;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
-import mekanism.fabric.compat.IngredientCodecs;
-import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
-import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.core.Holder;
 import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 
-/** Intersection of ingredients. Serialized like NeoForge: {@code {"type": "neoforge:intersection", "children": [...]}}. */
+/** Intersection of ingredients: {@code {"neoforge:ingredient_type": "neoforge:intersection", "children": [...]}}. */
 public record IntersectionIngredient(List<Ingredient> children) implements ICustomIngredient {
 
-    public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath("neoforge", "intersection");
-    public static final MapCodec<IntersectionIngredient> CODEC = IngredientCodecs.LIST_CODEC_NONEMPTY.fieldOf("children").xmap(IntersectionIngredient::new, IntersectionIngredient::children);
-    public static final StreamCodec<RegistryFriendlyByteBuf, IntersectionIngredient> STREAM_CODEC = Ingredient.CONTENTS_STREAM_CODEC.apply(ByteBufCodecs.list())
-          .map(IntersectionIngredient::new, IntersectionIngredient::children);
-    public static final CustomIngredientSerializer<IntersectionIngredient> SERIALIZER = IngredientCodecs.serializer(ID, CODEC, STREAM_CODEC);
+    public static final MapCodec<IntersectionIngredient> CODEC = Ingredient.CODEC.listOf()
+          .validate(list -> list.isEmpty() ? DataResult.error(() -> "Intersection ingredient must have at least one child") : DataResult.success(list))
+          .fieldOf("children").xmap(IntersectionIngredient::new, IntersectionIngredient::children);
+    public static final IngredientType<IntersectionIngredient> TYPE = new IngredientType<>(CODEC,
+          Ingredient.CONTENTS_STREAM_CODEC.apply(ByteBufCodecs.list()).map(IntersectionIngredient::new, IntersectionIngredient::children));
+
+    public IntersectionIngredient {
+        if (children.isEmpty()) {
+            throw new IllegalArgumentException("Intersection ingredient must have at least one child");
+        }
+        children = List.copyOf(children);
+    }
 
     public static Ingredient of(Ingredient... children) {
         if (children.length == 1) {
@@ -40,8 +44,15 @@ public record IntersectionIngredient(List<Ingredient> children) implements ICust
     }
 
     @Override
-    public Stream<ItemStack> getItems() {
-        return Arrays.stream(children.getFirst().getItems()).filter(this::test);
+    public Stream<Holder<Item>> items() {
+        return children.getFirst().items().filter(item -> {
+            for (int i = 1; i < children.size(); i++) {
+                if (!children.get(i).acceptsItem(item)) {
+                    return false;
+                }
+            }
+            return true;
+        });
     }
 
     @Override
@@ -50,7 +61,7 @@ public record IntersectionIngredient(List<Ingredient> children) implements ICust
     }
 
     @Override
-    public CustomIngredientSerializer<?> getSerializer() {
-        return SERIALIZER;
+    public IngredientType<?> getType() {
+        return TYPE;
     }
 }

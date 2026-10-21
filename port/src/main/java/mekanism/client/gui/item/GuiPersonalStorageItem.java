@@ -3,16 +3,14 @@ package mekanism.client.gui.item;
 import mekanism.client.gui.GuiMekanism;
 import mekanism.client.gui.element.tab.GuiSecurityTab;
 import mekanism.common.inventory.container.item.PersonalStorageItemContainer;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
 
 public class GuiPersonalStorageItem extends GuiMekanism<PersonalStorageItemContainer> {
 
     public GuiPersonalStorageItem(PersonalStorageItemContainer container, Inventory inv, Component title) {
-        super(container, inv, title);
-        imageHeight += 56;
+        super(container, inv, title, DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT + 56);
         inventoryLabelY = imageHeight - 94;
         dynamicSlots = true;
     }
@@ -24,7 +22,7 @@ public class GuiPersonalStorageItem extends GuiMekanism<PersonalStorageItemConta
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         renderTitleText(guiGraphics);
         renderInventoryText(guiGraphics);
         super.drawForegroundText(guiGraphics, mouseX, mouseY);

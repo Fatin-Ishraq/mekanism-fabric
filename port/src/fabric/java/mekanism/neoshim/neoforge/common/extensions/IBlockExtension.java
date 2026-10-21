@@ -3,13 +3,14 @@ package mekanism.neoshim.neoforge.common.extensions;
 import mekanism.neoshim.neoforge.common.ItemAbility;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
-import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.BlockAndLightGetter;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.Level;
@@ -26,7 +27,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.level.pathfinder.PathType;
-import net.minecraft.world.phys.HitResult;
 import org.jetbrains.annotations.Nullable;
 
 /** Injected into {@link Block}. */
@@ -44,16 +44,16 @@ public interface IBlockExtension {
         return self().getExplosionResistance();
     }
 
-    default ItemStack getCloneItemStack(BlockState state, HitResult target, LevelReader level, BlockPos pos, Player player) {
-        return self().getCloneItemStack(level, pos, state);
+    default ItemStack getCloneItemStack(LevelReader level, BlockPos pos, BlockState state, boolean includeData, Player player) {
+        return state.getCloneItemStack(level, pos, includeData);
     }
 
-    default boolean onDestroyedByPlayer(BlockState state, Level level, BlockPos pos, Player player, boolean willHarvest, FluidState fluid) {
+    default boolean onDestroyedByPlayer(BlockState state, Level level, BlockPos pos, Player player, ItemStack toolStack, boolean willHarvest, FluidState fluid) {
         self().playerWillDestroy(level, pos, state, player);
-        return level.setBlock(pos, fluid.createLegacyBlock(), level.isClientSide ? 11 : 3);
+        return level.setBlock(pos, fluid.createLegacyBlock(), level.isClientSide() ? 11 : 3);
     }
 
-    default void onBlockExploded(BlockState state, Level level, BlockPos pos, Explosion explosion) {
+    default void onBlockExploded(BlockState state, ServerLevel level, BlockPos pos, Explosion explosion) {
         level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
         self().wasExploded(level, pos, explosion);
     }
@@ -90,7 +90,7 @@ public interface IBlockExtension {
         return state.is(Blocks.OBSIDIAN);
     }
 
-    default boolean shouldDisplayFluidOverlay(BlockState state, BlockAndTintGetter level, BlockPos pos, FluidState fluidState) {
+    default boolean shouldDisplayFluidOverlay(BlockState state, BlockAndLightGetter level, BlockPos pos, FluidState fluidState) {
         return state.getBlock() instanceof HalfTransparentBlock || state.getBlock() instanceof LeavesBlock;
     }
 

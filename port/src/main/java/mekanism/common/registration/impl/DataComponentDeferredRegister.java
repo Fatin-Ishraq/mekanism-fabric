@@ -1,27 +1,32 @@
 package mekanism.common.registration.impl;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
-import mekanism.api.SerializerHelper;
-import mekanism.api.annotations.NothingNullByDefault;
-import mekanism.common.attachments.FrequencyAware;
+import mekanism.api.SerializationConstants;
+import mekanism.api.resource.LargeResourceStack;
+import mekanism.common.component.FrequencyAware;
+import mekanism.common.component.containers.resource.AttachedResources;
 import mekanism.common.lib.frequency.Frequency;
 import mekanism.common.lib.frequency.FrequencyType;
 import mekanism.common.registration.MekanismDeferredHolder;
 import mekanism.common.registration.MekanismDeferredRegister;
+import net.minecraft.core.NonNullList;
 import net.minecraft.core.Registry;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.ExtraCodecs;
+import mekanism.neoshim.neoforge.transfer.resource.Resource;
 
-@NothingNullByDefault
 public class DataComponentDeferredRegister extends MekanismDeferredRegister<DataComponentType<?>> {
 
     public DataComponentDeferredRegister(String namespace) {
@@ -41,6 +46,18 @@ public class DataComponentDeferredRegister extends MekanismDeferredRegister<Data
         });
     }
 
+    public <RESOURCE extends Resource> MekanismDeferredHolder<DataComponentType<?>, DataComponentType<AttachedResources<RESOURCE>>> registerAttachedContents(String name,
+          LargeResourceStack.StackHelper<RESOURCE> stackHelper) {
+        return simple(name, builder -> builder.persistent(
+              RecordCodecBuilder.create(instance -> instance.group(
+                    stackHelper.orEmptyCodec().listOf().fieldOf(SerializationConstants.CONTAINERS).forGetter(AttachedResources::containers)
+              ).apply(instance, AttachedResources::new))
+        ).networkSynchronized(stackHelper.streamCodec()
+              .apply(ByteBufCodecs.<RegistryFriendlyByteBuf, LargeResourceStack<RESOURCE>, List<LargeResourceStack<RESOURCE>>>collection(NonNullList::createWithCapacity))
+              .map(AttachedResources::new, AttachedResources::containers)
+        ).cacheEncoding());
+    }
+
     public MekanismDeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> registerBoolean(String name) {
         return simple(name, builder -> builder.persistent(Codec.BOOL)
               .networkSynchronized(ByteBufCodecs.BOOL));
@@ -56,9 +73,8 @@ public class DataComponentDeferredRegister extends MekanismDeferredRegister<Data
               .networkSynchronized(ByteBufCodecs.VAR_INT));
     }
 
-    @SuppressWarnings("removal")
     public MekanismDeferredHolder<DataComponentType<?>, DataComponentType<Long>> registerNonNegativeLong(String name) {
-        return simple(name, builder -> builder.persistent(SerializerHelper.POSITIVE_LONG_CODEC_LEGACY)
+        return simple(name, builder -> builder.persistent(ExtraCodecs.NON_NEGATIVE_LONG)
               .networkSynchronized(ByteBufCodecs.VAR_LONG));
     }
 
@@ -69,7 +85,7 @@ public class DataComponentDeferredRegister extends MekanismDeferredRegister<Data
 
     public MekanismDeferredHolder<DataComponentType<?>, DataComponentType<Component>> registerComponent(String name) {
         //Copied from DataComponents.CUSTOM_NAME and ITEM_NAME
-        return simple(name, builder -> builder.persistent(ComponentSerialization.FLAT_CODEC)
+        return simple(name, builder -> builder.persistent(ComponentSerialization.CODEC)
               .networkSynchronized(ComponentSerialization.STREAM_CODEC)
               .cacheEncoding());
     }

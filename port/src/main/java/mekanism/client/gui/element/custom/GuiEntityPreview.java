@@ -4,11 +4,11 @@ import java.util.function.Supplier;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.GuiElement;
 import mekanism.client.gui.element.GuiInnerScreen;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
-import org.jetbrains.annotations.NotNull;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
@@ -38,13 +38,13 @@ public class GuiEntityPreview extends GuiElement {
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
-        renderBackgroundTexture(guiGraphics, GuiInnerScreen.SCREEN, GuiInnerScreen.SCREEN_SIZE, GuiInnerScreen.SCREEN_SIZE);
+        guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, GuiInnerScreen.SCREEN, getButtonX(), getButtonY(), getButtonWidth(), getButtonHeight());
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         LivingEntity preview = this.preview.get();
         float oldBodyRot = preview.yBodyRot;
@@ -52,7 +52,7 @@ public class GuiEntityPreview extends GuiElement {
         //Apply our rotation to the entity
         preview.yBodyRot = 180.0F + rotation * 20.0F;
         preview.setYRot(180.0F + rotation * 40.0F);
-        InventoryScreen.renderEntityInInventory(guiGraphics, relativeX + xOffset, relativeY + yOffset, scale, PREVIEW_TRANSLATION, PREVIEW_ANGLE, null, preview);
+        //TODO - 26.1: InventoryScreen.renderEntityInInventory(guiGraphics, relativeX + xOffset, relativeY + yOffset, scale, PREVIEW_TRANSLATION, PREVIEW_ANGLE, null, preview);
         //Reset the values to what they were before we applied the rotation, even though our one use case doesn't actually care
         // as we only use the preview entity for rendering, so the correct rotation gets set every time before it is rendered
         preview.yBodyRot = oldBodyRot;
@@ -60,14 +60,14 @@ public class GuiEntityPreview extends GuiElement {
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY, int button) {
-        super.onClick(mouseX, mouseY, button);
+    public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
+        super.onClick(event, isDoubleClick);
         setDragging(true);
     }
 
     @Override
-    public void onDrag(double mouseX, double mouseY, double deltaX, double deltaY) {
-        super.onDrag(mouseX, mouseY, deltaX, deltaY);
+    protected void onDrag(MouseButtonEvent event, double deltaX, double deltaY) {
+        super.onDrag(event, deltaX, deltaY);
         if (isDragging()) {
             rotation = Mth.wrapDegrees(rotation - (float) (deltaX / 10));
         }

@@ -2,14 +2,19 @@ package mekanism.common.lib.multiblock;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongMaps;
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
-import mekanism.api.chemical.ChemicalStack;
+import mekanism.api.chemical.ChemicalResource;
 import mekanism.api.radiation.IRadiationManager;
 import mekanism.api.text.EnumColor;
 import mekanism.api.text.ILangEntry;
@@ -18,35 +23,40 @@ import mekanism.common.lib.multiblock.IValveHandler.ValveData;
 import mekanism.common.lib.multiblock.MultiblockCache.RejectContents;
 import mekanism.common.lib.radiation.RadiationManager;
 import mekanism.common.util.EnumUtils;
+import mekanism.common.util.InventoryUtils;
+import mekanism.common.util.InventoryUtils.ItemDropper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.phys.Vec3;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import org.jspecify.annotations.Nullable;
 
 public class FormationProtocol<T extends MultiblockData> {
 
     public static final int MAX_SIZE = 18;
 
-    /**
-     * The original block the calculation is getting run from.
-     */
+    /// The original block the calculation is getting run from.
     private final IMultiblock<T> pointer;
     private final Structure structure;
     private final MultiblockManager<T> manager;
+    private final MultiblockType<T> multiblockType;
 
     public final Set<BlockPos> locations = new ObjectOpenHashSet<>();
     public final Set<BlockPos> internalLocations = new ObjectOpenHashSet<>();
-    public final Set<ValveData> valves = new ObjectOpenHashSet<>();
+    public final Map<BlockPos, ValveData> valves = new HashMap<>();
     public final Map<UUID, MultiblockCache<T>> idsFound = new HashMap<>();
 
     public FormationProtocol(IMultiblock<T> tile, Structure structure) {
         pointer = tile;
+        multiblockType = tile.getMultiblockType();
         this.structure = structure;
         manager = tile.getManager();
     }
@@ -70,13 +80,14 @@ public class FormationProtocol<T extends MultiblockData> {
         return result.isFormed() ? form(structure, idsFound) : fail(result);
     }
 
-    /**
-     * Runs the protocol and updates all nodes that make a part of the multiblock.
-     */
+    /// Runs the protocol and updates all nodes that make a part of the multiblock.
     public FormationResult doUpdate() {
-        IStructureValidator<T> validator = manager.createValidator();
+        IStructureValidator<T> validator = multiblockType.createValidator();
         Level world = pointer.getLevel();
-        validator.init(world, manager, structure);
+        if (world == null) {
+            return FormationResult.FAIL;
+        }
+        validator.init(world, manager, multiblockType, structure);
         if (!validator.precheck()) {
             return FormationResult.FAIL;
         }
@@ -103,7 +114,7 @@ public class FormationProtocol<T extends MultiblockData> {
                     }
                 }
                 //Replace the caches for all the old ids with a singular merged cache with our desired id
-                manager.replaceCaches(result.idsFound().keySet(), idToUse, cache);
+                manager.replaceCaches(result.idsFound().keySet(), idToUse, Objects.requireNonNull(cache, "Tried to merge multiblock caches but couldn't find a cache?"));
                 if (!rejectContents.rejectedItems.isEmpty()) {
                     //TODO - 1.20.4: Don't drop it in the center if there is no nearest player, maybe drop it on top of the multiblock? Or to one of the sides
                     Vec3 dropPosition = pointerPos.getCenter();
@@ -113,17 +124,20 @@ public class FormationProtocol<T extends MultiblockData> {
                         //If there is one drop at the player instead of at the block that triggered the formation
                         dropPosition = nearestPlayer.position();
                     }
-                    for (ItemStack rejectedItem : rejectContents.rejectedItems) {
-                        world.addFreshEntity(new ItemEntity(world, dropPosition.x, dropPosition.y, dropPosition.z, rejectedItem));
+                    ItemDropper<Vec3> dropper = (level, pos, _, stack) -> level.addFreshEntity(new ItemEntity(level, pos.x(), pos.y(), pos.z(), stack));
+                    for (ObjectIterator<Object2LongMap.Entry<ItemResource>> iter = Object2LongMaps.fastIterator(rejectContents.rejectedItems); iter.hasNext(); ) {
+                        Object2LongMap.Entry<ItemResource> rejectedItem = iter.next();
+                        InventoryUtils.dropStack(world, dropPosition, null, rejectedItem.getKey(), rejectedItem.getLongValue(), dropper);
                     }
                 }
                 if (!rejectContents.rejectedChemicals.isEmpty() && RadiationManager.isGlobalRadiationEnabled()) {
                     //Dump any rejected gases, if they are radioactive vent them into the atmosphere
                     // we are able to skip this if radiation is disabled as it will just NO-OP further down the line
                     double radiation = 0;
-                    for (ChemicalStack rejectedChemical : rejectContents.rejectedChemicals) {
-                        //If we have a radioactive substance, then we need to set the tank to empty
-                        radiation += rejectedChemical.getRadioactivity();
+                    for (ObjectIterator<Object2LongMap.Entry<ChemicalResource>> iter = Object2LongMaps.fastIterator(rejectContents.rejectedChemicals); iter.hasNext(); ) {
+                        Object2LongMap.Entry<ChemicalResource> rejectedChemical = iter.next();
+                        //If we have a radioactive substance, we need to calculate how much radiation got vented
+                        radiation += rejectedChemical.getKey().getRadioactivity() * rejectedChemical.getLongValue();
                     }
                     if (radiation > 0) {
                         IRadiationManager.INSTANCE.radiate(world, structureFound.getBounds().getCenter(), radiation);
@@ -132,18 +146,21 @@ public class FormationProtocol<T extends MultiblockData> {
             }
             boolean trackCache = cache == null;
             if (trackCache) {
-                cache = manager.createCache();
+                cache = multiblockType.createCache();
             }
 
-            cache.apply(world.registryAccess(), structureFound);
-            structureFound.inventoryID = idToUse;
-            structureFound.onCreated(world);
-            if (trackCache) {
-                //If it is a new fresh cache we need to make sure to then sync the multiblock back to the cache
-                // so that we don't save it with empty data as otherwise we may end up with crashes in when merging multiblock caches
-                cache.sync(structureFound);
-                // and then we let the manager start tracking the cache so that it gets saved to the manager and can be used by multiblocks
-                manager.trackCache(idToUse, cache);
+            try (Transaction transaction = Transaction.openRoot()) {
+                cache.apply(structureFound, transaction);
+                structureFound.inventoryID = idToUse;
+                structureFound.onCreated(world, transaction);
+                if (trackCache) {
+                    //If it is a new fresh cache we need to make sure to then sync the multiblock back to the cache
+                    // so that we don't save it with empty data as otherwise we may end up with crashes in when merging multiblock caches
+                    cache.sync(structureFound, transaction);
+                    // and then we let the manager start tracking the cache so that it gets saved to the manager and can be used by multiblocks
+                    manager.trackCache(idToUse, cache);
+                }
+                transaction.commit();
             }
             //TODO: Do we want to validate against overfilled tanks here?
             return FormationResult.SUCCESS;
@@ -161,16 +178,18 @@ public class FormationProtocol<T extends MultiblockData> {
     }
 
     @FunctionalInterface
-    public interface FormationChecker<NODE> {
+    public interface FormationChecker<LEVEL extends BlockGetter, NODE extends @Nullable Object> {
 
-        boolean check(Level level, Long2ObjectMap<ChunkAccess> chunkMap, BlockPos start, NODE node, BlockPos toCheck);
+        boolean check(LEVEL level, Long2ObjectMap<ChunkAccess> chunkMap, BlockPos start, NODE node, BlockPos toCheck);
     }
 
-    public static <NODE> int explore(Level level, Long2ObjectMap<ChunkAccess> chunkMap, BlockPos start, NODE node, FormationChecker<NODE> checker) {
+    public static <LEVEL extends BlockGetter, NODE extends @Nullable Object> int explore(LEVEL level, Long2ObjectMap<ChunkAccess> chunkMap, BlockPos start, NODE node,
+          FormationChecker<LEVEL, NODE> checker) {
         return explore(level, chunkMap, start, node, checker, MAX_SIZE * MAX_SIZE * MAX_SIZE);
     }
 
-    public static <NODE> int explore(Level level, Long2ObjectMap<ChunkAccess> chunkMap, BlockPos start, NODE node, FormationChecker<NODE> checker, int maxCount) {
+    public static <LEVEL extends BlockGetter, NODE extends @Nullable Object> int explore(LEVEL level, Long2ObjectMap<ChunkAccess> chunkMap, BlockPos start, NODE node,
+          FormationChecker<LEVEL, NODE> checker, int maxCount) {
         if (!checker.check(level, chunkMap, start, node, start)) {
             return 0;
         }
@@ -203,11 +222,12 @@ public class FormationProtocol<T extends MultiblockData> {
         public static final FormationResult SUCCESS = new FormationResult(true, null, false);
         public static final FormationResult FAIL = new FormationResult(false, null, false);
 
+        @Nullable
         private final Component resultText;
         private final boolean formed;
         private final boolean noIgnore;
 
-        private FormationResult(boolean formed, Component resultText, boolean noIgnore) {
+        private FormationResult(boolean formed, @Nullable Component resultText, boolean noIgnore) {
             this.formed = formed;
             this.resultText = resultText;
             this.noIgnore = noIgnore;
@@ -253,20 +273,21 @@ public class FormationProtocol<T extends MultiblockData> {
             return noIgnore;
         }
 
+        @Nullable
         public Component getResultText() {
             return resultText;
         }
     }
 
     private StructureResult<T> fail(FormationResult result) {
-        return new StructureResult<>(result, null, null);
+        return new StructureResult<>(result, null, Collections.emptyMap());
     }
 
     private StructureResult<T> form(T structureFound, Map<UUID, MultiblockCache<T>> idsFound) {
         return new StructureResult<>(FormationResult.SUCCESS, structureFound, idsFound);
     }
 
-    private record StructureResult<T extends MultiblockData>(FormationResult result, T structureFound, Map<UUID, MultiblockCache<T>> idsFound) {
+    private record StructureResult<T extends MultiblockData>(FormationResult result, @Nullable T structureFound, Map<UUID, MultiblockCache<T>> idsFound) {
     }
 
     public enum CasingType {

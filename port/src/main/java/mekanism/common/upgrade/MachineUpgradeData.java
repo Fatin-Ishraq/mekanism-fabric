@@ -9,8 +9,9 @@ import mekanism.common.inventory.slot.InputInventorySlot;
 import mekanism.common.inventory.slot.OutputInventorySlot;
 import mekanism.common.tile.component.ITileComponent;
 import mekanism.common.tile.interfaces.IRedstoneControl.RedstoneControl;
-import net.minecraft.core.HolderLookup;
+import net.minecraft.core.HolderLookup.Provider;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.ProblemReporter.PathElement;
 
 public class MachineUpgradeData implements IUpgradeData {
 
@@ -25,15 +26,15 @@ public class MachineUpgradeData implements IUpgradeData {
     public final CompoundTag components;
 
     //Machine Constructor
-    public MachineUpgradeData(HolderLookup.Provider provider, boolean redstone, RedstoneControl controlType, IEnergyContainer energyContainer, int operatingTicks, EnergyInventorySlot energySlot,
-          InputInventorySlot inputSlot, OutputInventorySlot outputSlot, List<ITileComponent> components) {
+    public MachineUpgradeData(Provider provider, boolean redstone, RedstoneControl controlType, IEnergyContainer energyContainer, int operatingTicks, EnergyInventorySlot energySlot,
+          InputInventorySlot inputSlot, OutputInventorySlot outputSlot, List<ITileComponent> components, PathElement problemPath) {
         this(provider, redstone, controlType, energyContainer, new int[]{operatingTicks}, energySlot, Collections.singletonList(inputSlot),
-              Collections.singletonList(outputSlot), false, components);
+              Collections.singletonList(outputSlot), false, components, problemPath);
     }
 
     //Machine Factory Constructor
-    public MachineUpgradeData(HolderLookup.Provider provider, boolean redstone, RedstoneControl controlType, IEnergyContainer energyContainer, int[] progress, EnergyInventorySlot energySlot,
-          List<IInventorySlot> inputSlots, List<IInventorySlot> outputSlots, boolean sorting, List<ITileComponent> components) {
+    public MachineUpgradeData(Provider provider, boolean redstone, RedstoneControl controlType, IEnergyContainer energyContainer, int[] progress, EnergyInventorySlot energySlot,
+          List<IInventorySlot> inputSlots, List<IInventorySlot> outputSlots, boolean sorting, List<ITileComponent> components, PathElement problemPath) {
         this.redstone = redstone;
         this.controlType = controlType;
         this.energyContainer = energyContainer;
@@ -42,9 +43,6 @@ public class MachineUpgradeData implements IUpgradeData {
         this.inputSlots = inputSlots;
         this.outputSlots = outputSlots;
         this.sorting = sorting;
-        this.components = new CompoundTag();
-        for (ITileComponent component : components) {
-            component.write(this.components, provider);
-        }
+        this.components = IUpgradeData.readComponents(provider, components, problemPath);
     }
 }

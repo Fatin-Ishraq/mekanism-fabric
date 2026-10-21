@@ -5,16 +5,18 @@ import mekanism.api.gear.ICustomModule.ModuleDispenseResult;
 import mekanism.api.gear.IModule;
 import mekanism.api.gear.IModuleContainer;
 import mekanism.api.gear.IModuleHelper;
+import mekanism.common.lib.transaction.TransactionHelper;
 import net.minecraft.core.dispenser.BlockSource;
 import net.minecraft.core.dispenser.OptionalDispenseItemBehavior;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
 
 public class ModuleDispenseBehavior extends OptionalDispenseItemBehavior {
 
-    @NotNull
     @Override
-    protected ItemStack execute(@NotNull BlockSource source, @NotNull ItemStack stack) {
+    protected ItemStack execute(BlockSource source, ItemStack stack) {
         //Note: We don't check if the stack is empty as it is never checked in vanilla's ones, and we also
         // don't check if the stack is a module container as we only register this dispense behavior on stacks that are
         setSuccess(true);
@@ -25,13 +27,18 @@ public class ModuleDispenseBehavior extends OptionalDispenseItemBehavior {
         boolean preventDrop = result == ModuleDispenseResult.FAIL_PREVENT_DROP;
         IModuleContainer moduleContainer = IModuleHelper.INSTANCE.getModuleContainer(stack);
         if (moduleContainer != null) {
+            ItemAccess itemAccess = ItemAccess.forStack(stack);
             for (IModule<?> module : moduleContainer.modules()) {
                 if (module.isEnabled()) {
-                    result = onModuleDispense(module, source, moduleContainer, stack);
-                    if (result == ModuleDispenseResult.HANDLED) {
-                        return stack;
+                    //Protect against any mods that might be doing transactional logic, such as if a custom dispenser validates it has enough energy before calling this method
+                    try (Transaction transaction = TransactionHelper.openTransactionSafe()) {
+                        result = onModuleDispense(module, itemAccess, source, transaction);
+                        if (result == ModuleDispenseResult.HANDLED) {
+                            transaction.commit();
+                            return stack;
+                        }
+                        preventDrop |= result == ModuleDispenseResult.FAIL_PREVENT_DROP;
                     }
-                    preventDrop |= result == ModuleDispenseResult.FAIL_PREVENT_DROP;
                 }
             }
         }
@@ -43,11 +50,12 @@ public class ModuleDispenseBehavior extends OptionalDispenseItemBehavior {
         return super.execute(source, stack);
     }
 
-    private <MODULE extends ICustomModule<MODULE>> ModuleDispenseResult onModuleDispense(IModule<MODULE> module, @NotNull BlockSource source, IModuleContainer moduleContainer, ItemStack stack) {
-        return module.getCustomInstance().onDispense(module, moduleContainer, stack, source);
+    private <MODULE extends ICustomModule<MODULE>> ModuleDispenseResult onModuleDispense(IModule<MODULE> module, ItemAccess itemAccess, BlockSource source,
+          TransactionContext transaction) {
+        return module.getCustomInstance().onDispense(module, itemAccess, source, transaction);
     }
 
-    protected ModuleDispenseResult performBuiltin(@NotNull BlockSource source, @NotNull ItemStack stack) {
+    protected ModuleDispenseResult performBuiltin(BlockSource source, ItemStack stack) {
         return ModuleDispenseResult.DEFAULT;
     }
 }

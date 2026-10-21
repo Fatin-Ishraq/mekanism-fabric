@@ -10,29 +10,27 @@ import mekanism.api.text.TextComponentUtil;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.button.MekanismButton;
 import mekanism.client.gui.tooltip.TooltipUtils;
-import mekanism.client.render.MekanismRenderer;
 import mekanism.common.util.MekanismUtils.ResourceType;
 import mekanism.generators.common.MekanismGenerators;
 import mekanism.generators.common.base.IReactorLogic;
 import mekanism.generators.common.base.IReactorLogicMode;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
 public class ReactorLogicButton<TYPE extends Enum<TYPE> & IReactorLogicMode<TYPE>> extends MekanismButton {
 
-    private static final ResourceLocation TEXTURE = MekanismGenerators.rl(ResourceType.GUI_BUTTON.getPrefix() + "reactor_logic.png");
-    @NotNull
+    private static final Identifier TEXTURE = MekanismGenerators.rl(ResourceType.GUI_BUTTON.getPrefix() + "reactor_logic.png");
     private final IReactorLogic<TYPE> tile;
     private final Supplier<@Nullable TYPE> modeSupplier;
     private final Map<TYPE, Tooltip> typeTooltips;
     private final Consumer<TYPE> onPress;
 
 
-    public ReactorLogicButton(IGuiWrapper gui, int x, int y, int index, @NotNull IReactorLogic<TYPE> tile, Class<TYPE> clazz, IntSupplier indexSupplier, Supplier<TYPE[]> modeList,
+    public ReactorLogicButton(IGuiWrapper gui, int x, int y, int index, IReactorLogic<TYPE> tile, Class<TYPE> clazz, IntSupplier indexSupplier, Supplier<TYPE[]> modeList,
           Consumer<TYPE> onPress) {
         this(gui, x, y, tile, clazz, onPress, () -> {
             int i = indexSupplier.getAsInt() + index;
@@ -41,8 +39,8 @@ public class ReactorLogicButton<TYPE extends Enum<TYPE> & IReactorLogicMode<TYPE
         });
     }
 
-    private ReactorLogicButton(IGuiWrapper gui, int x, int y, @NotNull IReactorLogic<TYPE> tile, Class<TYPE> clazz, Consumer<TYPE> onPress, Supplier<@Nullable TYPE> modeSupplier) {
-        super(gui, x, y, 128, 22, CommonComponents.EMPTY, (element, mouseX, mouseY) -> ((ReactorLogicButton<?>) element).click());
+    private ReactorLogicButton(IGuiWrapper gui, int x, int y, IReactorLogic<TYPE> tile, Class<TYPE> clazz, Consumer<TYPE> onPress, Supplier<@Nullable TYPE> modeSupplier) {
+        super(gui, x, y, 128, 22, CommonComponents.EMPTY, (element, _, _) -> ((ReactorLogicButton<?>) element).click());
         this.onPress = onPress;
         this.modeSupplier = modeSupplier;
         this.tile = tile;
@@ -58,17 +56,16 @@ public class ReactorLogicButton<TYPE extends Enum<TYPE> & IReactorLogicMode<TYPE
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         TYPE mode = modeSupplier.get();
         if (mode != null) {
-            MekanismRenderer.color(guiGraphics, mode.getColor());
-            guiGraphics.blit(TEXTURE, getButtonX(), getButtonY(), 0, mode == tile.getMode() ? 22 : 0, getButtonWidth(), getButtonHeight(), 128, 44);
-            MekanismRenderer.resetColor(guiGraphics);
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, getButtonX(), getButtonY(), 0, mode == tile.getMode() ? 22 : 0, getButtonWidth(), getButtonHeight(), 128, 44,
+                  mode.getColor().getPackedColor());
         }
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         TYPE mode = modeSupplier.get();
         if (mode != null) {
             gui().renderItem(guiGraphics, mode.getRenderStack(), relativeX + 3, relativeY + 3);

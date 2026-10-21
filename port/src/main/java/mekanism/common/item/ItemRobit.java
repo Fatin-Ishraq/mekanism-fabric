@@ -1,48 +1,54 @@
 package mekanism.common.item;
 
-import java.util.List;
 import java.util.UUID;
-import mekanism.api.energy.IEnergyContainer;
+import java.util.function.Consumer;
 import mekanism.api.robit.RobitSkin;
 import mekanism.api.security.IItemSecurityUtils;
 import mekanism.api.security.ISecurityObject;
 import mekanism.api.security.SecurityMode;
 import mekanism.api.text.EnumColor;
 import mekanism.common.MekanismLang;
-import mekanism.common.attachments.containers.ContainerType;
-import mekanism.common.capabilities.security.SecurityObject;
+import mekanism.common.component.containers.type.ContainerType;
 import mekanism.common.base.holiday.HolidayManager;
 import mekanism.common.capabilities.ICapabilityAware;
+import mekanism.common.capabilities.security.SecurityObject;
 import mekanism.common.entity.EntityRobit;
 import mekanism.common.network.to_client.security.PacketSyncSecurity;
 import mekanism.common.registries.MekanismDataComponents;
+import mekanism.common.registries.MekanismEntityTypes;
 import mekanism.common.registries.MekanismRobitSkins;
 import mekanism.common.tile.TileEntityChargepad;
 import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.util.InventoryUtils;
-import mekanism.common.util.StorageUtils;
+import mekanism.common.util.ItemAccessUtils;
 import mekanism.common.util.WorldUtils;
 import mekanism.common.util.text.BooleanStateDisplay.YesNo;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.gameevent.GameEvent;
 import mekanism.neoshim.neoforge.capabilities.RegisterCapabilitiesEvent;
 import mekanism.neoshim.neoforge.network.PacketDistributor;
-import org.jetbrains.annotations.NotNull;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public class ItemRobit extends ItemEnergized implements ICapabilityAware {
 
@@ -55,24 +61,25 @@ public class ItemRobit extends ItemEnergized implements ICapabilityAware {
     }
 
     @Override
-    public void onDestroyed(@NotNull ItemEntity item, @NotNull DamageSource damageSource) {
+    public void onDestroyed(ItemEntity item, DamageSource damageSource) {
         InventoryUtils.dropItemContents(item, damageSource);
     }
 
     @Override
-    public void appendHoverText(@NotNull ItemStack stack, @NotNull Item.TooltipContext context, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        super.appendHoverText(stack, context, tooltip, flag);
+    @Deprecated
+    public void appendHoverText(ItemStack stack, Item.TooltipContext context, TooltipDisplay tooltipDisplay, Consumer<Component> tooltipAdder, TooltipFlag flag) {
+        super.appendHoverText(stack, context, tooltipDisplay, tooltipAdder, flag);
         Component name = stack.get(MekanismDataComponents.ROBIT_NAME);
         if (name == null) {
             name = MekanismLang.ROBIT.translate();
         }
-        tooltip.add(MekanismLang.ROBIT_NAME.translateColored(EnumColor.INDIGO, EnumColor.GRAY, name));
-        tooltip.add(MekanismLang.ROBIT_SKIN.translateColored(EnumColor.INDIGO, EnumColor.GRAY, RobitSkin.getTranslatedName(stack.getOrDefault(MekanismDataComponents.ROBIT_SKIN, MekanismRobitSkins.BASE))));
-        IItemSecurityUtils.INSTANCE.addSecurityTooltip(stack, tooltip);
-        tooltip.add(MekanismLang.HAS_INVENTORY.translateColored(EnumColor.AQUA, EnumColor.GRAY, YesNo.hasInventory(stack)));
+        tooltipAdder.accept(MekanismLang.ROBIT_NAME.translateColored(EnumColor.INDIGO, EnumColor.GRAY, name));
+        tooltipAdder.accept(MekanismLang.ROBIT_SKIN.translateColored(EnumColor.INDIGO, EnumColor.GRAY, RobitSkin.getTranslatedName(stack.getOrDefault(MekanismDataComponents.ROBIT_SKIN, MekanismRobitSkins.BASE))));
+        ItemAccess itemAccess = ItemAccessUtils.sideEffectFreeAccess(stack);
+        IItemSecurityUtils.INSTANCE.addSecurityTooltip(itemAccess, tooltipAdder);
+        tooltipAdder.accept(MekanismLang.HAS_INVENTORY.translateColored(EnumColor.AQUA, EnumColor.GRAY, YesNo.hasInventory(itemAccess)));
     }
 
-    @NotNull
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Player player = context.getPlayer();
@@ -83,60 +90,62 @@ public class ItemRobit extends ItemEnergized implements ICapabilityAware {
         BlockPos pos = context.getClickedPos();
         TileEntityMekanism chargepad = WorldUtils.getTileEntity(TileEntityChargepad.class, world, pos);
         if (chargepad != null && !chargepad.getActive()) {
-            if (!world.isClientSide) {
+            if (world instanceof ServerLevel level) {
                 ItemStack stack = context.getItemInHand();
-                EntityRobit robit = EntityRobit.create(world, pos.getX() + 0.5, pos.getY() + 0.1, pos.getZ() + 0.5);
-                if (robit == null) {
+                //TODO - 26.1: Determine how we want to set the y offset
+                //EntityRobit robit = EntityRobit.create(world, pos.getX() + 0.5, pos.getY() + 0.1, pos.getZ() + 0.5);
+                EntityRobit spawnedRobit = MekanismEntityTypes.ROBIT.get().spawn(level, robit -> {
+                    robit.setHome(chargepad.getTileGlobalPos());
+                    ItemAccess itemAccess = ItemAccessUtils.sideEffectFreeAccess(stack);
+                    ItemResource itemType = itemAccess.getResource();
+                    UUID ownerUUID = IItemSecurityUtils.INSTANCE.getOwnerUUID(itemAccess);
+                    if (ownerUUID == null) {
+                        robit.setOwnerUUID(player.getUUID(), null);
+                        //If the robit doesn't already have an owner, make sure we portray this
+                        PacketDistributor.sendToAllPlayers(new PacketSyncSecurity(player.getUUID()));
+                    } else {
+                        robit.setOwnerUUID(ownerUUID, null);
+                    }
+                    ContainerType.ENERGY.copyToContainer(robit.getEnergyContainer(), itemType);
+                    ContainerType.ITEM.copyToContainers(robit.getInventorySlots(), itemType);
+                    Component name = itemType.get(MekanismDataComponents.ROBIT_NAME);
+                    if (name != null) {
+                        robit.setCustomName(name);
+                    }
+                    ISecurityObject securityObject = IItemSecurityUtils.INSTANCE.securityCapability(itemAccess);
+                    if (securityObject != null) {
+                        robit.setSecurityMode(securityObject.getSecurityMode(), null);
+                    }
+                    robit.setSkin(itemType.getOrDefault(MekanismDataComponents.ROBIT_SKIN, MekanismRobitSkins.BASE), player);
+                    robit.setDefaultSkinManuallySelected(itemType.getOrDefault(MekanismDataComponents.DEFAULT_MANUALLY_SELECTED, false));
+                }, pos, EntitySpawnReason.SPAWN_ITEM_USE, false, false);
+                if (spawnedRobit == null) {
                     return InteractionResult.FAIL;
                 }
-                robit.setHome(chargepad.getTileGlobalPos());
-                IEnergyContainer energyContainer = StorageUtils.getEnergyContainer(stack, 0);
-                if (energyContainer != null) {
-                    robit.getEnergyContainer().setEnergy(energyContainer.getEnergy());
-                }
-                UUID ownerUUID = IItemSecurityUtils.INSTANCE.getOwnerUUID(stack);
-                if (ownerUUID == null) {
-                    robit.setOwnerUUID(player.getUUID());
-                    //If the robit doesn't already have an owner, make sure we portray this
-                    PacketDistributor.sendToAllPlayers(new PacketSyncSecurity(player.getUUID()));
-                } else {
-                    robit.setOwnerUUID(ownerUUID);
-                }
-                ContainerType.ITEM.copyFromStack(world.registryAccess(), stack, robit.getInventorySlots(null));
-                Component name = stack.get(MekanismDataComponents.ROBIT_NAME);
-                if (name != null) {
-                    robit.setCustomName(name);
-                }
-                ISecurityObject securityObject = IItemSecurityUtils.INSTANCE.securityCapability(stack);
-                if (securityObject != null) {
-                    robit.setSecurityMode(securityObject.getSecurityMode());
-                }
-                robit.setSkin(stack.getOrDefault(MekanismDataComponents.ROBIT_SKIN, MekanismRobitSkins.BASE), player);
-                robit.setDefaultSkinManuallySelected(stack.getOrDefault(MekanismDataComponents.DEFAULT_MANUALLY_SELECTED, false));
-                world.addFreshEntity(robit);
-                world.gameEvent(player, GameEvent.ENTITY_PLACE, robit.blockPosition());
+                world.gameEvent(player, GameEvent.ENTITY_PLACE, spawnedRobit.blockPosition());
+                //TODO - 26.1: Do we want this to be consume?
                 stack.shrink(1);
-                CriteriaTriggers.SUMMONED_ENTITY.trigger((ServerPlayer) player, robit);
+                CriteriaTriggers.SUMMONED_ENTITY.trigger((ServerPlayer) player, spawnedRobit);
             }
-            return InteractionResult.sidedSuccess(world.isClientSide);
+            return InteractionResult.SUCCESS;
         }
         return InteractionResult.PASS;
     }
 
     @Override
     public void attachCapabilities(RegisterCapabilitiesEvent event) {
-        event.registerItem(IItemSecurityUtils.INSTANCE.ownerCapability(), (stack, ctx) -> new SecurityObject(stack), this);
-        event.registerItem(IItemSecurityUtils.INSTANCE.securityCapability(), (stack, ctx) -> new SecurityObject(stack), this);
+        event.registerItem(IItemSecurityUtils.INSTANCE.ownerCapability(), (_, itemAccess) -> new SecurityObject(itemAccess), this);
+        event.registerItem(IItemSecurityUtils.INSTANCE.securityCapability(), (_, itemAccess) -> new SecurityObject(itemAccess), this);
     }
 
     @Override
-    public void inventoryTick(@NotNull ItemStack stack, @NotNull Level level, @NotNull Entity entity, int slot, boolean isSelected) {
-        super.inventoryTick(stack, level, entity, slot, isSelected);
-        if (!level.isClientSide && HolidayManager.hasRobitSkinsToday() && !stack.getOrDefault(MekanismDataComponents.DEFAULT_MANUALLY_SELECTED, false)) {
+    public void inventoryTick(ItemStack stack, ServerLevel level, Entity entity, @Nullable EquipmentSlot slot) {
+        super.inventoryTick(stack, level, entity, slot);
+        if (!level.isClientSide() && HolidayManager.hasRobitSkinsToday() && !stack.getOrDefault(MekanismDataComponents.DEFAULT_MANUALLY_SELECTED, false)) {
             ResourceKey<RobitSkin> skin = stack.get(MekanismDataComponents.ROBIT_SKIN);
             if (skin == null || skin == MekanismRobitSkins.BASE) {
                 //Randomize the robit's skin
-                stack.set(MekanismDataComponents.ROBIT_SKIN, HolidayManager.getRandomBaseSkin(level.random));
+                stack.set(MekanismDataComponents.ROBIT_SKIN, HolidayManager.getRandomBaseSkin(level.getRandom()));
             }
         }
     }

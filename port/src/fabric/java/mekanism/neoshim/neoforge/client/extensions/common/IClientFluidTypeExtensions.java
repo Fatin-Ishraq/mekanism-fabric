@@ -1,20 +1,20 @@
 package mekanism.neoshim.neoforge.client.extensions.common;
 
-import com.mojang.blaze3d.shaders.FogShape;
 import com.mojang.blaze3d.vertex.PoseStack;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
 import mekanism.neoshim.neoforge.fluids.FluidType;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.FogRenderer;
+import net.minecraft.client.renderer.fog.FogData;
+import net.minecraft.client.renderer.fog.environment.FogEnvironment;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.resources.Identifier;
+import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Vector3f;
+import org.joml.Vector4f;
 
 public interface IClientFluidTypeExtensions {
 
@@ -37,45 +37,44 @@ public interface IClientFluidTypeExtensions {
         return 0xFFFFFFFF;
     }
 
-    default ResourceLocation getStillTexture() {
+    default Identifier getStillTexture() {
         return null;
     }
 
-    default ResourceLocation getFlowingTexture() {
-        return null;
-    }
-
-    @Nullable
-    default ResourceLocation getOverlayTexture() {
+    default Identifier getFlowingTexture() {
         return null;
     }
 
     @Nullable
-    default ResourceLocation getRenderOverlayTexture(Minecraft mc) {
+    default Identifier getOverlayTexture() {
+        return null;
+    }
+
+    @Nullable
+    default Identifier getRenderOverlayTexture(Minecraft mc) {
         return null;
     }
 
     default void renderOverlay(Minecraft mc, PoseStack poseStack) {
     }
 
-    default Vector3f modifyFogColor(Camera camera, float partialTick, ClientLevel level, int renderDistance, float darkenWorldAmount, Vector3f fluidFogColor) {
+    default Vector4f modifyFogColor(Camera camera, float partialTick, ClientLevel level, int renderDistance, float darkenWorldAmount, Vector4f fluidFogColor) {
         return fluidFogColor;
     }
 
-    default void modifyFogRender(Camera camera, FogRenderer.FogMode mode, float renderDistance, float partialTick, float nearDistance, float farDistance,
-          FogShape shape) {
+    default void modifyFogRender(Camera camera, @Nullable FogEnvironment environment, float renderDistance, float partialTick, FogData fog) {
     }
 
-    default ResourceLocation getStillTexture(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
+    default Identifier getStillTexture(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
         return getStillTexture();
     }
 
-    default ResourceLocation getFlowingTexture(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
+    default Identifier getFlowingTexture(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
         return getFlowingTexture();
     }
 
     @Nullable
-    default ResourceLocation getOverlayTexture(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
+    default Identifier getOverlayTexture(FluidState state, BlockAndTintGetter getter, BlockPos pos) {
         return getOverlayTexture();
     }
 
@@ -83,15 +82,15 @@ public interface IClientFluidTypeExtensions {
         return getTintColor();
     }
 
-    default ResourceLocation getStillTexture(FluidStack stack) {
+    default Identifier getStillTexture(FluidStack stack) {
         return getStillTexture();
     }
 
-    default ResourceLocation getFlowingTexture(FluidStack stack) {
+    default Identifier getFlowingTexture(FluidStack stack) {
         return getFlowingTexture();
     }
 
-    default ResourceLocation getOverlayTexture(FluidStack stack) {
+    default Identifier getOverlayTexture(FluidStack stack) {
         return getOverlayTexture();
     }
 

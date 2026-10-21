@@ -15,6 +15,7 @@ import mekanism.api.recipes.ingredients.InputIngredient;
 import mekanism.common.Mekanism;
 import mekanism.common.integration.crafttweaker.chemical.ICrTChemicalStack;
 import mekanism.common.integration.crafttweaker.ingredient.CrTChemicalStackIngredient;
+import net.minecraft.core.TypedInstance;
 
 public class CrTRecipeComponents {
 
@@ -26,10 +27,10 @@ public class CrTRecipeComponents {
           new TypeToken<>() {},
           RecipeComponentEqualityCheckers::areNumbersEqual
     );
-    public static final IRecipeComponent<Long> ENERGY = IRecipeComponent.simple(
+    public static final IRecipeComponent<Integer> ENERGY = IRecipeComponent.simple(
           Mekanism.rl("energy"),
           new TypeToken<>() {},
-          Long::equals
+          Integer::equals
     );
     public static final IRecipeComponent<Boolean> PER_TICK_USAGE = IRecipeComponent.simple(
           Mekanism.rl("per_tick_usage"),
@@ -61,7 +62,7 @@ public class CrTRecipeComponents {
           )
     );
 
-    private static <TYPE, INGREDIENT extends InputIngredient<TYPE>> boolean ingredientsMatch(INGREDIENT a, INGREDIENT b) {
+    private static <TYPE, STACK extends TypedInstance<TYPE>, INGREDIENT extends InputIngredient<TYPE, STACK>> boolean ingredientsMatch(INGREDIENT a, INGREDIENT b) {
         return Objects.equals(a, b) || a.getRepresentations().stream().allMatch(b) && b.getRepresentations().stream().allMatch(a);
     }
 

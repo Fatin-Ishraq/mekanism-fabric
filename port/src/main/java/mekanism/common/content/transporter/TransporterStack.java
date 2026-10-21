@@ -3,13 +3,10 @@ package mekanism.common.content.transporter;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongList;
-import java.util.Collections;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.IntFunction;
 import mekanism.api.SerializationConstants;
-import mekanism.api.SerializerHelper;
+import mekanism.api.resource.LargeResourceStack;
 import mekanism.api.text.EnumColor;
 import mekanism.common.content.network.transmitter.LogisticalTransporterBase;
 import mekanism.common.content.transporter.TransporterPathfinder.Destination;
@@ -20,10 +17,6 @@ import mekanism.common.lib.inventory.TransitRequest.TransitResponse;
 import mekanism.common.util.NBTUtils;
 import mekanism.common.util.WorldUtils;
 import net.minecraft.core.Direction;
-import net.minecraft.core.GlobalPos;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -31,22 +24,24 @@ import net.minecraft.util.ByIdMap;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import mekanism.neoshim.neoforge.network.codec.NeoForgeStreamCodecs;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
 import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class TransporterStack {
 
     //Make sure to call updateForPos before calling this method
-    public static StreamCodec<RegistryFriendlyByteBuf, TransporterStack> STREAM_CODEC = NeoForgeStreamCodecs.composite(
+    public static StreamCodec<RegistryFriendlyByteBuf, TransporterStack> STREAM_CODEC = StreamCodec.composite(
           EnumColor.OPTIONAL_STREAM_CODEC, stack -> Optional.ofNullable(stack.color),
           ByteBufCodecs.VAR_INT, stack -> stack.progress,
           ByteBufCodecs.VAR_LONG, stack -> stack.originalLocation,
           Path.STREAM_CODEC, TransporterStack::getPathType,
           ByteBufCodecs.optional(ByteBufCodecs.VAR_LONG), stack -> stack.clientNext == Long.MAX_VALUE ? Optional.empty() : Optional.of(stack.clientNext),
           ByteBufCodecs.optional(ByteBufCodecs.VAR_LONG), stack -> stack.clientPrev == Long.MAX_VALUE ? Optional.empty() : Optional.of(stack.clientPrev),
-          ItemStack.OPTIONAL_STREAM_CODEC, stack -> stack.itemStack,
+          LargeResourceStack.ITEM_HELPER.streamCodec(), stack -> stack.itemStack,
           (color, progress, originalLocation, pathType, clientNext, clientPrev, itemStack) -> {
               TransporterStack stack = new TransporterStack();
               stack.color = color.orElse(null);
@@ -60,14 +55,16 @@ public class TransporterStack {
           }
     );
 
-    public ItemStack itemStack = ItemStack.EMPTY;
+    private LargeResourceStack<ItemResource> itemStack = LargeResourceStack.ITEM_HELPER.empty();
 
     public int progress;
 
+    @Nullable
     public EnumColor color = null;
 
     public boolean initiatedPath = false;
 
+    @Nullable
     public Direction idleDir = null;
 
     //packed BlockPos-es
@@ -81,110 +78,99 @@ public class TransporterStack {
     private Path pathType;
     private LongList pathToTarget = new LongArrayList();
 
-    public static TransporterStack readFromNBT(HolderLookup.Provider provider, CompoundTag nbtTags) {
-        TransporterStack stack = new TransporterStack();
-        stack.read(provider, nbtTags);
+    public TransporterStack() {
+    }
+
+    private TransporterStack(ValueInput input) {
+        this.color = NBTUtils.getEnum(input, SerializationConstants.COLOR, EnumColor.BY_ID);
+        this.progress = input.getIntOr(SerializationConstants.PROGRESS, progress);
+        this.originalLocation = input.getLongOr(SerializationConstants.ORIGINAL_LOCATION, Long.MAX_VALUE);
+        this.pathType = NBTUtils.getEnum(input, SerializationConstants.PATH_TYPE, Path.BY_ID);
+        this.itemStack = LargeResourceStack.ITEM_HELPER.readOrEmpty(input, SerializationConstants.ITEM);
+    }
+
+    public static TransporterStack read(ValueInput input) {
+        TransporterStack stack = new TransporterStack(input);
+        stack.idleDir = NBTUtils.getEnum(input, SerializationConstants.IDLE_DIR, Direction::from3DDataValue);
+        stack.homeLocation = input.getLongOr(SerializationConstants.HOME_LOCATION, Long.MAX_VALUE);
         return stack;
     }
 
-    public static TransporterStack readFromUpdate(HolderLookup.Provider provider, CompoundTag nbtTags) {
-        TransporterStack stack = new TransporterStack();
-        stack.readFromUpdateTag(provider, nbtTags);
+    public static TransporterStack readFromUpdate(ValueInput input) {
+        TransporterStack stack = new TransporterStack(input);
+        stack.clientNext = input.getLongOr(SerializationConstants.NEXT, Long.MAX_VALUE);
+        stack.clientPrev = input.getLongOr(SerializationConstants.PREVIOUS, Long.MAX_VALUE);
         return stack;
     }
 
-    public void writeToUpdateTag(HolderLookup.Provider provider, LogisticalTransporterBase transporter, CompoundTag updateTag) {
+    private void writeCommon(ValueOutput output) {
         if (color != null) {
-            NBTUtils.writeEnum(updateTag, SerializationConstants.COLOR, color);
+            NBTUtils.writeEnum(output, SerializationConstants.COLOR, color);
         }
-        updateTag.putInt(SerializationConstants.PROGRESS, progress);
-        updateTag.putLong(SerializationConstants.ORIGINAL_LOCATION, originalLocation);
-        NBTUtils.writeEnum(updateTag, SerializationConstants.PATH_TYPE, getPathType());
+        output.putInt(SerializationConstants.PROGRESS, progress);
+        output.putLong(SerializationConstants.ORIGINAL_LOCATION, originalLocation);
+        LargeResourceStack.ITEM_HELPER.storeNonEmpty(output, SerializationConstants.ITEM, itemStack);
+    }
+
+    public void writeToUpdateTag(LogisticalTransporterBase transporter, ValueOutput output) {
+        writeCommon(output);
+        NBTUtils.writeEnum(output, SerializationConstants.PATH_TYPE, getPathType());
         long next = getNext(transporter);
         if (next != Long.MAX_VALUE) {
-            updateTag.putLong(SerializationConstants.NEXT, next);
+            output.putLong(SerializationConstants.NEXT, next);
         }
         long prev = getPrev(transporter);
         if (prev != Long.MAX_VALUE) {
-            updateTag.putLong(SerializationConstants.PREVIOUS, prev);
-        }
-        if (!itemStack.isEmpty()) {
-            updateTag.put(SerializationConstants.ITEM, SerializerHelper.saveOversized(provider, itemStack));
+            output.putLong(SerializationConstants.PREVIOUS, prev);
         }
     }
 
-    public void readFromUpdateTag(HolderLookup.Provider provider, CompoundTag updateTag) {
-        this.color = NBTUtils.getEnum(updateTag, SerializationConstants.COLOR, EnumColor.BY_ID);
-        progress = updateTag.getInt(SerializationConstants.PROGRESS);
-        NBTUtils.setLongIfPresent(updateTag, SerializationConstants.ORIGINAL_LOCATION, coord -> originalLocation = coord);
-        NBTUtils.setEnumIfPresent(updateTag, SerializationConstants.PATH_TYPE, Path.BY_ID, type -> pathType = type);
-
-        //todo is backcompat needed?
-        clientNext = Long.MAX_VALUE;
-        NBTUtils.setLongIfPresent(updateTag, SerializationConstants.NEXT, coord -> clientNext = coord);
-        NBTUtils.setBlockPosIfPresent(updateTag, SerializationConstants.NEXT, coord -> clientNext = coord.asLong());
-        clientPrev = Long.MAX_VALUE;
-        NBTUtils.setLongIfPresent(updateTag, SerializationConstants.PREVIOUS, coord -> clientPrev = coord);
-        NBTUtils.setBlockPosIfPresent(updateTag, SerializationConstants.PREVIOUS, coord -> clientPrev = coord.asLong());
-
-        Tag itemTag = updateTag.get(SerializationConstants.ITEM);
-        if (itemTag != null) {
-            itemStack = SerializerHelper.parseOversized(provider, itemTag).orElse(ItemStack.EMPTY);
+    public void write(ValueOutput output) {
+        writeCommon(output);
+        if (pathType != null) {
+            //TODO - 26.1: Figure out path type and if we should set it to none when saving to file instead of not saving it
+            // given that for syncing we pretend it is none.
+            NBTUtils.writeEnum(output, SerializationConstants.PATH_TYPE, pathType);
         }
-    }
-
-    public void write(HolderLookup.Provider provider, CompoundTag nbtTags) {
-        if (color != null) {
-            NBTUtils.writeEnum(nbtTags, SerializationConstants.COLOR, color);
-        }
-
-        nbtTags.putInt(SerializationConstants.PROGRESS, progress);
-        nbtTags.putLong(SerializationConstants.ORIGINAL_LOCATION, originalLocation);
-
         if (idleDir != null) {
-            NBTUtils.writeEnum(nbtTags, SerializationConstants.IDLE_DIR, idleDir);
+            NBTUtils.writeEnum(output, SerializationConstants.IDLE_DIR, idleDir);
         }
         if (homeLocation != Long.MAX_VALUE) {
-            nbtTags.putLong(SerializationConstants.HOME_LOCATION, homeLocation);
-        }
-        if (pathType != null) {
-            NBTUtils.writeEnum(nbtTags, SerializationConstants.PATH_TYPE, pathType);
-        }
-        if (!itemStack.isEmpty()) {
-            nbtTags.put(SerializationConstants.ITEM_OVERSIZED, SerializerHelper.saveOversized(provider, itemStack));
+            output.putLong(SerializationConstants.HOME_LOCATION, homeLocation);
         }
     }
 
-    public void read(HolderLookup.Provider provider, CompoundTag nbtTags) {
-        this.color = NBTUtils.getEnum(nbtTags, SerializationConstants.COLOR, EnumColor.BY_ID);
-        progress = nbtTags.getInt(SerializationConstants.PROGRESS);
-        NBTUtils.setBlockPosIfPresent(nbtTags, SerializationConstants.ORIGINAL_LOCATION, coord -> originalLocation = coord.asLong());//TODO - 1.22 remove backcompat
-        NBTUtils.setLongIfPresent(nbtTags, SerializationConstants.ORIGINAL_LOCATION, coord -> originalLocation = coord);
-        NBTUtils.setEnumIfPresent(nbtTags, SerializationConstants.IDLE_DIR, Direction::from3DDataValue, dir -> idleDir = dir);
-        NBTUtils.setBlockPosIfPresent(nbtTags, SerializationConstants.HOME_LOCATION, coord -> homeLocation = coord.asLong());//TODO - 1.22 remove backcompat
-        NBTUtils.setLongIfPresent(nbtTags, SerializationConstants.HOME_LOCATION, coord -> homeLocation = coord);
-        NBTUtils.setEnumIfPresent(nbtTags, SerializationConstants.PATH_TYPE, Path.BY_ID, type -> pathType = type);
-        Tag oversizedTag = nbtTags.get(SerializationConstants.ITEM_OVERSIZED);
-        if (oversizedTag != null) {
-            itemStack = SerializerHelper.parseOversized(provider, oversizedTag).orElse(ItemStack.EMPTY);
-        } else if (nbtTags.contains(SerializationConstants.ITEM, Tag.TAG_COMPOUND)) {//TODO - 1.22: Remove this legacy way of loading data
-            itemStack = ItemStack.parseOptional(provider, nbtTags.getCompound(SerializationConstants.ITEM));
-        } else {//TODO - 1.22: Remove this legacy way of loading data
-            itemStack = ItemStack.parseOptional(provider, nbtTags);
-        }
+    public boolean isEmpty() {
+        return itemStack.isEmpty();
     }
 
-    private void setPath(Level world, @NotNull LongList path, @NotNull Path type, boolean updateFlowing) {
+    public ItemStack asItemStack() {
+        return getItemType().toStack(size());
+    }
+
+    public ItemResource getItemType() {
+        return itemStack.resource();
+    }
+
+    public int size() {
+        return itemStack.amountAsInt();
+    }
+
+    public void setStack(ItemResource itemType, int amount) {
+        this.itemStack = LargeResourceStack.ITEM_HELPER.createStack(itemType, amount);
+    }
+
+    private void setPath(Level world, LongList path, Path type, @Nullable TransactionContext transaction) {
         //Make sure old path isn't null
-        if (updateFlowing && (pathType == null || pathType.hasTarget())) {
+        if (pathType == null || pathType.hasTarget()) {
             //Only update the actual flowing stacks if we want to modify more than our current stack
-            TransporterManager.remove(world, this);
+            TransporterManager.remove(world, this, transaction);
         }
         pathToTarget = path;
         pathType = type;
-        if (updateFlowing && pathType.hasTarget()) {
+        if (pathType.hasTarget()) {
             //Only update the actual flowing stacks if we want to modify more than our current stack
-            TransporterManager.add(world, this);
+            TransporterManager.add(world, this, transaction);
         }
     }
 
@@ -200,59 +186,41 @@ public class TransporterStack {
         return pathType == null ? Path.NONE : pathType;
     }
 
-    public TransitResponse recalculatePath(TransitRequest request, LogisticalTransporterBase transporter, int min) {
-        return recalculatePath(request, transporter, min, true);
+    public final TransitResponse recalculatePath(TransitRequest request, @Nullable BlockEntity ignored, LogisticalTransporterBase transporter, int min, @Nullable TransactionContext transaction) {
+        return recalculatePath(request, transporter, min, transaction);
     }
 
-    public final TransitResponse recalculatePath(TransitRequest request, BlockEntity ignored, LogisticalTransporterBase transporter, int min, boolean updateFlowing) {
-        return recalculatePath(request, transporter, min, updateFlowing);
-    }
-
-    public TransitResponse recalculatePath(TransitRequest request, LogisticalTransporterBase transporter, int min, boolean updateFlowing) {
-        return recalculatePath(request, transporter, min, updateFlowing, Collections.emptyMap());
-    }
-
-    public TransitResponse recalculatePath(TransitRequest request, LogisticalTransporterBase transporter, int min,
-          Map<GlobalPos, Set<TransporterStack>> additionalFlowingStacks) {
-        return recalculatePath(request, transporter, min, false, additionalFlowingStacks);
-    }
-
-    private TransitResponse recalculatePath(TransitRequest request, LogisticalTransporterBase transporter, int min, boolean updateFlowing,
-          Map<GlobalPos, Set<TransporterStack>> additionalFlowingStacks) {
-        Destination newPath = TransporterPathfinder.getNewBasePath(transporter, this, request, min, additionalFlowingStacks);
+    public TransitResponse recalculatePath(TransitRequest request, LogisticalTransporterBase transporter, int min, @Nullable TransactionContext transaction) {
+        Destination newPath = TransporterPathfinder.getNewBasePath(transporter, this, request, min, transaction);
         if (newPath == null) {
-            return request.getEmptyResponse();
+            return TransitResponse.EMPTY;
         }
         idleDir = null;
-        setPath(transporter.getLevel(), newPath.getPath(), Path.DEST, updateFlowing);
+        setPath(transporter.getLevel(), newPath.getPath(), Path.DEST, transaction);
         initiatedPath = true;
         return newPath.getResponse();
     }
 
-    public <BE extends BlockEntity & IAdvancedTransportEjector> TransitResponse recalculateRRPath(TransitRequest request, BE outputter, LogisticalTransporterBase transporter, int min) {
-        return recalculateRRPath(request, outputter, transporter, min, true);
-    }
-
-    public <BE extends BlockEntity & IAdvancedTransportEjector> TransitResponse recalculateRRPath(TransitRequest request, BE outputter, LogisticalTransporterBase transporter, int min, boolean updateFlowing) {
-        Destination newPath = TransporterPathfinder.getNewRRPath(transporter, this, request, outputter, min);
+    public TransitResponse recalculateRRPath(TransitRequest request, IAdvancedTransportEjector outputter, LogisticalTransporterBase transporter, int min, @Nullable TransactionContext transaction) {
+        Destination newPath = TransporterPathfinder.getNewRRPath(transporter, this, request, outputter, min, transaction);
         if (newPath == null) {
-            return request.getEmptyResponse();
+            return TransitResponse.EMPTY;
         }
         idleDir = null;
-        setPath(transporter.getLevel(), newPath.getPath(), Path.DEST, updateFlowing);
+        setPath(transporter.getLevel(), newPath.getPath(), Path.DEST, transaction);
         initiatedPath = true;
         return newPath.getResponse();
     }
 
-    public boolean calculateIdle(LogisticalTransporterBase transporter) {
-        IdlePathData newPath = TransporterPathfinder.getIdlePath(transporter, this);
+    public boolean calculateIdle(LogisticalTransporterBase transporter, @Nullable TransactionContext transaction) {
+        IdlePathData newPath = TransporterPathfinder.getIdlePath(transporter, this, transaction);
         if (newPath == null) {
             return false;
         }
         if (newPath.type().isHome()) {
             idleDir = null;
         }
-        setPath(transporter.getLevel(), newPath.path(), newPath.type(), true);
+        setPath(transporter.getLevel(), newPath.path(), newPath.type(), transaction);
         originalLocation = transporter.getWorldPositionLong();
         initiatedPath = true;
         return true;
@@ -323,20 +291,23 @@ public class TransporterStack {
     }
 
     @Contract("null, _, _ -> false")
-    public boolean canInsertToTransporter(@Nullable LogisticalTransporterBase transmitter, Direction from, @Nullable LogisticalTransporterBase transporterFrom) {
-        return transmitter != null && canInsertToTransporterNN(transmitter, from, transporterFrom);
-    }
-
-    public boolean canInsertToTransporterNN(@NotNull LogisticalTransporterBase transporter, Direction from, @Nullable BlockEntity tileFrom) {
-        //If the color is valid, make sure that the connection is valid
-        EnumColor color = transporter.getColor();
-        return (color == null || color == this.color) && transporter.canConnectMutual(from.getOpposite(), tileFrom);
-    }
-
-    public boolean canInsertToTransporterNN(@NotNull LogisticalTransporterBase transporter, Direction from, @Nullable LogisticalTransporterBase transporterFrom) {
+    public boolean canInsertToTransporter(@Nullable LogisticalTransporterBase transporter, Direction from, @Nullable LogisticalTransporterBase transporterFrom) {
+        if (transporter == null) {
+            return false;
+        }
         //If the color is valid, make sure that the connection is valid
         EnumColor color = transporter.getColor();
         return (color == null || color == this.color) && transporter.canConnectMutual(from.getOpposite(), transporterFrom);
+    }
+
+    @Contract("null, _, _ -> false")
+    public boolean canInsertToTransporter(@Nullable LogisticalTransporterBase transporter, Direction from, @Nullable BlockEntity tileFrom) {
+        if (transporter == null) {
+            return false;
+        }
+        //If the color is valid, make sure that the connection is valid
+        EnumColor color = transporter.getColor();
+        return (color == null || color == this.color) && transporter.canConnectMutual(from.getOpposite(), tileFrom);
     }
 
     public long getDest() {

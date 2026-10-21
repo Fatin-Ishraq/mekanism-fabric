@@ -1,41 +1,37 @@
 package mekanism.client.gui.element.button;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import mekanism.client.gui.IGuiWrapper;
-import mekanism.client.render.MekanismRenderer;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.resources.Identifier;
 
 public class FilterSelectButton extends MekanismButton {
 
-    private static final ResourceLocation ARROWS = MekanismUtils.getResource(ResourceType.GUI_BUTTON, "filter_arrows.png");
+    private static final Identifier ARROWS = MekanismUtils.getResource(ResourceType.GUI_BUTTON, "filter_arrows.png");
     private static final int TEXTURE_WIDTH = 22;
     private static final int TEXTURE_HEIGHT = 14;
 
     private final boolean down;
 
-    public FilterSelectButton(IGuiWrapper gui, int x, int y, boolean down, @NotNull IClickable onPress) {
+    public FilterSelectButton(IGuiWrapper gui, int x, int y, boolean down, IClickable onPress) {
         super(gui, x, y, 11, 7, CommonComponents.EMPTY, onPress);
         this.down = down;
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
-        if (resetColorBeforeRender()) {
-            MekanismRenderer.resetColor(guiGraphics);
-        }
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.enableDepthTest();
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
+        //TODO - 26.1 Gui blend
+        //RenderSystem.enableBlend();
+        //RenderSystem.defaultBlendFunc();
+        //RenderSystem.enableDepthTest();
         int width = getButtonWidth();
         int height = getButtonHeight();
         int x = getButtonX();
         int y = getButtonY();
-        guiGraphics.blit(ARROWS, x, y, isMouseOverCheckWindows(mouseX, mouseY) ? width : 0, down ? 7 : 0, width, height, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, ARROWS, x, y, isMouseOverCheckWindows(mouseX, mouseY) ? width : 0, down ? 7 : 0, width, height, TEXTURE_WIDTH, TEXTURE_HEIGHT);
     }
 
     @Override

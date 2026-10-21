@@ -5,12 +5,12 @@ import java.util.BitSet;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 
-/** Set of chunk render types (indexes into {@link RenderType#chunkBufferLayers()}). */
-public final class ChunkRenderTypeSet implements Iterable<RenderType> {
+/** Set of chunk render layers (indexes into {@link ChunkSectionLayer#values()}). NeoForge's ChunkRenderTypeSet re-based on 26.1's layer enum. */
+public final class ChunkRenderTypeSet implements Iterable<ChunkSectionLayer> {
 
-    private static final List<RenderType> CHUNK_RENDER_TYPES_LIST = RenderType.chunkBufferLayers();
+    private static final List<ChunkSectionLayer> CHUNK_RENDER_TYPES_LIST = List.of(ChunkSectionLayer.values());
     private static final ChunkRenderTypeSet NONE = new ChunkRenderTypeSet(new BitSet());
     private static final ChunkRenderTypeSet ALL;
 
@@ -28,16 +28,16 @@ public final class ChunkRenderTypeSet implements Iterable<RenderType> {
         return ALL;
     }
 
-    public static ChunkRenderTypeSet of(RenderType... renderTypes) {
+    public static ChunkRenderTypeSet of(ChunkSectionLayer... renderTypes) {
         return of(List.of(renderTypes));
     }
 
-    public static ChunkRenderTypeSet of(Collection<RenderType> renderTypes) {
+    public static ChunkRenderTypeSet of(Collection<ChunkSectionLayer> renderTypes) {
         BitSet bits = new BitSet();
-        for (RenderType renderType : renderTypes) {
+        for (ChunkSectionLayer renderType : renderTypes) {
             int index = CHUNK_RENDER_TYPES_LIST.indexOf(renderType);
             if (index < 0) {
-                throw new IllegalArgumentException("Attempted to create chunk render type set with a non-chunk render type: " + renderType);
+                throw new IllegalArgumentException("Attempted to create chunk render type set with a non-chunk render layer: " + renderType);
             }
             bits.set(index);
         }
@@ -66,21 +66,21 @@ public final class ChunkRenderTypeSet implements Iterable<RenderType> {
         return bits.isEmpty();
     }
 
-    public boolean contains(RenderType renderType) {
+    public boolean contains(ChunkSectionLayer renderType) {
         int index = CHUNK_RENDER_TYPES_LIST.indexOf(renderType);
         return index >= 0 && bits.get(index);
     }
 
-    public List<RenderType> asList() {
-        List<RenderType> list = new ArrayList<>();
-        for (RenderType renderType : this) {
+    public List<ChunkSectionLayer> asList() {
+        List<ChunkSectionLayer> list = new ArrayList<>();
+        for (ChunkSectionLayer renderType : this) {
             list.add(renderType);
         }
         return list;
     }
 
     @Override
-    public Iterator<RenderType> iterator() {
+    public Iterator<ChunkSectionLayer> iterator() {
         return bits.stream().mapToObj(CHUNK_RENDER_TYPES_LIST::get).iterator();
     }
 }

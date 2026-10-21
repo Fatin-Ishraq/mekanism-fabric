@@ -1,6 +1,6 @@
 package mekanism.common.item.block.transmitter;
 
-import java.util.List;
+import java.util.function.Consumer;
 import mekanism.api.text.EnumColor;
 import mekanism.api.text.ILangEntry;
 import mekanism.common.MekanismLang;
@@ -11,8 +11,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.item.component.TooltipDisplay;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import org.jspecify.annotations.Nullable;
 
 public class ItemBlockTransporter<TILE extends TileEntityLogisticalTransporterBase> extends ItemBlockTooltip<BlockLargeTransmitter<TILE>> {
 
@@ -29,13 +30,14 @@ public class ItemBlockTransporter<TILE extends TileEntityLogisticalTransporterBa
     }
 
     @Override
-    protected void addDetails(@NotNull ItemStack stack, @NotNull Item.TooltipContext context, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        super.addDetails(stack, context, tooltip, flag);
-        tooltip.add(MekanismLang.CAPABLE_OF_TRANSFERRING.translateColored(EnumColor.DARK_GRAY));
-        tooltip.add(MekanismLang.ITEMS.translateColored(EnumColor.PURPLE, MekanismLang.UNIVERSAL));
-        tooltip.add(MekanismLang.BLOCKS.translateColored(EnumColor.PURPLE, MekanismLang.UNIVERSAL));
+    protected void addDetails(ItemStack stack, ItemAccess itemAccess, Item.TooltipContext context, TooltipDisplay tooltipDisplay,
+          Consumer<Component> tooltipAdder, TooltipFlag flag) {
+        super.addDetails(stack, itemAccess, context, tooltipDisplay, tooltipAdder, flag);
+        tooltipAdder.accept(MekanismLang.CAPABLE_OF_TRANSFERRING.translateColored(EnumColor.DARK_GRAY));
+        tooltipAdder.accept(MekanismLang.ITEMS.translateColored(EnumColor.PURPLE, MekanismLang.UNIVERSAL));
+        tooltipAdder.accept(MekanismLang.BLOCKS.translateColored(EnumColor.PURPLE, MekanismLang.UNIVERSAL));
         if (extraDetails != null) {
-            tooltip.add(extraDetails.translateColored(EnumColor.DARK_RED));
+            tooltipAdder.accept(extraDetails.translateColored(EnumColor.DARK_RED));
         }
     }
 }

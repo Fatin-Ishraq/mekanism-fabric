@@ -12,10 +12,9 @@ import mekanism.client.gui.element.tab.GuiEnergyTab;
 import mekanism.common.inventory.container.tile.MekanismTileContainer;
 import mekanism.common.inventory.warning.WarningTracker.WarningType;
 import mekanism.common.tile.machine.TileEntityPrecisionSawmill;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
 
 public class GuiPrecisionSawmill extends GuiConfigurableTile<TileEntityPrecisionSawmill, MekanismTileContainer<TileEntityPrecisionSawmill>> {
 
@@ -28,9 +27,9 @@ public class GuiPrecisionSawmill extends GuiConfigurableTile<TileEntityPrecision
     protected void addGuiElements() {
         super.addGuiElements();
         addRenderableWidget(new GuiUpArrow(this, 60, 38));
-        addRenderableWidget(new GuiVerticalPowerBar(this, tile.getEnergyContainer(), 164, 15))
+        addRenderableWidget(new GuiVerticalPowerBar(this, tile.energyContainer(), 164, 15))
               .warning(WarningType.NOT_ENOUGH_ENERGY, tile.getWarningCheck(RecipeError.NOT_ENOUGH_ENERGY));
-        addRenderableWidget(new GuiEnergyTab(this, tile.getEnergyContainer(), tile::getActive));
+        addRenderableWidget(new GuiEnergyTab(this, tile.energyContainer(), tile::getActive));
         //Note: We just draw the wide slot on top of the normal slots so that it looks a bit better
         addRenderableWidget(new GuiSlot(SlotType.OUTPUT_WIDE, this, 111, 30))
               .warning(WarningType.NO_SPACE_IN_OUTPUT, tile.getWarningCheck(RecipeError.NOT_ENOUGH_OUTPUT_SPACE))
@@ -40,7 +39,7 @@ public class GuiPrecisionSawmill extends GuiConfigurableTile<TileEntityPrecision
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         renderTitleText(guiGraphics);
         renderInventoryText(guiGraphics);
         super.drawForegroundText(guiGraphics, mouseX, mouseY);

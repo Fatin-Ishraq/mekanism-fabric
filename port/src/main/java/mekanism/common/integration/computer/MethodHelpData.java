@@ -12,23 +12,22 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import mekanism.api.SerializationConstants;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.chemical.ChemicalStack;
+import mekanism.api.resource.LargeResourceStack;
 import mekanism.common.content.filter.IFilter;
 import mekanism.common.lib.frequency.Frequency;
 import mekanism.common.util.MekCodecs;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.Vec3i;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
+import mekanism.neoshim.neoforge.transfer.resource.Resource;
 import org.apache.commons.lang3.ClassUtils;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public record MethodHelpData(String methodName, @Nullable List<Param> params, Returns returns, @Nullable String description, MethodRestriction restriction,
                              boolean requiresPublicSecurity) {
 
@@ -53,17 +52,17 @@ public record MethodHelpData(String methodName, @Nullable List<Param> params, Re
         return new MethodHelpData(data.name(), params, Returns.from(data), data.methodDescription(), data.restriction(), data.requiresPublicSecurity());
     }
 
-    @NotNull
     private static String getHumanType(Class<?> clazz) {
         return getHumanType(clazz, NO_CLASSES);
     }
 
-    @NotNull
     public static String getHumanType(Class<?> clazz, Class<?>[] extraTypes) {
-        if (clazz == UUID.class || clazz == ResourceLocation.class || clazz == Item.class || clazz.isEnum()) {
+        if (clazz == UUID.class || clazz == Identifier.class || clazz == Item.class || clazz.isEnum()) {
             return "String (" + clazz.getSimpleName() + ")";
         }
-        if (Frequency.class.isAssignableFrom(clazz) || clazz == GlobalPos.class || Vec3i.class.isAssignableFrom(clazz) || clazz == FluidStack.class || clazz == ItemStack.class || clazz == BlockState.class || ChemicalStack.class.isAssignableFrom(clazz) || IFilter.class.isAssignableFrom(clazz)) {
+        if (Frequency.class.isAssignableFrom(clazz) || clazz == GlobalPos.class || Vec3i.class.isAssignableFrom(clazz) || clazz == FluidStack.class ||
+            clazz == ItemStack.class || clazz == BlockState.class || clazz == ChemicalStack.class || clazz == LargeResourceStack.class || Resource.class.isAssignableFrom(clazz) ||
+            IFilter.class.isAssignableFrom(clazz)) {
             return "Table (" + clazz.getSimpleName() + ")";
         }
         if (clazz == int.class || clazz == long.class || clazz == float.class || clazz == double.class || Number.class.isAssignableFrom(clazz)) {
@@ -127,7 +126,6 @@ public record MethodHelpData(String methodName, @Nullable List<Param> params, Re
               Codec.STRING.listOf().optionalFieldOf(SerializationConstants.VALUES, null).forGetter(Param::values)*/
         ).apply(instance, Param::new));
 
-        @NotNull
         private static Param from(Class<?> argClass, String paramName) {
             return new Param(paramName, getHumanType(argClass), argClass, getEnumConstantNames(argClass));
         }
@@ -159,7 +157,7 @@ public record MethodHelpData(String methodName, @Nullable List<Param> params, Re
         }
 
         @Override
-        public boolean equals(Object o) {
+        public boolean equals(@Nullable Object o) {
             if (this == o) {
                 return true;
             } else if (o == null || getClass() != o.getClass()) {

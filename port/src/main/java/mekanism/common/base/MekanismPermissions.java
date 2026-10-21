@@ -8,6 +8,7 @@ import mekanism.common.Mekanism;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.PermissionCheck;
 import mekanism.neoshim.neoforge.server.permission.PermissionAPI;
 import mekanism.neoshim.neoforge.server.permission.events.PermissionGatherEvent;
 import mekanism.neoshim.neoforge.server.permission.nodes.PermissionDynamicContext;
@@ -16,20 +17,20 @@ import mekanism.neoshim.neoforge.server.permission.nodes.PermissionNode;
 import mekanism.neoshim.neoforge.server.permission.nodes.PermissionNode.PermissionResolver;
 import mekanism.neoshim.neoforge.server.permission.nodes.PermissionType;
 import mekanism.neoshim.neoforge.server.permission.nodes.PermissionTypes;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class MekanismPermissions {
 
     private static final List<PermissionNode<?>> NODES_TO_REGISTER = new ArrayList<>();
-    private static final PermissionResolver<Boolean> PLAYER_IS_OP = (player, uuid, context) -> player != null && player.hasPermissions(Commands.LEVEL_GAMEMASTERS);
-    private static final PermissionResolver<Boolean> ALWAYS_TRUE = (player, uuid, context) -> true;
+    private static final PermissionResolver<Boolean> PLAYER_IS_OP = (player, _, _) -> player != null && Commands.LEVEL_GAMEMASTERS.check(player.permissions());
+    private static final PermissionResolver<Boolean> ALWAYS_TRUE = (_, _, _) -> true;
 
     public static final PermissionNode<Boolean> BYPASS_SECURITY = node("bypass_security", PermissionTypes.BOOLEAN,
-          (player, uuid, context) -> player != null && player.server.getPlayerList().isOp(player.getGameProfile()));
+          (player, _, _) -> player != null && player.level().getServer().getPlayerList().isOp(player.nameAndId()));
 
     //Commands
     public static final CommandPermissionNode COMMAND = new CommandPermissionNode(node("command", PermissionTypes.BOOLEAN,
-          (player, uuid, contexts) -> player != null && player.hasPermissions(Commands.LEVEL_ALL)), Commands.LEVEL_ALL);
+          (player, _, _) -> player != null && Commands.LEVEL_ALL.check(player.permissions())), Commands.LEVEL_ALL);
 
     public static final CommandPermissionNode COMMAND_BUILD = nodeOpCommand("build");
     public static final CommandPermissionNode COMMAND_BUILD_REMOVE = nodeSubCommand(COMMAND_BUILD, "remove");
@@ -70,9 +71,7 @@ public class MekanismPermissions {
         return new CommandPermissionNode(node, parent.fallbackLevel);
     }
 
-    /**
-     * @apiNote For use in sub nodes that don't know if there parent has been checked yet.
-     */
+    /// @apiNote For use in sub nodes that don't know if there parent has been checked yet.
     private static <T> PermissionNode<T> subNode(PermissionNode<T> parent, String nodeName) {
         return subNode(parent, nodeName, (player, uuid, context) -> getPermission(player, uuid, parent, context));
     }
@@ -109,13 +108,13 @@ public class MekanismPermissions {
         return PermissionAPI.getPermission(player, node, context);
     }
 
-    public record CommandPermissionNode(PermissionNode<Boolean> node, int fallbackLevel) implements Predicate<CommandSourceStack> {
+    public record CommandPermissionNode(PermissionNode<Boolean> node, PermissionCheck fallbackLevel) implements Predicate<CommandSourceStack> {
 
         @Override
         public boolean test(CommandSourceStack source) {
             //See https://github.com/MinecraftForge/MinecraftForge/commit/f7eea35cb9b043aae0a3866a9578724aa7560585 for details on why
             // has permission is checked first and the implications
-            return source.hasPermission(fallbackLevel) || source.source instanceof ServerPlayer player && PermissionAPI.getPermission(player, node);
+            return fallbackLevel.check(source.permissions()) || source.getEntity() instanceof ServerPlayer player && PermissionAPI.getPermission(player, node);//FABRIC: CommandSourceStack.source is private; getEntity() is the player-backed source
         }
     }
 

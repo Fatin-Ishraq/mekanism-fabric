@@ -1,14 +1,17 @@
 package mekanism.common.content.filter;
 
 import java.util.function.BiConsumer;
+import java.util.function.Supplier;
+import net.minecraft.world.level.Level;
+import org.jspecify.annotations.Nullable;
 
 public class SortableFilterManager<FILTER extends IFilter<?>> extends FilterManager<FILTER> {
 
     private final BiConsumer<FILTER, FILTER> postSwap;
 
     //TODO: Improve how we create this when done with a generic intermediary class
-    public SortableFilterManager(Class<? extends FILTER> filterClass, Runnable markForSave) {
-        super(filterClass, markForSave);
+    public SortableFilterManager(Class<? extends FILTER> filterClass, Runnable markForSave, Supplier<@Nullable Level> levelSupplier) {
+        super(filterClass, markForSave, levelSupplier);
         this.postSwap = (sourceFilter, targetFilter) -> {
             //Save the change
             this.markForSave.run();

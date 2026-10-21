@@ -1,6 +1,9 @@
 package mekanism.common.content.filter;
 
+import java.util.function.Supplier;
 import mekanism.common.integration.computer.annotation.ComputerMethod;
+import net.minecraft.core.HolderLookup;
+import org.jspecify.annotations.Nullable;
 
 public interface IFilter<FILTER extends IFilter<FILTER>> {
 
@@ -16,4 +19,6 @@ public interface IFilter<FILTER extends IFilter<FILTER>> {
 
     @ComputerMethod(threadSafe = true)
     void setEnabled(boolean enabled);
+
+    void setRegistryAccess(Supplier<HolderLookup.@Nullable Provider> registryAccess);
 }

@@ -1,7 +1,6 @@
 package mekanism.client.model;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import java.util.List;
 import mekanism.client.render.MekanismRenderType;
 import mekanism.common.Mekanism;
@@ -13,16 +12,16 @@ import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.LightCoordsUtil;
 
-public class ModelJetpack extends MekanismJavaModel {
+public class ModelJetpack extends MekanismJavaModel.NoState {
 
     public static final ModelLayerLocation JETPACK_LAYER = new ModelLayerLocation(Mekanism.rl("jetpack"), "main");
-    private static final ResourceLocation JETPACK_TEXTURE = MekanismUtils.getResource(ResourceType.RENDER, "jetpack.png");
+    private static final Identifier JETPACK_TEXTURE = MekanismUtils.getResource(ResourceType.RENDER, "jetpack.png");
 
     protected static final ModelPartData PACK_TOP = new ModelPartData("packTop", CubeListBuilder.create()
           .texOffs(92, 28)
@@ -100,7 +99,7 @@ public class ModelJetpack extends MekanismJavaModel {
               BOTTOM_THRUSTER, LIGHT_1, LIGHT_2, LIGHT_3);
     }
 
-    private final RenderType frameRenderType;
+    protected final RenderType frameRenderType = RenderTypes.entitySolid(JETPACK_TEXTURE);
     private final RenderType wingRenderType;
     private final List<ModelPart> parts;
     private final List<ModelPart> litParts;
@@ -111,8 +110,7 @@ public class ModelJetpack extends MekanismJavaModel {
     }
 
     protected ModelJetpack(ModelPart root) {
-        super(RenderType::entitySolid);
-        this.frameRenderType = renderType(JETPACK_TEXTURE);
+        super(root);
         this.wingRenderType = MekanismRenderType.JETPACK_GLASS.apply(JETPACK_TEXTURE);
         parts = getRenderableParts(root, PACK_TOP, PACK_BOTTOM, THRUSTER_LEFT, THRUSTER_RIGHT, FUEL_TUBE_RIGHT, FUEL_TUBE_LEFT, PACK_MID,
               WING_SUPPORT_L, WING_SUPPORT_R, PACK_TOP_REAR, EXTENDO_SUPPORT_L, EXTENDO_SUPPORT_R, PACK_DOODAD_2, PACK_DOODAD_3, BOTTOM_THRUSTER);
@@ -120,15 +118,12 @@ public class ModelJetpack extends MekanismJavaModel {
         wingParts = getRenderableParts(root, WING_BLADE_L, WING_BLADE_R);
     }
 
-    public void render(@NotNull PoseStack poseStack, @NotNull MultiBufferSource renderer, int light, int overlayLight, boolean hasEffect) {
-        renderToBuffer(poseStack, getVertexConsumer(renderer, frameRenderType, hasEffect), light, overlayLight, 0xFFFFFFFF);
-        renderPartsToBuffer(wingParts, poseStack, getVertexConsumer(renderer, wingRenderType, hasEffect), LightTexture.FULL_BRIGHT, overlayLight, 0x33FFFFFF);
-    }
-
     @Override
-    public void renderToBuffer(@NotNull PoseStack poseStack, @NotNull VertexConsumer vertexConsumer, int light, int overlayLight, int color) {
-        renderPartsToBuffer(parts, poseStack, vertexConsumer, light, overlayLight, color);
-        renderPartsToBuffer(litParts, poseStack, vertexConsumer, LightTexture.FULL_BRIGHT, overlayLight, color);
+    public void collect(PoseStack poseStack, SubmitNodeCollector collector, int light, int overlayLight, boolean hasFoil) {
+        setupAnim();
+        collectParts(parts, poseStack, frameRenderType, collector, light, overlayLight, -1, null, hasFoil);
+        collectParts(litParts, poseStack, frameRenderType, collector, LightCoordsUtil.FULL_BRIGHT, overlayLight, -1, null, hasFoil);
+        collectParts(wingParts, poseStack, wingRenderType, collector, LightCoordsUtil.FULL_BRIGHT, overlayLight, 0x33FFFFFF, null, hasFoil);
     }
 
     protected static ModelPartData thrusterLeft(float fuelZ) {

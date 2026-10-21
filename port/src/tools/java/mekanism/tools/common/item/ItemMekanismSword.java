@@ -1,24 +1,24 @@
 package mekanism.tools.common.item;
 
-import java.util.List;
+import java.util.function.Consumer;
 import mekanism.tools.common.material.MaterialCreator;
 import mekanism.tools.common.util.ToolsUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.SwordItem;
 import net.minecraft.world.item.TooltipFlag;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.item.component.TooltipDisplay;
 
-public class ItemMekanismSword extends SwordItem {
+public class ItemMekanismSword extends Item {
 
     public ItemMekanismSword(MaterialCreator material, Item.Properties properties) {
-        super(material, properties.attributes(createAttributes(material, Math.round(material.getSwordDamage()), material.getSwordAtkSpeed())/*FABRIC: vanilla takes an int damage*/));
+        super(properties.sword(material.toToolMaterial(), material.getSwordDamage(), material.getSwordAtkSpeed()));
     }
 
     @Override
-    public void appendHoverText(@NotNull ItemStack stack, @NotNull Item.TooltipContext context, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        super.appendHoverText(stack, context, tooltip, flag);
-        ToolsUtils.addDurability(tooltip, stack);
+    @Deprecated
+    public void appendHoverText(ItemStack stack, Item.TooltipContext context, TooltipDisplay tooltipDisplay, Consumer<Component> tooltipAdder, TooltipFlag flag) {
+        super.appendHoverText(stack, context, tooltipDisplay, tooltipAdder, flag);
+        ToolsUtils.addDurability(tooltipAdder, stack);
     }
 }

@@ -1,6 +1,6 @@
 package mekanism.neoshim.neoforge.client;
 
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderType;
 
 public record RenderTypeGroup(RenderType block, RenderType entity, RenderType entityFabulous) {
 

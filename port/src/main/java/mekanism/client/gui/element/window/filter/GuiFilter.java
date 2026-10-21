@@ -2,6 +2,7 @@ package mekanism.client.gui.element.window.filter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import mekanism.api.text.EnumColor;
@@ -26,14 +27,13 @@ import mekanism.common.network.to_server.filter.PacketEditFilter;
 import mekanism.common.network.to_server.filter.PacketNewFilter;
 import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.tile.interfaces.ITileFilterHolder;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 
 public abstract class GuiFilter<FILTER extends IFilter<FILTER>, TILE extends TileEntityMekanism & ITileFilterHolder<? super FILTER>> extends GuiWindow
       implements GuiFilterHelper<TILE> {
@@ -68,12 +68,14 @@ public abstract class GuiFilter<FILTER extends IFilter<FILTER>, TILE extends Til
         if (!isFocusOverlay()) {
             if (isNew && hasFilterSelect()) {
                 //If it is a new filter, and we have a filter select screen add a back button instead of a close button
-                addChild(new MekanismImageButton(gui, relativeX + 6, relativeY + 6, 11, 14, getButtonLocation("back"), (element, mouseX, mouseY) -> {
+                addChild(new MekanismImageButton(gui, relativeX + 6, relativeY + 6, 11, 14, getButtonLocation("back"), (element, event, isDoubleClick) -> {
                     //Add the window for the filter select dialog to the parent gui
                     IGuiWrapper wrapper = element.gui();
-                    wrapper.addWindow(getFilterSelect(wrapper, this.tile));
+                    GuiFilterSelect<TILE> filterSelect = Objects.requireNonNull(getFilterSelect(wrapper, this.tile),
+                          "Returned that there was a filter select from hasFilterSelect, but didn't provide a selection window.");
+                    wrapper.addWindow(filterSelect);
                     //And close the filter
-                    return close(element, mouseX, mouseY);
+                    return close(element, event, isDoubleClick);
                 })).setTooltip(TooltipUtils.BACK);
             } else {
                 super.addCloseButton();
@@ -125,13 +127,13 @@ public abstract class GuiFilter<FILTER extends IFilter<FILTER>, TILE extends Til
         int screenBottom = screenTop + getScreenHeight();
         addChild(new GuiInnerScreen(gui(), relativeX + 29, screenTop, getScreenWidth(), getScreenHeight(), this::getScreenText).clearFormat());
         addChild(new TranslationButton(gui(), getLeftButtonX(), screenBottom + 2, 60, 20,
-              isNew ? MekanismLang.BUTTON_CANCEL : MekanismLang.BUTTON_DELETE, (element, mouseX, mouseY) -> {
+              isNew ? MekanismLang.BUTTON_CANCEL : MekanismLang.BUTTON_DELETE, (element, event, isDoubleClick) -> {
             if (origFilter != null) {
-                PacketUtils.sendToServer(new PacketEditFilter<>(this.tile.getBlockPos(), origFilter, null));
+                PacketUtils.sendToServer(PacketEditFilter.delete(this.tile.getBlockPos(), origFilter));
             }
-            return close(element, mouseX, mouseY);
+            return close(element, event, isDoubleClick);
         }));
-        addChild(new TranslationButton(gui(), getLeftButtonX() + 62, screenBottom + 2, 60, 20, MekanismLang.BUTTON_SAVE, (element, mouseX, mouseY) -> {
+        addChild(new TranslationButton(gui(), getLeftButtonX() + 62, screenBottom + 2, 60, 20, MekanismLang.BUTTON_SAVE, (_, _, _) -> {
             validateAndSave();
             return true;
         }));
@@ -168,10 +170,11 @@ public abstract class GuiFilter<FILTER extends IFilter<FILTER>, TILE extends Til
         }
     }
 
-    protected static <FILTER extends SorterFilter<FILTER>> void validateAndSaveSorterFilter(GuiFilter<FILTER, ?> guiFilter, GuiTextField minField, GuiTextField maxField) {
+    protected static <FILTER extends SorterFilter<FILTER>> void validateAndSaveSorterFilter(GuiFilter<FILTER, ?> guiFilter, @Nullable GuiTextField minField,
+          @Nullable GuiTextField maxField) {
         //Note: This is here not in GuiSorterFilterHelper so that it can access the saveFilter/filterSaveFailed methods
         if (guiFilter.filter.hasFilter()) {
-            if (minField.getText().isEmpty() || maxField.getText().isEmpty()) {
+            if (minField == null || maxField == null || minField.getText().isEmpty() || maxField.getText().isEmpty()) {
                 guiFilter.filterSaveFailed(MekanismLang.SORTER_FILTER_SIZE_MISSING);
             } else {
                 int min = Integer.parseInt(minField.getText());
@@ -201,22 +204,22 @@ public abstract class GuiFilter<FILTER extends IFilter<FILTER>, TILE extends Til
         ticker = 0;
     }
 
+    @SuppressWarnings("Convert2Diamond")//Confuses IntelliJ about the nullability state
     protected void saveFilter() {
         if (isNew) {
             PacketUtils.sendToServer(new PacketNewFilter(tile.getBlockPos(), filter));
         } else {
-            PacketUtils.sendToServer(new PacketEditFilter<>(tile.getBlockPos(), origFilter, filter));
+            PacketUtils.sendToServer(new PacketEditFilter<FILTER>(tile.getBlockPos(), Objects.requireNonNull(origFilter), filter));
         }
         close();
     }
 
     protected abstract ILangEntry getNoFilterSaveError();
 
-    @NotNull
     protected abstract List<ItemStack> getRenderStacks();
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         drawTitleText(guiGraphics, (isNew ? MekanismLang.FILTER_NEW : MekanismLang.FILTER_EDIT).translate(filterName), 6);
     }
@@ -233,16 +236,16 @@ public abstract class GuiFilter<FILTER extends IFilter<FILTER>, TILE extends Til
 
     protected abstract FILTER createNewFilter();
 
-    public static IClickable getHandleClickSlot(Predicate<ItemStack> stackValidator, Consumer<ItemStack> itemConsumer) {
-        return (element, mouseX, mouseY) -> {
-            if (Screen.hasShiftDown()) {
-                itemConsumer.accept(ItemStack.EMPTY);
+    public static IClickable getHandleClickSlot(Predicate<ItemStack> stackValidator, Consumer<ItemResource> itemConsumer) {
+        return (element, event, _) -> {
+            if (event.hasShiftDown()) {
+                itemConsumer.accept(ItemResource.EMPTY);
             } else {
                 ItemStack stack = element.gui().getCarriedItem();
                 if (!stackValidator.test(stack)) {
                     return false;
                 }
-                itemConsumer.accept(stack.copyWithCount(1));
+                itemConsumer.accept(ItemResource.of(stack));
             }
             return true;
         };

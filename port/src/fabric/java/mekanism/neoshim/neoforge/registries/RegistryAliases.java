@@ -4,7 +4,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -12,21 +12,21 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class RegistryAliases {
 
-    private static final Map<ResourceKey<? extends Registry<?>>, Map<ResourceLocation, ResourceLocation>> ALIASES = new ConcurrentHashMap<>();
+    private static final Map<ResourceKey<? extends Registry<?>>, Map<Identifier, Identifier>> ALIASES = new ConcurrentHashMap<>();
 
     private RegistryAliases() {
     }
 
-    public static void add(ResourceKey<? extends Registry<?>> registry, ResourceLocation from, ResourceLocation to) {
+    public static void add(ResourceKey<? extends Registry<?>> registry, Identifier from, Identifier to) {
         ALIASES.computeIfAbsent(registry, r -> new ConcurrentHashMap<>()).put(from, to);
     }
 
     @Nullable
-    public static ResourceLocation resolve(ResourceKey<? extends Registry<?>> registry, @Nullable ResourceLocation id) {
+    public static Identifier resolve(ResourceKey<? extends Registry<?>> registry, @Nullable Identifier id) {
         if (id == null) {
             return null;
         }
-        Map<ResourceLocation, ResourceLocation> aliases = ALIASES.get(registry);
+        Map<Identifier, Identifier> aliases = ALIASES.get(registry);
         return aliases == null ? null : aliases.get(id);
     }
 }

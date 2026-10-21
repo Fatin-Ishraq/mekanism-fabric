@@ -4,8 +4,9 @@ import mekanism.api.SerializationConstants;
 import mekanism.common.lib.multiblock.MultiblockCache;
 import mekanism.common.tile.TileEntityChemicalTank.GasMode;
 import mekanism.common.util.NBTUtils;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
 
 public class TurbineCache extends MultiblockCache<TurbineMultiblockData> {
 
@@ -18,26 +19,26 @@ public class TurbineCache extends MultiblockCache<TurbineMultiblockData> {
     }
 
     @Override
-    public void apply(HolderLookup.Provider provider, TurbineMultiblockData data) {
-        super.apply(provider, data);
+    public void apply(TurbineMultiblockData data, TransactionContext transaction) {
+        super.apply(data, transaction);
         data.dumpMode = dumpMode;
     }
 
     @Override
-    public void sync(TurbineMultiblockData data) {
-        super.sync(data);
+    public void sync(TurbineMultiblockData data, TransactionContext transaction) {
+        super.sync(data, transaction);
         dumpMode = data.dumpMode;
     }
 
     @Override
-    public void load(HolderLookup.Provider provider, CompoundTag nbtTags) {
-        super.load(provider, nbtTags);
-        NBTUtils.setEnumIfPresent(nbtTags, SerializationConstants.DUMP_MODE, GasMode.BY_ID, mode -> dumpMode = mode);
+    public void load(ValueInput input) {
+        super.load(input);
+        NBTUtils.setEnumIfPresent(input, SerializationConstants.DUMP_MODE, GasMode.BY_ID, mode -> dumpMode = mode);
     }
 
     @Override
-    public void save(HolderLookup.Provider provider, CompoundTag nbtTags) {
-        super.save(provider, nbtTags);
-        NBTUtils.writeEnum(nbtTags, SerializationConstants.DUMP_MODE, dumpMode);
+    public void save(ValueOutput output) {
+        super.save(output);
+        NBTUtils.writeEnum(output, SerializationConstants.DUMP_MODE, dumpMode);
     }
 }

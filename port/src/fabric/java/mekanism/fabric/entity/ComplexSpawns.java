@@ -11,7 +11,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 
@@ -26,7 +26,7 @@ public final class ComplexSpawns {
 
     public record SpawnDataPayload(int entityId, byte[] data) implements CustomPacketPayload {
 
-        public static final Type<SpawnDataPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("mekanism_fabric", "spawn_data"));
+        public static final Type<SpawnDataPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath("mekanism_fabric", "spawn_data"));
         public static final StreamCodec<RegistryFriendlyByteBuf, SpawnDataPayload> STREAM_CODEC = StreamCodec.composite(
               ByteBufCodecs.VAR_INT, SpawnDataPayload::entityId,
               ByteBufCodecs.BYTE_ARRAY, SpawnDataPayload::data,
@@ -40,7 +40,7 @@ public final class ComplexSpawns {
     }
 
     public static void init() {
-        PayloadTypeRegistry.playS2C().register(SpawnDataPayload.TYPE, SpawnDataPayload.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(SpawnDataPayload.TYPE, SpawnDataPayload.STREAM_CODEC);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -51,7 +51,7 @@ public final class ComplexSpawns {
             byte[] data = new byte[buf.readableBytes()];
             buf.readBytes(data);
             //The custom payload packet is a common packet; the client game listener handles it inside bundles as well
-            return (Packet) ServerPlayNetworking.createS2CPacket(new SpawnDataPayload(entity.getId(), data));
+            return (Packet) ServerPlayNetworking.createClientboundPacket(new SpawnDataPayload(entity.getId(), data));
         } finally {
             buf.release();
         }

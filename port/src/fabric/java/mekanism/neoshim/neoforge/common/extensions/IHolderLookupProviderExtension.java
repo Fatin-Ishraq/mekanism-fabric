@@ -11,7 +11,7 @@ public interface IHolderLookupProviderExtension {
 
     @SuppressWarnings("unchecked")
     default <T> Optional<Holder.Reference<T>> holder(ResourceKey<T> key) {
-        Optional<HolderLookup.RegistryLookup<T>> registry = ((HolderLookup.Provider) this).lookup((ResourceKey<? extends Registry<? extends T>>) key.registryKey());
+        Optional<? extends HolderLookup.RegistryLookup<T>> registry = ((HolderLookup.Provider) this).lookup((ResourceKey<? extends Registry<? extends T>>) key.registryKey());
         return registry.flatMap(lookup -> lookup.get(key));
     }
 

@@ -13,3 +13,5 @@ port/.idea/
 port/*.iml
 port/logs/
 port/.jqwik-database
+/upstream-*/
+/ref/

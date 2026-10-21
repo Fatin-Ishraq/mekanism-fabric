@@ -1,11 +1,20 @@
 package mekanism.common.lib.math.voxel;
 
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import mekanism.api.SerializationConstants;
 import mekanism.common.lib.multiblock.Structure.Axis;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.phys.AABB;
+import org.jspecify.annotations.Nullable;
 
 public class VoxelCuboid implements IShape {
+
+    public static final MapCodec<VoxelCuboid> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+          BlockPos.CODEC.fieldOf(SerializationConstants.MIN).forGetter(VoxelCuboid::getMinPos),
+          BlockPos.CODEC.fieldOf(SerializationConstants.MAX).forGetter(VoxelCuboid::getMaxPos)
+    ).apply(instance, VoxelCuboid::new));
 
     private BlockPos minPos;
     private BlockPos maxPos;
@@ -57,6 +66,7 @@ public class VoxelCuboid implements IShape {
               (minPos.getZ() + maxPos.getZ()) / 2);
     }
 
+    @Nullable
     public Direction getSide(BlockPos pos) {
         if (pos.getX() == minPos.getX()) {
             return Direction.WEST;
@@ -74,8 +84,10 @@ public class VoxelCuboid implements IShape {
         return null;
     }
 
-    public boolean isOnSide(BlockPos pos) {
-        return getWallRelative(pos).isWall();
+    public boolean isWall(BlockPos pos) {
+        return pos.getX() == minPos.getX() || pos.getX() == maxPos.getX() ||
+               pos.getY() == minPos.getY() || pos.getY() == maxPos.getY() ||
+               pos.getZ() == minPos.getZ() || pos.getZ() == maxPos.getZ();
     }
 
     public boolean isOnEdge(BlockPos pos) {
@@ -147,7 +159,7 @@ public class VoxelCuboid implements IShape {
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(@Nullable Object obj) {
         return obj instanceof VoxelCuboid other && minPos.equals(other.minPos) && maxPos.equals(other.maxPos);
     }
 

@@ -1,6 +1,6 @@
 package mekanism.common.inventory.container.slot;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -8,12 +8,11 @@ import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.EnchantmentEffectComponents;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import org.jetbrains.annotations.NotNull;
 
-public class ArmorSlot extends InsertableSlot {
+public class ArmorSlot extends TransactionalSlot {
 
-    protected static final ResourceLocation[] ARMOR_SLOT_TEXTURES = {InventoryMenu.EMPTY_ARMOR_SLOT_BOOTS, InventoryMenu.EMPTY_ARMOR_SLOT_LEGGINGS,
-                                                                     InventoryMenu.EMPTY_ARMOR_SLOT_CHESTPLATE, InventoryMenu.EMPTY_ARMOR_SLOT_HELMET};
+    protected static final Identifier[] ARMOR_SLOT_TEXTURES = {InventoryMenu.EMPTY_ARMOR_SLOT_BOOTS, InventoryMenu.EMPTY_ARMOR_SLOT_LEGGINGS,
+                                                               InventoryMenu.EMPTY_ARMOR_SLOT_CHESTPLATE, InventoryMenu.EMPTY_ARMOR_SLOT_HELMET};
 
     private final EquipmentSlot slotType;
     private final Player owner;
@@ -22,11 +21,11 @@ public class ArmorSlot extends InsertableSlot {
         super(inventory, index, x, y);
         this.slotType = slotType;
         this.owner = inventory.player;
-        setBackground(InventoryMenu.BLOCK_ATLAS, ARMOR_SLOT_TEXTURES[this.slotType.getIndex()]);
+        setBackground(ARMOR_SLOT_TEXTURES[this.slotType.getIndex()]);
     }
 
     @Override
-    public void setByPlayer(@NotNull ItemStack newStack, @NotNull ItemStack oldStack) {
+    public void setByPlayer(ItemStack newStack, ItemStack oldStack) {
         this.owner.onEquipItem(slotType, oldStack, newStack);
         super.setByPlayer(newStack, oldStack);
     }
@@ -42,7 +41,7 @@ public class ArmorSlot extends InsertableSlot {
     }
 
     @Override
-    public boolean mayPickup(@NotNull Player player) {
+    public boolean mayPickup(Player player) {
         ItemStack stack = getItem();
         return (stack.isEmpty() || player.isCreative() || !EnchantmentHelper.has(stack, EnchantmentEffectComponents.PREVENT_ARMOR_CHANGE)) && super.mayPickup(player);
     }

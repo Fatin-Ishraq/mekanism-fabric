@@ -2,8 +2,6 @@ package mekanism.common;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.HashCode;
-import com.google.common.hash.Hashing;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -20,7 +18,6 @@ import mekanism.client.integration.emi.EmiAliasProvider;
 import mekanism.client.integration.emi.MekanismEmiDefaults;
 import mekanism.client.recipe_viewer.alias.IAliasMapping;
 import mekanism.client.recipe_viewer.alias.MekanismAliasMapping;
-import mekanism.common.integration.crafttweaker.MekanismCrTExampleProvider;
 import mekanism.common.integration.projecte.MekanismCustomConversions;
 import mekanism.common.lib.FieldReflectionHelper;
 import net.minecraft.core.HolderLookup;
@@ -30,15 +27,15 @@ import net.minecraft.data.DataProvider;
 import net.minecraft.data.HashCache;
 import net.minecraft.data.HashCache.ProviderCache;
 import net.minecraft.data.PackOutput;
-import mekanism.neoshim.neoforge.common.data.ExistingFileHelper;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.resources.ResourceManager;
 import mekanism.neoshim.neoforge.data.event.GatherDataEvent;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Used for helping to persist specific integrations we have that aren't updated yet.
- */
+/// Used for helping to persist specific integrations we have that aren't updated yet.
 public class PersistingDisabledProvidersProvider implements DataProvider {
 
+    @Nullable
     private static HashCache globalCache;
 
     //Called by a core mod
@@ -49,12 +46,12 @@ public class PersistingDisabledProvidersProvider implements DataProvider {
     public static void addDisableableProviders(GatherDataEvent event, CompletableFuture<HolderLookup.Provider> lookupProvider, Set<String> disabledCompats) {
         DataGenerator gen = event.getGenerator();
         PackOutput output = gen.getPackOutput();
-        ExistingFileHelper existingFileHelper = event.getExistingFileHelper();
         Set<String> pathsToSkip = new HashSet<>();
         List<String> fakeProviders = new ArrayList<>();
+        ResourceManager serverResources = event.getResourceManager(PackType.SERVER_DATA);
         if (Mekanism.hooks.emi.isLoaded()) {
-            gen.addProvider(event.includeClient(), new EmiAliasProvider(output, lookupProvider, Mekanism.MODID, MekanismAliasMapping::new));
-            gen.addProvider(event.includeClient(), new MekanismEmiDefaults(output, existingFileHelper, lookupProvider));
+            gen.addProvider(true, new EmiAliasProvider(output, lookupProvider, Mekanism.MODID, MekanismAliasMapping::new));
+            gen.addProvider(true, new MekanismEmiDefaults(output, serverResources, lookupProvider));
         } else {
             pathsToSkip.add("emi/aliases");
             pathsToSkip.add("emi/recipes/defaults");
@@ -62,13 +59,14 @@ public class PersistingDisabledProvidersProvider implements DataProvider {
             fakeProviders.add("EMI Default Recipe Provider: mekanism");
         }
         if (Mekanism.hooks.projecte.isLoaded()) {
-            gen.addProvider(event.includeServer(), new MekanismCustomConversions(output, lookupProvider));
+            gen.addProvider(true, new MekanismCustomConversions(output, lookupProvider));
         } else {
             pathsToSkip.add("pe_custom_conversions");
             fakeProviders.add("Custom EMC Conversions: mekanism");
         }
         if (Mekanism.hooks.craftTweaker.isLoaded()) {
-            gen.addProvider(event.includeServer(), new MekanismCrTExampleProvider(output, existingFileHelper));
+            throw new UnsupportedOperationException("uncomment me, then");
+            //gen.addProvider(true, new MekanismCrTExampleProvider(output, serverResources, lookupProvider));
         } else {
             pathsToSkip.add("scripts");
             fakeProviders.add("CraftTweaker Examples: mekanism");
@@ -86,8 +84,8 @@ public class PersistingDisabledProvidersProvider implements DataProvider {
         Set<String> pathsToSkip = new HashSet<>();
         List<String> fakeProviders = new ArrayList<>();
         if (Mekanism.hooks.emi.isLoaded()) {
-            gen.addProvider(event.includeClient(), new EmiAliasProvider(output, lookupProvider, modid, mappings));
-            gen.addProvider(event.includeClient(), defaultsProviderFunction.get().create(output, event.getExistingFileHelper(), lookupProvider));
+            gen.addProvider(true, new EmiAliasProvider(output, lookupProvider, modid, mappings));
+            gen.addProvider(true, defaultsProviderFunction.get().create(output, event.getResourceManager(PackType.SERVER_DATA), lookupProvider));
         } else {
             pathsToSkip.add("emi/aliases");
             pathsToSkip.add("emi/recipes/defaults");
@@ -99,21 +97,20 @@ public class PersistingDisabledProvidersProvider implements DataProvider {
         gen.addProvider(true, new PersistingDisabledProvidersProvider(output, Collections.emptySet(), pathsToSkip, fakeProviders));
     }
 
-    private final Set<String> compatRecipesToSkip;
+    private final Set<String> disabledCompats;
     private final Set<String> pathsToSkip;
     private final List<String> fakeProviders;
     private final Path baseOutputPath;
 
     private PersistingDisabledProvidersProvider(PackOutput output, Set<String> disabledCompats, Set<String> pathsToSkip, List<String> fakeProviders) {
         this.baseOutputPath = output.getOutputFolder();
-        this.compatRecipesToSkip = disabledCompats.stream().map(compat -> compat + "/").collect(Collectors.toUnmodifiableSet());
+        this.disabledCompats = disabledCompats;
         this.pathsToSkip = pathsToSkip.stream().map(path -> "/" + path + "/").collect(Collectors.toUnmodifiableSet());
         this.fakeProviders = fakeProviders;
     }
 
-    @NotNull
     @Override
-    public CompletableFuture<?> run(@NotNull CachedOutput cache) {
+    public CompletableFuture<?> run(CachedOutput cache) {
         if (globalCache == null) {
             throw new RuntimeException("Failed to retrieve global cache");
         }
@@ -121,13 +118,15 @@ public class PersistingDisabledProvidersProvider implements DataProvider {
     }
 
     private void tryPersist(HashCache cache) {
+        //Note: We have to do this here rather than in the constructor as the set isn't populated yet in the constructor
+        Set<String> compatRecipesToSkip = disabledCompats.stream().map(compat -> compat + "/").collect(Collectors.toUnmodifiableSet());
         if (compatRecipesToSkip.isEmpty() && pathsToSkip.isEmpty() && fakeProviders.isEmpty()) {
             //Skip if we don't have any things to override and persist
             return;
         }
 
         //NeoForge added field so we can't just AT it
-        FieldReflectionHelper<HashCache, Map<String, ProviderCache>> originalCachesField = new FieldReflectionHelper<>(HashCache.class, "originalCaches", () -> null);
+        FieldReflectionHelper<HashCache, Map<String, ProviderCache>> originalCachesField = new FieldReflectionHelper<>(HashCache.class, "originalCaches", Collections::emptyMap);
         Map<String, ProviderCache> originalCaches = originalCachesField.getValue(cache);
 
         int additionalWrites = 0;
@@ -141,7 +140,7 @@ public class PersistingDisabledProvidersProvider implements DataProvider {
             ImmutableMap<Path, HashCode> oldCacheData = oldCache.data();
             for (Map.Entry<Path, HashCode> oldEntry : oldCacheData.entrySet()) {
                 Path dataPath = oldEntry.getKey();
-                if (!newCacheData.containsKey(dataPath) && shouldPersist(dataPath) && Files.exists(dataPath)) {
+                if (!newCacheData.containsKey(dataPath) && shouldPersist(compatRecipesToSkip, dataPath) && Files.exists(dataPath)) {
                     newCacheData.put(dataPath, oldEntry.getValue());
                     changed = true;
                     additionalWrites++;
@@ -156,11 +155,10 @@ public class PersistingDisabledProvidersProvider implements DataProvider {
         //Technically this is unused except in a logging message but log it anyway, if we didn't end up having any caches to add though we can ignore it
         cache.writes += additionalWrites;
 
-        Path cacheDir = baseOutputPath.resolve(".cache");
         //Load and inject any providers we have that are fully disabled into the cache system
         // We do this after copying things to persist, so we don't have to copy these as well
         for (String fakeProvider : fakeProviders) {
-            Path path = getProviderCachePath(cacheDir, fakeProvider);
+            Path path = cache.getProviderCachePath(fakeProvider);
             ProviderCache provider = HashCache.readCache(baseOutputPath, path);
             cache.cachePaths.add(path);
             cache.caches.put(fakeProvider, provider);
@@ -169,7 +167,7 @@ public class PersistingDisabledProvidersProvider implements DataProvider {
         }
     }
 
-    private boolean shouldPersist(Path path) {
+    private boolean shouldPersist(Set<String> compatRecipesToSkip, Path path) {
         //Get the string representation of the path and sanitize it
         String stringPath = path.toString().replace('\\', '/');
         //Mekanism.logger.info("Evaluating path: {}", stringPath);
@@ -186,21 +184,14 @@ public class PersistingDisabledProvidersProvider implements DataProvider {
         return false;
     }
 
-    @NotNull
     @Override
     public String getName() {
         return "Persisting disabled provider";
     }
 
-    @SuppressWarnings("deprecation")
-    private static Path getProviderCachePath(Path cacheDir, String providerName) {
-        //Copy of HashCache#getProviderCachePath
-        return cacheDir.resolve(Hashing.sha1().hashString(providerName, StandardCharsets.UTF_8).toString());
-    }
-
     @FunctionalInterface
     public interface ExistingFileProvider {
 
-        DataProvider create(PackOutput packOutput, ExistingFileHelper existingFileHelper, CompletableFuture<HolderLookup.Provider> registries);
+        DataProvider create(PackOutput packOutput, ResourceManager serverResources, CompletableFuture<HolderLookup.Provider> registries);
     }
 }

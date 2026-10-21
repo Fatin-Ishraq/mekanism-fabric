@@ -9,36 +9,28 @@ import moze_intel.projecte.api.nss.AbstractNSSTag;
 import moze_intel.projecte.api.nss.NormalizedSimpleStack;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
-import org.jetbrains.annotations.NotNull;
 
-/**
- * Implementation of {@link NormalizedSimpleStack} and {@link moze_intel.projecte.api.nss.NSSTag} for representing {@link Chemical}s.
- */
+/// Implementation of [NormalizedSimpleStack] and [moze_intel.projecte.api.nss.NSSTag] for representing [Chemical]s.
 public final class NSSChemical extends AbstractNSSTag<Chemical> {
 
     public static final MapCodec<NSSChemical> CODEC = createCodec(MekanismAPI.CHEMICAL_REGISTRY, false, NSSChemical::new);
 
-    private NSSChemical(@NotNull ResourceLocation resourceLocation, boolean isTag) {
+    private NSSChemical(Identifier resourceLocation, boolean isTag) {
         super(resourceLocation, isTag);
     }
 
-    /**
-     * Helper method to create an {@link NSSChemical} representing a chemical from a {@link ChemicalStack}
-     */
-    @NotNull
-    public static NSSChemical createChemical(@NotNull ChemicalStack stack) {
+    /// Helper method to create an [NSSChemical] representing a chemical from a [ChemicalStack]
+    public static NSSChemical createChemical(TypedInstance<Chemical> stack) {
         //Don't bother checking if it is empty as getType returns EMPTY which will then fail anyway for being empty
-        return createChemical(stack.getChemicalHolder());
+        return createChemical(stack.typeHolder());
     }
 
-    /**
-     * Helper method to create an {@link NSSChemical} representing a chemical from a {@link Holder}.
-     */
-    @NotNull
-    public static NSSChemical createChemical(@NotNull Holder<Chemical> chemical) {
+    /// Helper method to create an [NSSChemical] representing a chemical from a [Holder].
+    public static NSSChemical createChemical(Holder<Chemical> chemical) {
         ResourceKey<Chemical> key = chemical.getKey();
         if (key == null) {
             if (!chemical.isBound()) {
@@ -51,37 +43,27 @@ public final class NSSChemical extends AbstractNSSTag<Chemical> {
             key = registryKey.get();
         }
         //This should never be null, or it would have crashed on being registered
-        return createChemical(key.location());
+        return createChemical(key.identifier());
     }
 
-    /**
-     * Helper method to create an {@link NSSChemical} representing a chemical from a {@link ResourceLocation}
-     */
-    @NotNull
-    public static NSSChemical createChemical(@NotNull ResourceLocation chemicalId) {
+    /// Helper method to create an [NSSChemical] representing a chemical from a [Identifier]
+    public static NSSChemical createChemical(Identifier chemicalId) {
         if (chemicalId.equals(MekanismAPI.CHEMICAL_REGISTRY.getDefaultKey())) {
             throw new IllegalArgumentException("Can't make NSSChemical with an empty chemical");
         }
         return new NSSChemical(chemicalId, false);
     }
 
-    /**
-     * Helper method to create an {@link NSSChemical} representing a tag from a {@link ResourceLocation}
-     */
-    @NotNull
-    public static NSSChemical createTag(@NotNull ResourceLocation tagId) {
+    /// Helper method to create an [NSSChemical] representing a tag from a [Identifier]
+    public static NSSChemical createTag(Identifier tagId) {
         return new NSSChemical(tagId, true);
     }
 
-    /**
-     * Helper method to create an {@link NSSChemical} representing a tag from a {@link TagKey}&lt;{@link Chemical}&gt;
-     */
-    @NotNull
-    public static NSSChemical createTag(@NotNull TagKey<Chemical> tag) {
+    /// Helper method to create an [NSSChemical] representing a tag from a [TagKey]<[Chemical]>
+    public static NSSChemical createTag(TagKey<Chemical> tag) {
         return createTag(tag.location());
     }
 
-    @NotNull
     @Override
     protected Registry<Chemical> getRegistry() {
         return MekanismAPI.CHEMICAL_REGISTRY;

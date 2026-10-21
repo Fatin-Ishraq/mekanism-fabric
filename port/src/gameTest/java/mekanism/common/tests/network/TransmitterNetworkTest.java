@@ -17,20 +17,21 @@ import mekanism.common.util.EnumUtils;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.DistanceManager;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import mekanism.neoshim.neoforge.event.level.ChunkEvent;
 import mekanism.neoshim.testframework.DynamicTest;
 import mekanism.neoshim.testframework.annotation.ForEachTest;
 import mekanism.neoshim.testframework.annotation.RegisterStructureTemplate;
 import mekanism.neoshim.testframework.annotation.TestHolder;
+import mekanism.neoshim.testframework.gametest.GameTest;
 import mekanism.neoshim.testframework.gametest.StructureTemplateBuilder;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @ForEachTest(groups = "network.transmitter")
 public class TransmitterNetworkTest {
@@ -56,10 +57,10 @@ public class TransmitterNetworkTest {
               .thenExecute(() -> {
                   //Use the configurator on all sides
                   for (Direction direction : EnumUtils.DIRECTIONS) {
-                      helper.useConfigurator(1, 2, 1, direction, direction.getAxisDirection() == AxisDirection.POSITIVE ? 1 : 2);
+                      helper.useConfigurator(1, 1, 1, direction, direction.getAxisDirection() == AxisDirection.POSITIVE ? 1 : 2);
                   }
               })
-              .thenMap(() -> helper.requireBlockEntity(1, 2, 1, TileEntityLogisticalTransporter.class).getTransmitter())
+              .thenMap(() -> helper.getBlockEntity(1, 1, 1, TileEntityLogisticalTransporter.class).getTransmitter())
               .thenExecute(transporter -> {
                   //Validate all sides got properly changed
                   for (Direction direction : EnumUtils.DIRECTIONS) {
@@ -90,10 +91,8 @@ public class TransmitterNetworkTest {
         );
     }
 
-    /**
-     * This test represents the issue that was reported in <a href="https://github.com/mekanism/Mekanism/issues/7428">Issue 7428</a> and most likely is also the last
-     * remaining cause of <a href="https://github.com/mekanism/Mekanism/issues/6356">Issue 6356</a>.
-     */
+    /// This test represents the issue that was reported in [Issue 7428](https://github.com/mekanism/Mekanism/issues/7428) and most likely is also the last remaining
+    /// cause of [Issue 6356](https://github.com/mekanism/Mekanism/issues/6356).
     @GameTest(template = STRAIGHT_CABLE, batch = "2")
     @TestHolder(description = "Tests that when part of a network becomes inaccessible but still loaded, "
                               + "we are able to properly remove the transmitters and then recover when the chunk becomes accessible again.")
@@ -103,12 +102,12 @@ public class TransmitterNetworkTest {
               .thenMap(() -> helper.setChunkLoadLevel(relativeChunk, MekGameTestHelper.INACCESSIBLE_LEVEL))
               //Wait 5 ticks in case anything needs more time to process after the chunk unloads
               .thenIdle(5)
-              .thenSequence(sequence -> sequence.thenMap(() -> helper.getBlockState(0, 1, 0))
+              .thenSequence(sequence -> sequence.thenMap(() -> helper.getBlockState(0, 0, 0))
                     //Force a rebuild of the network by breaking one transmitter
-                    .thenExecute(() -> helper.setBlock(0, 1, 0, Blocks.AIR))
+                    .thenExecute(() -> helper.setBlock(0, 0, 0, Blocks.AIR))
                     //Wait 5 ticks to ensure it has time to process everything (expected to only take two ticks)
                     //Set the block back to what it was before (the transmitter)
-                    .thenExecuteAfter(5, state -> helper.setBlock(0, 1, 0, state))
+                    .thenExecuteAfter(5, state -> helper.setBlock(0, 0, 0, state))
               )
               //Wait 5 ticks to ensure it has time to process everything (expected to only take two ticks)
               //Set the chunk level back to what it was before (aka loading it fully again)
@@ -121,6 +120,7 @@ public class TransmitterNetworkTest {
     private static class MatchingNetworkValidator implements Runnable {
 
         private final MekGameTestHelper helper;
+        @Nullable
         private UUID networkUUID;
 
         public MatchingNetworkValidator(MekGameTestHelper helper) {
@@ -131,11 +131,11 @@ public class TransmitterNetworkTest {
         public void run() {
             helper.forEveryBlockInStructure(relativePos -> {
                 if (helper.isBlockLoaded(relativePos)) {
-                    Transmitter<?, ?, ?> transmitter = helper.requireBlockEntity(relativePos, TileEntityTransmitter.class).getTransmitter();
+                    Transmitter<?, ?, ?> transmitter = helper.getBlockEntity(relativePos, TileEntityTransmitter.class).getTransmitter();
                     if (!transmitter.hasTransmitterNetwork()) {
                         helper.fail("No transmitter network found", relativePos);
                     }
-                    DynamicNetwork<?, ?, ?> network = transmitter.getTransmitterNetwork();
+                    DynamicNetwork<?, ?, ?> network = transmitter.getTransmitterNetworkNN();
                     if (networkUUID == null) {
                         networkUUID = network.getUUID();
                     } else if (!networkUUID.equals(network.getUUID())) {
@@ -166,7 +166,7 @@ public class TransmitterNetworkTest {
         public int updateChunkLoading(MekGameTestHelper helper, boolean load, int level) {
             if (absolutePos == null) {
                 absolutePos = helper.absolutePos(relativePos);
-                absPos = absolutePos.toLong();
+                absPos = absolutePos.pack();
             }
             if (helper.isChunkLoaded(relativePos) != load) {
                 //If the chunk isn't watched and is loaded we want to try and unload it
@@ -206,7 +206,7 @@ public class TransmitterNetworkTest {
             return level;
         }
 
-        public void updateChunk(ChunkEvent event, boolean loaded) {
+        public void updateChunk(ChunkEvent<LevelChunk> event, boolean loaded) {
             if (!event.getLevel().isClientSide() && event.getChunk().getPos().equals(absolutePos)) {
                 //If we are watching the chunk and the loaded state isn't what we already had it as
                 if (isLoaded != loaded) {

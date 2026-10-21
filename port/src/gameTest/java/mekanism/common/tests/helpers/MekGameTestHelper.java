@@ -7,25 +7,26 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
 import java.util.function.Function;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.common.capabilities.Capabilities;
-import mekanism.common.lib.inventory.HashedItem;
 import mekanism.common.util.WorldUtils;
-import net.minecraft.Util;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestInfo;
+import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.DistanceManager;
 import net.minecraft.util.GsonHelper;
+import net.minecraft.util.Util;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -36,10 +37,11 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
-import mekanism.neoshim.neoforge.items.IItemHandler;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.ResourceHandlerUtil;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
 import mekanism.neoshim.testframework.gametest.ExtendedGameTestHelper;
 
-@NothingNullByDefault
 public class MekGameTestHelper extends ExtendedGameTestHelper {
 
     public static final int INACCESSIBLE_LEVEL = ChunkMap.MAX_VIEW_DISTANCE + 1;
@@ -49,8 +51,9 @@ public class MekGameTestHelper extends ExtendedGameTestHelper {
         super(info);
     }
 
-    public static HashedItem hashedStack(Item item) {
-        return HashedItem.raw(new ItemStack(item));
+    public GameTestAssertException assertionException(String description) {
+        //TODO - 26.1: Do we want to make any of our assertions translatable so that they can replace parameters instead of using string concat?
+        return assertionException(Component.literal(description));
     }
 
     public ChunkMap getChunkMap() {
@@ -58,7 +61,7 @@ public class MekGameTestHelper extends ExtendedGameTestHelper {
     }
 
     public int setChunkLoadLevel(ChunkPos relativePos, int newLevel) {
-        long absPos = absolutePos(relativePos).toLong();
+        long absPos = absolutePos(relativePos).pack();
         DistanceManager distanceManager = getChunkMap().getDistanceManager();
         ChunkHolder holder = distanceManager.getChunk(absPos);
         int oldLevel = holder == null ? UNLOAD_LEVEL : holder.getTicketLevel();
@@ -72,7 +75,7 @@ public class MekGameTestHelper extends ExtendedGameTestHelper {
     public ChunkPos absolutePos(ChunkPos relativePos) {
         BlockPos relativeMiddle = relativePos.getMiddleBlockPosition(0);
         BlockPos absolutePos = absolutePos(relativeMiddle);
-        return new ChunkPos(absolutePos);
+        return ChunkPos.containing(absolutePos);
     }
 
     public BlockState getBlockState(int x, int y, int z) {
@@ -89,7 +92,7 @@ public class MekGameTestHelper extends ExtendedGameTestHelper {
 
     public void fail(String message, ChunkPos relativePos) {
         ChunkPos absolutePos = absolutePos(relativePos);
-        fail(message + " at " + absolutePos.x + "," + absolutePos.z + " (relative: " + relativePos.x + "," + relativePos.z + ") (t=" + getTick() + ")");
+        fail(message + " at " + absolutePos.x() + "," + absolutePos.z() + " (relative: " + relativePos.x() + "," + relativePos.z() + ") (t=" + getTick() + ")");
     }
 
     @Override
@@ -101,54 +104,47 @@ public class MekGameTestHelper extends ExtendedGameTestHelper {
         assertContainerContains(new BlockPos(x, y, z), item, count);
     }
 
-    /**
-     * This is similar and based off of vanilla's assertContainerContains, except supports checking for a specific amount, and checking blocks that expose item handlers.
-     */
+    /// This is similar and based off of vanilla's assertContainerContains, except supports checking for a specific amount, and checking blocks that expose item
+    /// handlers.
     public void assertContainerContains(BlockPos relativePos, Item item, int count) {
         //TODO: Do we want to make a PR to Neo that adds this overload, even if it is as simple as only checking the count
         // and doesn't also add support for checking item handlers?
-        BlockEntity blockentity = getBlockEntity(relativePos);
-        boolean sameCount;
+        BlockEntity blockentity = getLevel().getBlockEntity(absolutePos(relativePos));
+        int found;
         if (blockentity instanceof BaseContainerBlockEntity containerBE) {
-            sameCount = containerBE.countItem(item) == count;
+            found = containerBE.countItem(item);
         } else {
-            IItemHandler handler = getCapability(Capabilities.ITEM.block(), relativePos, null);
+            ResourceHandler<ItemResource> handler = getCapability(Capabilities.ITEM.block(), relativePos, null);
             if (handler == null) {
-                throw new GameTestAssertException("Expected a container or item handler at " + relativePos + ", found " +
-                                                  Util.getRegisteredName(BuiltInRegistries.BLOCK_ENTITY_TYPE, blockentity.getType()));
+                throw assertionException(relativePos, "Expected a container or item handler, found " +
+                                                      (blockentity == null ? Util.getRegisteredName(BuiltInRegistries.BLOCK, getBlockState(relativePos).getBlock())
+                                                                           : Util.getRegisteredName(BuiltInRegistries.BLOCK_ENTITY_TYPE, blockentity.getType())));
             }
-            int found = 0;
-            for (int i = 0, slots = handler.getSlots(); i < slots; i++) {
-                ItemStack stack = handler.getStackInSlot(i);
-                if (stack.is(item)) {
-                    found += stack.getCount();
+            found = 0;
+            for (int i = 0, slots = handler.size(); i < slots; i++) {
+                ItemResource resource = handler.getResource(i);
+                if (resource.is(item)) {
+                    found += handler.getAmountAsInt(i);
                 }
             }
-            sameCount = found == count;
         }
-        if (!sameCount) {
-            throw new GameTestAssertException("Container should contain: " + count + " " + item);
+        if (found != count) {
+            throw assertionException(relativePos, "test.error.expected_container_contents", count + " " + getItemName(item) + " but contained " + found);
         }
     }
 
-    /**
-     * Adds support for validating that item handlers are empty.
-     */
+    /// Adds support for validating that item handlers are empty.
     @Override
     public void assertContainerEmpty(BlockPos relativePos) {
-        BlockEntity blockentity = getBlockEntity(relativePos);
+        BlockEntity blockentity = getLevel().getBlockEntity(absolutePos(relativePos));
         if (blockentity instanceof BaseContainerBlockEntity containerBE) {
             if (!containerBE.isEmpty()) {
-                throw new GameTestAssertException("Container should be empty");
+                throw assertionException(relativePos, "test.error.expected_empty_container");
             }
         } else {
-            IItemHandler handler = getCapability(Capabilities.ITEM.block(), relativePos, null);
-            if (handler != null) {
-                for (int i = 0, slots = handler.getSlots(); i < slots; i++) {
-                    if (!handler.getStackInSlot(i).isEmpty()) {
-                        throw new GameTestAssertException("Container should be empty");
-                    }
-                }
+            ResourceHandler<ItemResource> handler = getCapability(Capabilities.ITEM.block(), relativePos, null);
+            if (handler != null && !ResourceHandlerUtil.isEmpty(handler)) {
+                throw assertionException(relativePos, "test.error.expected_empty_container");
             }
         }
     }
@@ -165,9 +161,7 @@ public class MekGameTestHelper extends ExtendedGameTestHelper {
         return player;
     }
 
-    /**
-     * Adds support for providing a more accurate/useful Vec3 location in the hit result.
-     */
+    /// Adds support for providing a more accurate/useful Vec3 location in the hit result.
     @Override
     public void useOn(BlockPos relativePos, ItemStack item, Player player, Direction direction) {
         useOn(relativePos, item, player, direction, 1);
@@ -182,14 +176,12 @@ public class MekGameTestHelper extends ExtendedGameTestHelper {
         }
     }
 
-    /**
-     * Adds support for providing a more accurate/useful Vec3 location in the hit result.
-     */
+    /// Adds support for providing a more accurate/useful Vec3 location in the hit result.
     @Override
     public void useBlock(BlockPos relativePos, Player player, ItemStack item, Direction direction) {
         player.setItemInHand(InteractionHand.MAIN_HAND, item);
         BlockHitResult hit = createHitResult(relativePos, direction, true);
-        ItemInteractionResult result = getBlockState(relativePos).useItemOn(item, getLevel(), player, InteractionHand.MAIN_HAND, hit);
+        InteractionResult result = getBlockState(relativePos).useItemOn(item, getLevel(), player, InteractionHand.MAIN_HAND, hit);
         if (!result.consumesAction()) {
             item.useOn(new UseOnContext(getLevel(), player, InteractionHand.MAIN_HAND, item, hit));
         }
@@ -205,7 +197,7 @@ public class MekGameTestHelper extends ExtendedGameTestHelper {
         RegistryOps<JsonElement> serializationContext = getLevel().registryAccess().createSerializationContext(JsonOps.INSTANCE);
         DataResult<JsonElement> encodedResult = codec.encodeStart(serializationContext, sourceObject);
         //Note: Theoretically encoding shouldn't have any issues, but if it does, throw them
-        JsonElement encoded = encodedResult.getOrThrow(GameTestAssertException::new);
+        JsonElement encoded = encodedResult.getOrThrow(this::assertionException);
 
         String asString = GsonHelper.toStableString(encoded);
         String replacedString = rawJsonReplacer.apply(asString);
@@ -213,12 +205,17 @@ public class MekGameTestHelper extends ExtendedGameTestHelper {
             fail("Could not find target to replace in: " + asString);
         }
         JsonElement toDecode = switch (encoded) {
-            case JsonObject json -> GsonHelper.parse(replacedString);
-            case JsonArray json -> GsonHelper.parseArray(replacedString);
-            case null, default -> throw new GameTestAssertException("Unable to determine type of json element to decode");
+            case JsonObject _ -> GsonHelper.parse(replacedString);
+            case JsonArray _ -> GsonHelper.parseArray(replacedString);
+            case null, default -> throw assertionException("Unable to determine type of json element to decode");
         };
 
         DataResult<TYPE> decoded = codec.parse(serializationContext, toDecode);
-        return decoded.getOrThrow(GameTestAssertException::new);
+        return decoded.getOrThrow(this::assertionException);
+    }
+
+    /// Copied from [net.minecraft.gametest.framework.GameTestHelper]
+    private static Component getItemName(Item itemType) {
+        return itemType.components().getOrDefault(DataComponents.ITEM_NAME, CommonComponents.EMPTY);
     }
 }

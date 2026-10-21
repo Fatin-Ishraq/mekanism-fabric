@@ -11,19 +11,14 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextColor;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.util.ARGB;
 import net.minecraft.util.ByIdMap;
-import net.minecraft.util.FastColor;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.material.MapColor;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Simple color enum for adding colors to in-game GUI strings of text.
- *
- * @author AidanBrady
- */
+/// Simple color enum for adding colors to in-game GUI strings of text.
 public enum EnumColor implements IIncrementalEnum<EnumColor>, SupportsColorMap, StringRepresentable {
     BLACK("§0", APILang.COLOR_BLACK, "Black", "black", new int[]{64, 64, 64}, DyeColor.BLACK),
     DARK_BLUE("§1", APILang.COLOR_DARK_BLUE, "Blue", "blue", new int[]{54, 107, 208}, DyeColor.BLUE),
@@ -45,33 +40,23 @@ public enum EnumColor implements IIncrementalEnum<EnumColor>, SupportsColorMap, 
     BROWN("§6", APILang.COLOR_BROWN, "Brown", "brown", new int[]{161, 118, 73}, DyeColor.BROWN),
     BRIGHT_PINK("§d", APILang.COLOR_BRIGHT_PINK, "Pink", "pink", new int[]{255, 188, 196}, DyeColor.PINK);
 
-    /**
-     * Codec for serializing colors based on their name.
-     *
-     * @since 10.6.0
-     */
+    /// Codec for serializing colors based on their name.
+    ///
+    /// @since 10.6.0
     public static final Codec<EnumColor> CODEC = StringRepresentable.fromEnum(EnumColor::values);
-    /**
-     * Gets a color by index, wrapping for out of bounds indices.
-     *
-     * @since 10.6.0
-     */
+    /// Gets a color by index, wrapping for out of bounds indices.
+    ///
+    /// @since 10.6.0
     public static final IntFunction<EnumColor> BY_ID = ByIdMap.continuous(EnumColor::ordinal, values(), ByIdMap.OutOfBoundsStrategy.WRAP);
-    /**
-     * Stream codec for syncing colors by index.
-     *
-     * @since 10.6.0
-     */
+    /// Stream codec for syncing colors by index.
+    ///
+    /// @since 10.6.0
     public static final StreamCodec<ByteBuf, EnumColor> STREAM_CODEC = ByteBufCodecs.idMapper(BY_ID, EnumColor::ordinal);
-    /**
-     * Stream codec for syncing optional colors by index.
-     *
-     * @since 10.6.0
-     */
+    /// Stream codec for syncing optional colors by index.
+    ///
+    /// @since 10.6.0
     public static final StreamCodec<ByteBuf, Optional<EnumColor>> OPTIONAL_STREAM_CODEC = ByteBufCodecs.optional(STREAM_CODEC);
-    /**
-     * The color code that will be displayed
-     */
+    /// The color code that will be displayed
     public final String code;
     private final ILangEntry langEntry;
     private final String englishName;
@@ -98,63 +83,47 @@ public enum EnumColor implements IIncrementalEnum<EnumColor>, SupportsColorMap, 
         this.mapColor = mapColor;
     }
 
-    /**
-     * Gets the prefix to use in registry names for this color.
-     */
+    /// Gets the prefix to use in registry names for this color.
     public String getRegistryPrefix() {
         return registryPrefix;
     }
 
-    /**
-     * Gets the English name of this color.
-     */
+    /// Gets the English name of this color.
     public String getEnglishName() {
         return englishName;
     }
 
-    /**
-     * Gets the material or map color that most closely corresponds to this color.
-     */
+    /// Gets the material or map color that most closely corresponds to this color.
     public MapColor getMapColor() {
         return mapColor;
     }
 
-    /**
-     * Gets the corresponding dye color or {@code null} if there isn't one.
-     */
+    /// Gets the corresponding dye color or `null` if there isn't one.
     @Nullable
     public DyeColor getDyeColor() {
         return dyeColor;
     }
 
-    /**
-     * Gets the name of this color with its color prefix code.
-     *
-     * @return the color's name and color prefix
-     */
+    /// Gets the name of this color with its color prefix code.
+    ///
+    /// @return the color's name and color prefix
     public Component getColoredName() {
         return TextComponentUtil.build(this, getName());
     }
 
-    /**
-     * Gets the name of this color without coloring the returned result
-     *
-     * @return the color's name
-     */
+    /// Gets the name of this color without coloring the returned result
+    ///
+    /// @return the color's name
     public MutableComponent getName() {
         return langEntry.translate();
     }
 
-    /**
-     * @apiNote For use by the data generators.
-     */
+    /// @apiNote For use by the data generators.
     public ILangEntry getLangEntry() {
         return langEntry;
     }
 
-    /**
-     * Gets the corresponding text color for this color.
-     */
+    /// Gets the corresponding text color for this color.
     public TextColor getColor() {
         return color;
     }
@@ -164,19 +133,16 @@ public enum EnumColor implements IIncrementalEnum<EnumColor>, SupportsColorMap, 
         return code;
     }
 
-    @NotNull
     @Override
     public EnumColor byIndex(int index) {
         return BY_ID.apply(index);
     }
 
-    /**
-     * @apiNote This method is mostly for <strong>INTERNAL</strong> usage.
-     */
+    /// @apiNote This method is mostly for **INTERNAL** usage.
     @Override
     public void setColorFromAtlas(int[] color) {
         rgbCode = color;
-        this.argb = FastColor.ARGB32.color(rgbCode[0], rgbCode[1], rgbCode[2]);
+        this.argb = ARGB.color(0xFF, rgbCode[0], rgbCode[1], rgbCode[2]);
         this.color = TextColor.fromRgb(this.argb);
     }
 
@@ -185,15 +151,12 @@ public enum EnumColor implements IIncrementalEnum<EnumColor>, SupportsColorMap, 
         return argb;
     }
 
-    /**
-     * @apiNote Modifying the returned array will result in this color object changing the color it represents, and should not be done.
-     */
+    /// @apiNote Modifying the returned array will result in this color object changing the color it represents, and should not be done.
     @Override
     public int[] getRgbCode() {
         return rgbCode;
     }
 
-    @NotNull
     @Override
     public String getSerializedName() {
         return registryPrefix;

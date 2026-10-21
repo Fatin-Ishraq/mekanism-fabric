@@ -3,13 +3,17 @@ package mekanism.common.tile;
 import mekanism.api.IContentsListener;
 import mekanism.api.RelativeSide;
 import mekanism.api.SerializationConstants;
-import mekanism.common.attachments.containers.ContainerType;
+import mekanism.api.energy.IEnergyContainer;
+import mekanism.api.inventory.IInventorySlot;
+import mekanism.common.Mekanism;
 import mekanism.common.block.attribute.Attribute;
 import mekanism.common.capabilities.energy.EnergyCubeEnergyContainer;
-import mekanism.common.capabilities.holder.energy.EnergyContainerHelper;
-import mekanism.common.capabilities.holder.energy.IEnergyContainerHolder;
-import mekanism.common.capabilities.holder.slot.IInventorySlotHolder;
-import mekanism.common.capabilities.holder.slot.InventorySlotHelper;
+import mekanism.common.capabilities.holder.container.IContainerHolder;
+import mekanism.common.capabilities.holder.container.MekContainerHelper;
+import mekanism.common.capabilities.holder.single.ISingleContainerHolder;
+import mekanism.common.capabilities.holder.single.SingleConfigHolder;
+import mekanism.common.component.containers.type.ContainerType;
+import mekanism.common.component.containers.type.IContainerType;
 import mekanism.common.integration.computer.SpecialComputerMethodWrapper.ComputerIInventorySlotWrapper;
 import mekanism.common.integration.computer.annotation.WrappingComputerMethod;
 import mekanism.common.inventory.container.slot.SlotOverlay;
@@ -26,64 +30,60 @@ import mekanism.common.upgrade.EnergyCubeUpgradeData;
 import mekanism.common.upgrade.IUpgradeData;
 import mekanism.common.util.EnumUtils;
 import mekanism.common.util.MekanismUtils;
-import mekanism.common.util.NBTUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.HolderLookup.Provider;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import mekanism.neoshim.neoforge.client.model.data.ModelData;
-import mekanism.neoshim.neoforge.client.model.data.ModelProperty;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import mekanism.neoshim.neoforge.model.data.ModelData;
+import mekanism.neoshim.neoforge.model.data.ModelProperty;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jetbrains.annotations.UnknownNullability;
 
 public class TileEntityEnergyCube extends TileEntityConfigurableMachine {
 
     public static final ModelProperty<CubeSideState[]> SIDE_STATE_PROPERTY = new ModelProperty<>();
 
-    /**
-     * This Energy Cube's tier.
-     */
-    private EnergyCubeTier tier;
+    /// This Energy Cube's tier.
+    private final EnergyCubeTier tier;
     private float prevScale;
 
+    @UnknownNullability//Initialized via getInitialEnergyContainer
     private EnergyCubeEnergyContainer energyContainer;
+    @UnknownNullability//Initialized via getInitialInventory
     @WrappingComputerMethod(wrapper = ComputerIInventorySlotWrapper.class, methodNames = "getChargeItem", docPlaceholder = "charge slot")
     EnergyInventorySlot chargeSlot;
+    @UnknownNullability//Initialized via getInitialInventory
     @WrappingComputerMethod(wrapper = ComputerIInventorySlotWrapper.class, methodNames = "getDischargeItem", docPlaceholder = "discharge slot")
     EnergyInventorySlot dischargeSlot;
 
-    /**
-     * A block used to store and transfer electricity.
-     */
+    /// A block used to store and transfer electricity.
     public TileEntityEnergyCube(Holder<Block> blockProvider, BlockPos pos, BlockState state) {
-        super(blockProvider, pos, state);
-        configComponent.setupIOConfig(TransmissionType.ITEM, chargeSlot, dischargeSlot, RelativeSide.FRONT, true).setCanEject(false);
-        configComponent.setupIOConfig(TransmissionType.ENERGY, energyContainer, RelativeSide.FRONT);
-        ejectorComponent = new TileComponentEjector(this, () -> tier.getOutput(), false);
-        ejectorComponent.setOutputData(configComponent, TransmissionType.ENERGY).setCanEject(type -> canFunction());
+        EnergyCubeTier tier = Attribute.getTierNN(blockProvider, EnergyCubeTier.class);
+        this.tier = tier;
+        super(blockProvider, pos, state, tile -> TileComponentEjector.energy(tile, tier::getTransferRate));
+        configComponent.setupIOConfig(TransmissionType.ITEM, chargeSlot, dischargeSlot, true).setCanEject(false);
+        configComponent.setupIOConfig(TransmissionType.ENERGY, energyContainer);
+        ejectorComponent.setOutputData(configComponent, TransmissionType.ENERGY).setCanEject(_ -> canFunction());
     }
 
     @Override
-    protected void presetVariables() {
-        super.presetVariables();
-        tier = Attribute.getTier(getBlockHolder(), EnergyCubeTier.class);
+    protected ISingleContainerHolder<IEnergyContainer> getInitialEnergyContainer(IContentsListener listener) {
+        energyContainer = EnergyCubeEnergyContainer.create(this, listener);
+        return SingleConfigHolder.energy(energyContainer, this);
     }
 
-    @NotNull
     @Override
-    protected IEnergyContainerHolder getInitialEnergyContainers(IContentsListener listener) {
-        EnergyContainerHelper builder = EnergyContainerHelper.forSideWithConfig(this);
-        builder.addContainer(energyContainer = EnergyCubeEnergyContainer.create(tier, listener));
-        return builder.build();
-    }
-
-    @NotNull
-    @Override
-    protected IInventorySlotHolder getInitialInventory(IContentsListener listener) {
-        InventorySlotHelper builder = InventorySlotHelper.forSideWithConfig(this);
-        builder.addSlot(dischargeSlot = EnergyInventorySlot.fillOrConvert(energyContainer, this::getLevel, listener, 17, 35));
-        builder.addSlot(chargeSlot = EnergyInventorySlot.drain(energyContainer, listener, 143, 35));
+    protected IContainerHolder<IInventorySlot> getInitialInventory(IContentsListener listener) {
+        MekContainerHelper<IInventorySlot> builder = MekContainerHelper.forSideWithItemConfig(this);
+        builder.addContainer(dischargeSlot = EnergyInventorySlot.fillOrConvert(energyContainer, this::getLevel, listener, 17, 35));
+        builder.addContainer(chargeSlot = EnergyInventorySlot.drain(energyContainer, listener, 143, 35));
         dischargeSlot.setSlotOverlay(SlotOverlay.MINUS);
         chargeSlot.setSlotOverlay(SlotOverlay.PLUS);
         return builder.build();
@@ -94,10 +94,10 @@ public class TileEntityEnergyCube extends TileEntityConfigurableMachine {
     }
 
     @Override
-    protected boolean onUpdateServer() {
-        boolean sendUpdatePacket = super.onUpdateServer();
-        chargeSlot.drainContainer();
-        dischargeSlot.fillContainerOrConvert();
+    protected boolean onUpdateServer(ServerLevel level) {
+        boolean sendUpdatePacket = super.onUpdateServer(level);
+        chargeSlot.drainContainerIntoSlot(null);
+        dischargeSlot.fillContainerOrConvert(null);
         float newScale = MekanismUtils.getScale(prevScale, energyContainer);
         if (MekanismUtils.scaleChanged(newScale, prevScale)) {
             prevScale = newScale;
@@ -108,55 +108,54 @@ public class TileEntityEnergyCube extends TileEntityConfigurableMachine {
 
     @Override
     public int getRedstoneLevel() {
-        return MekanismUtils.redstoneLevelFromContents(energyContainer.getEnergy(), energyContainer.getMaxEnergy());
+        return MekanismUtils.redstoneLevelFromContents(energyContainer.getAmountAsLong(), energyContainer.getCapacityAsLong());
     }
 
     @Override
-    protected boolean makesComparatorDirty(ContainerType<?, ?, ?> type) {
+    protected boolean makesComparatorDirty(IContainerType<?, ?> type) {
         return type == ContainerType.ENERGY;
     }
 
     @Override
-    public void parseUpgradeData(HolderLookup.Provider provider, @NotNull IUpgradeData upgradeData) {
+    public void parseUpgradeData(IUpgradeData upgradeData, Provider provider, TransactionContext transaction) {
         if (upgradeData instanceof EnergyCubeUpgradeData data) {
             redstone = data.redstone;
             setControlType(data.controlType);
-            getEnergyContainer().setEnergy(data.energyContainer.getEnergy());
-            chargeSlot.setStack(data.chargeSlot.getStack());
-            //Copy the contents using NBT so that if it is not actually valid due to a reload we don't crash
-            dischargeSlot.deserializeNBT(provider, data.dischargeSlot.serializeNBT(provider));
-            for (ITileComponent component : getComponents()) {
-                component.read(data.components, provider);
+            energyContainer.copyContents(data.energyContainer, transaction);
+            chargeSlot.copyContents(data.chargeSlot, transaction);
+            dischargeSlot.copyContents(data.dischargeSlot, transaction);
+            try (var reporter = new ProblemReporter.ScopedCollector(problemPath(), Mekanism.logger)) {
+                ValueInput input = TagValueInput.create(reporter, provider, data.components);
+                for (ITileComponent component : getComponents()) {
+                    component.read(input);
+                }
             }
         } else {
-            super.parseUpgradeData(provider, upgradeData);
+            super.parseUpgradeData(upgradeData, provider, transaction);
         }
     }
 
-    public EnergyCubeEnergyContainer getEnergyContainer() {
+    public EnergyCubeEnergyContainer energyContainer() {
         return energyContainer;
     }
 
-    @NotNull
     @Override
     public EnergyCubeUpgradeData getUpgradeData(HolderLookup.Provider provider) {
-        return new EnergyCubeUpgradeData(provider, redstone, getControlType(), getEnergyContainer(), chargeSlot, dischargeSlot, getComponents());
+        return new EnergyCubeUpgradeData(provider, redstone, getControlType(), energyContainer, chargeSlot, dischargeSlot, getComponents(), problemPath());
     }
 
     public float getEnergyScale() {
         return prevScale;
     }
 
-    @NotNull
     @Override
-    public CompoundTag getReducedUpdateTag(@NotNull HolderLookup.Provider provider) {
-        CompoundTag updateTag = super.getReducedUpdateTag(provider);
-        updateTag.putFloat(SerializationConstants.SCALE, prevScale);
-        return updateTag;
+    public void writeReducedUpdatedTag(ValueOutput output) {
+        super.writeReducedUpdatedTag(output);
+        output.putFloat(SerializationConstants.SCALE, prevScale);
     }
 
     @Override
-    public void handleUpdateTag(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider provider) {
+    public void handleUpdateTag(ValueInput input) {
         ConfigInfo config = getConfig().getConfig(TransmissionType.ENERGY);
         DataType[] currentConfig = new DataType[EnumUtils.SIDES.length];
         if (config != null) {
@@ -164,8 +163,8 @@ public class TileEntityEnergyCube extends TileEntityConfigurableMachine {
                 currentConfig[side.ordinal()] = config.getDataType(side);
             }
         }
-        super.handleUpdateTag(tag, provider);
-        NBTUtils.setFloatIfPresent(tag, SerializationConstants.SCALE, scale -> prevScale = scale);
+        super.handleUpdateTag(input);
+        prevScale = input.getFloatOr(SerializationConstants.SCALE, prevScale);
         if (config != null) {
             for (RelativeSide side : EnumUtils.SIDES) {
                 if (currentConfig[side.ordinal()] != config.getDataType(side)) {
@@ -177,7 +176,6 @@ public class TileEntityEnergyCube extends TileEntityConfigurableMachine {
         }
     }
 
-    @NotNull
     @Override
     public ModelData getModelData() {
         ConfigInfo config = getConfig().getConfig(TransmissionType.ENERGY);
@@ -201,8 +199,8 @@ public class TileEntityEnergyCube extends TileEntityConfigurableMachine {
     }
 
     public enum CubeSideState {
+        INACTIVE,//NB: EnergyCubeModel relies on this being ordinal 0
         ACTIVE_LIT,
-        ACTIVE_UNLIT,
-        INACTIVE
+        ACTIVE_UNLIT
     }
 }

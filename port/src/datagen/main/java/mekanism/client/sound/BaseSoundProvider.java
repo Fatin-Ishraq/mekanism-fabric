@@ -4,22 +4,19 @@ import java.util.function.UnaryOperator;
 import mekanism.api.text.IHasTranslationKey;
 import mekanism.common.registration.impl.SoundEventRegistryObject;
 import net.minecraft.data.PackOutput;
-import net.minecraft.resources.ResourceLocation;
-import mekanism.neoshim.neoforge.common.data.ExistingFileHelper;
+import net.minecraft.resources.Identifier;
 import mekanism.neoshim.neoforge.common.data.SoundDefinition;
 import mekanism.neoshim.neoforge.common.data.SoundDefinitionsProvider;
-import org.jetbrains.annotations.NotNull;
 
 public abstract class BaseSoundProvider extends SoundDefinitionsProvider {
 
     private final String modid;
 
-    protected BaseSoundProvider(PackOutput output, ExistingFileHelper existingFileHelper, String modid) {
-        super(output, modid, existingFileHelper);
+    protected BaseSoundProvider(PackOutput output, String modid) {
+        super(output, modid);
         this.modid = modid;
     }
 
-    @NotNull
     @Override
     public String getName() {
         return super.getName() + ": " + modid;
@@ -39,6 +36,6 @@ public abstract class BaseSoundProvider extends SoundDefinitionsProvider {
 
     protected void addSoundEvent(SoundEventRegistryObject<?> soundEventRO, String path, UnaryOperator<SoundDefinition> definitionModifier,
           UnaryOperator<SoundDefinition.Sound> soundModifier) {
-        add(soundEventRO.get(), definitionModifier.apply(definition()).with(soundModifier.apply(sound(ResourceLocation.fromNamespaceAndPath(modid, path)))));
+        add(soundEventRO.get(), definitionModifier.apply(definition()).with(soundModifier.apply(sound(Identifier.fromNamespaceAndPath(modid, path)))));
     }
 }

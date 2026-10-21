@@ -5,42 +5,38 @@ import java.util.Set;
 import java.util.function.Predicate;
 import mekanism.api.SerializationConstants;
 import mekanism.api.functions.ConstantPredicates;
-import mekanism.common.Mekanism;
 import mekanism.common.capabilities.Capabilities;
 import mekanism.common.content.qio.QIOFrequency;
-import mekanism.common.content.transporter.TransporterManager;
+import mekanism.common.content.qio.filter.QIOFilter;
 import mekanism.common.integration.computer.ComputerException;
 import mekanism.common.integration.computer.annotation.ComputerMethod;
 import mekanism.common.inventory.container.MekanismContainer;
 import mekanism.common.inventory.container.sync.SyncableBoolean;
-import mekanism.common.lib.inventory.HashedItem;
 import mekanism.common.registries.MekanismBlocks;
 import mekanism.common.registries.MekanismDataComponents;
-import mekanism.common.util.InventoryUtils;
 import mekanism.common.util.MekanismUtils;
-import mekanism.common.util.NBTUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.core.component.DataComponentMap;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import mekanism.neoshim.neoforge.capabilities.BlockCapabilityCache;
-import mekanism.neoshim.neoforge.items.IItemHandler;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import org.jspecify.annotations.Nullable;
 
 public class TileEntityQIOImporter extends TileEntityQIOFilterHandler {
 
     private static final int MAX_DELAY = MekanismUtils.TICKS_PER_HALF_SECOND;
 
-    private final Predicate<ItemStack> FILTER_ENABLED = stack -> getFilterManager().anyEnabledMatch(stack, (filter, s) -> filter.getFinder().test(s));
+    private final Predicate<ItemResource> FILTER_ENABLED = resource -> getFilterManager().anyEnabledMatch(resource, QIOFilter::test);
 
     @Nullable
-    private BlockCapabilityCache<IItemHandler, @Nullable Direction> backInventory;
+    private BlockCapabilityCache<ResourceHandler<ItemResource>, @Nullable Direction> backInventory;
     private int delay = 0;
     private boolean importWithoutFilter = true;
 
@@ -49,13 +45,13 @@ public class TileEntityQIOImporter extends TileEntityQIOFilterHandler {
     }
 
     @Override
-    protected boolean onUpdateServer(@Nullable QIOFrequency frequency) {
-        boolean needsUpdate = super.onUpdateServer(frequency);
+    protected boolean onUpdateServer(ServerLevel level, @Nullable QIOFrequency frequency) {
+        boolean needsUpdate = super.onUpdateServer(level, frequency);
         if (frequency != null && canFunction()) {
             if (delay > 0) {
                 delay--;
             } else {
-                tryImport(frequency);
+                tryImport(level, frequency);
                 delay = MAX_DELAY;
             }
         }
@@ -68,17 +64,22 @@ public class TileEntityQIOImporter extends TileEntityQIOFilterHandler {
         backInventory = null;
     }
 
-    private void tryImport(QIOFrequency freq) {
+    private void tryImport(ServerLevel level, QIOFrequency freq) {
         if (backInventory == null) {
             Direction direction = getDirection();
-            backInventory = Capabilities.ITEM.createCache((ServerLevel) level, worldPosition.relative(direction.getOpposite()), direction);
+            backInventory = Capabilities.ITEM.createCache(level, worldPosition.relative(direction.getOpposite()), direction);
         }
-        IItemHandler inventory = backInventory.getCapability();
+        ResourceHandler<ItemResource> inventory = backInventory.getCapability();
         if (inventory == null) {//Not an IItemHandler
             return;
         }
+        int slots = inventory.size();
+        if (slots == 0) {
+            //If the inventory has no slots just exit early
+            return;
+        }
 
-        Predicate<ItemStack> canFilter;
+        Predicate<ItemResource> canFilter;
         if (getFilterManager().hasEnabledFilters()) {
             canFilter = FILTER_ENABLED;
         } else if (importWithoutFilter) {
@@ -88,36 +89,34 @@ public class TileEntityQIOImporter extends TileEntityQIOFilterHandler {
             //If we don't have any enabled filters installed, and we don't allow filterless importing
             return;
         }
-        int slots = inventory.getSlots();
-        if (slots == 0) {
-            //If the inventory has no slots just exit early
-            return;
-        }
-        Set<HashedItem> typesAdded = new HashSet<>();
-        int maxTypes = getMaxTransitTypes(), maxCount = getMaxTransitCount(), countAdded = 0;
+        Set<ItemResource> seenTypes = new HashSet<>();
+        int maxTypes = getMaxTransitTypes();
+        int maxCount = getMaxTransitCount();
+        int countAdded = 0;
+        int typesAdded = 0;
 
-        for (int i = slots - 1; i >= 0; i--) {
-            ItemStack stack = inventory.extractItem(i, maxCount - countAdded, true);
-            if (stack.isEmpty()) {
+        for (int slot = slots - 1; slot >= 0; slot--) {
+            ItemResource type = inventory.getResource(slot);
+            if (type.isEmpty() || !seenTypes.add(type) || typesAdded == maxTypes || !canFilter.test(type)) {
+                // if the slot is empty, we have already seen the item type, we don't have room for another item type,
+                // or we can't filter this item type, skip
                 continue;
             }
-            HashedItem type = HashedItem.create(stack);
-            // if we don't have room for another item type, skip
-            if (!typesAdded.contains(type) && typesAdded.size() == maxTypes) {
-                continue;
+            int extractable;
+            try (Transaction simulation = Transaction.openRoot()) {
+                extractable = inventory.extract(type, maxCount - countAdded, simulation);
+                if (extractable == 0) {//Nothing can be extracted, skip it
+                    continue;
+                }
             }
-            // if we can't filter this item type, skip
-            if (!canFilter.test(stack)) {
-                continue;
+            try (Transaction transaction = Transaction.openRoot()) {
+                int inserted = freq.addItem(type, extractable, transaction);
+                if (inserted > 0 && inventory.extract(type, inserted, transaction) == inserted) {
+                    countAdded += inserted;
+                    typesAdded++;
+                    transaction.commit();
+                }
             }
-            ItemStack used = TransporterManager.getToUse(stack, freq.addItem(stack));
-            ItemStack ret = inventory.extractItem(i, used.getCount(), false);
-            if (!InventoryUtils.areItemsStackable(used, ret) || used.getCount() != ret.getCount()) {
-                Mekanism.logger.error("QIO insertion error: item handler at {} in {} returned {} during simulated extraction, but returned {} during execution. This is wrong!",
-                      worldPosition.relative(getOppositeDirection()), level.dimension().location(), stack, ret);
-            }
-            typesAdded.add(type);
-            countAdded += used.getCount();
         }
     }
 
@@ -138,25 +137,25 @@ public class TileEntityQIOImporter extends TileEntityQIOFilterHandler {
     }
 
     @Override
-    public void writeSustainedData(HolderLookup.Provider provider, CompoundTag dataMap) {
-        super.writeSustainedData(provider, dataMap);
-        dataMap.putBoolean(SerializationConstants.AUTO, importWithoutFilter);
+    public void writeSustainedData(ValueOutput output) {
+        super.writeSustainedData(output);
+        output.putBoolean(SerializationConstants.AUTO, importWithoutFilter);
     }
 
     @Override
-    public void readSustainedData(HolderLookup.Provider provider, @NotNull CompoundTag dataMap) {
-        super.readSustainedData(provider, dataMap);
-        NBTUtils.setBooleanIfPresent(dataMap, SerializationConstants.AUTO, value -> importWithoutFilter = value);
+    public void readSustainedData(ValueInput input) {
+        super.readSustainedData(input);
+        importWithoutFilter = input.getBooleanOr(SerializationConstants.AUTO, importWithoutFilter);
     }
 
     @Override
-    protected void collectImplicitComponents(@NotNull DataComponentMap.Builder builder) {
+    protected void collectImplicitComponents(DataComponentMap.Builder builder) {
         super.collectImplicitComponents(builder);
         builder.set(MekanismDataComponents.AUTO, importWithoutFilter);
     }
 
     @Override
-    protected void applyImplicitComponents(@NotNull BlockEntity.DataComponentInput input) {
+    protected void applyImplicitComponents(DataComponentGetter input) {
         super.applyImplicitComponents(input);
         importWithoutFilter = input.getOrDefault(MekanismDataComponents.AUTO, importWithoutFilter);
     }

@@ -22,7 +22,6 @@ import mekanism.common.base.KeySync;
 import mekanism.common.base.holiday.HolidayManager;
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.content.gear.mekasuit.ModuleVisionEnhancementUnit;
-import mekanism.common.item.gear.ItemHDPEElytra;
 import mekanism.common.item.gear.ItemJetpack;
 import mekanism.common.item.gear.ItemMekaSuitArmor;
 import mekanism.common.item.gear.ItemScubaTank;
@@ -36,41 +35,41 @@ import mekanism.common.lib.radiation.RadiationScale;
 import mekanism.common.network.PacketUtils;
 import mekanism.common.network.to_server.PacketModeChange;
 import mekanism.common.network.to_server.PacketPortableTeleporterTeleport;
-import mekanism.common.recipe.MekanismRecipeType;
+import mekanism.common.registries.MekanismItems;
 import mekanism.common.registries.MekanismModules;
+import mekanism.common.util.ItemAccessUtils;
 import mekanism.common.util.MekanismUtils;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.model.ArmorStandModel;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.HumanoidModel;
-import net.minecraft.client.model.PlayerModel;
+import net.minecraft.client.model.object.armorstand.ArmorStandModel;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.entity.state.ArmorStandRenderState;
+import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.material.FogType;
 import mekanism.neoshim.bus.api.SubscribeEvent;
-import mekanism.neoshim.neoforge.client.event.ClientPlayerNetworkEvent;
 import mekanism.neoshim.neoforge.client.event.ClientTickEvent;
 import mekanism.neoshim.neoforge.client.event.InputEvent.MouseScrollingEvent;
-import mekanism.neoshim.neoforge.client.event.RecipesUpdatedEvent;
 import mekanism.neoshim.neoforge.client.event.RenderLivingEvent;
 import mekanism.neoshim.neoforge.client.event.ViewportEvent;
 import mekanism.neoshim.neoforge.event.entity.EntityJoinLevelEvent;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Client-side tick handler for Mekanism. Used mainly for the update check upon startup.
- *
- * @author AidanBrady
- */
+/// Client-side tick handler for Mekanism. Used mainly for the update check upon startup.
 public class ClientTickHandler {
 
     private static final Minecraft minecraft = Minecraft.getInstance();
@@ -85,18 +84,20 @@ public class ClientTickHandler {
         visionEnhancement = false;
     }
 
-    private boolean isConnected;
-
-    public static boolean isJetpackInUse(Player player, ItemStack jetpack) {
-        if (!player.isSpectator() && !jetpack.isEmpty()) {
-            JetpackMode mode = ((IJetpackItem) jetpack.getItem()).getJetpackMode(jetpack);
+    public static boolean isJetpackInUse(LocalPlayer player, @Nullable ItemAccess jetpack) {
+        if (!player.isSpectator() && jetpack != null) {
+            ItemResource jetpackType = jetpack.getResource();
+            if (jetpackType.isEmpty()) {
+                return false;
+            }
+            JetpackMode mode = ((IJetpackItem) jetpackType.getItem()).getJetpackMode(jetpackType);
             boolean guiOpen = minecraft.screen != null;
-            boolean ascending = minecraft.player.input.jumping;
+            boolean ascending = player.input.keyPresses.jump();
             boolean rising = ascending && !guiOpen;
             if (mode == JetpackMode.NORMAL || mode == JetpackMode.VECTOR) {
                 return rising;
             } else if (mode == JetpackMode.HOVER) {
-                boolean descending = minecraft.player.input.shiftKeyDown;
+                boolean descending = player.input.keyPresses.shift();
                 if (!rising || descending) {
                     return !CommonPlayerTickHandler.isOnGroundOrSleeping(player);
                 }
@@ -110,7 +111,7 @@ public class ClientTickHandler {
         if (player != minecraft.player) {
             return Mekanism.playerState.isScubaMaskOn(player);
         }
-        return CommonPlayerTickHandler.isScubaMaskOn(player, player.getItemBySlot(EquipmentSlot.CHEST));
+        return CommonPlayerTickHandler.isScubaMaskOn(player, ItemAccessUtils.forEntitySlot(player, EquipmentSlot.CHEST));
     }
 
     public static boolean isGravitationalModulationOn(Player player) {
@@ -121,12 +122,13 @@ public class ClientTickHandler {
     }
 
     public static boolean isVisionEnhancementOn(Player player) {
-        ItemStack head = player.getItemBySlot(EquipmentSlot.HEAD);
-        if (!player.getCooldowns().isOnCooldown(head.getItem())) {
-            IModuleContainer container = IModuleHelper.INSTANCE.getModuleContainer(head);
+        ItemAccess head = ItemAccessUtils.forEntitySlot(player, EquipmentSlot.HEAD);
+        ItemResource headResource = head.getResource();
+        if (!player.getCooldowns().isOnCooldown(headResource.toStack())) {
+            IModuleContainer container = IModuleHelper.INSTANCE.getModuleContainer(headResource);
             if (container != null) {
                 IModule<ModuleVisionEnhancementUnit> module = container.getIfEnabled(MekanismModules.VISION_ENHANCEMENT_UNIT);
-                return module != null && module.hasEnoughEnergy(head, MekanismConfig.gear.mekaSuitEnergyUsageVisionEnhancement);
+                return module != null && module.hasEnoughEnergy(player, head, MekanismConfig.gear.mekaSuitEnergyUsageVisionEnhancement.get(), null);
             }
         }
         return false;
@@ -138,31 +140,14 @@ public class ClientTickHandler {
         if (delay == 0) {
             PacketUtils.sendToServer(new PacketPortableTeleporterTeleport(hand, identity));
         } else {
-            portableTeleports.put(player, new TeleportData(hand, identity, minecraft.level.getGameTime() + delay));
+            portableTeleports.put(player, new TeleportData(hand, identity, player.level().getGameTime() + delay));
         }
     }
 
     @SubscribeEvent
     public void onStartTracking(EntityJoinLevelEvent event) {
-        if (event.getLevel().isClientSide && event.getEntity() instanceof Player player && MekanismConfig.client.enablePlayerSounds.get()) {
+        if (event.getLevel().isClientSide() && event.getEntity() instanceof Player player && MekanismConfig.client.enablePlayerSounds.get()) {
             SoundHandler.startFlamethrowerSound(player);
-        }
-    }
-
-    @SubscribeEvent
-    public void onJoinServer(ClientPlayerNetworkEvent.LoggingIn event) {
-        if (!isConnected) {//Note: This should always be true when the event is fired
-            isConnected = true;
-            MekanismClient.launchClient(event.getConnection());
-        }
-    }
-
-    @SubscribeEvent
-    public void onLeaveServer(ClientPlayerNetworkEvent.LoggingOut event) {
-        //Note: We check if the client has actually connected before handling this, as this event is also called when the client is setting up the server
-        if (isConnected) {
-            isConnected = false;
-            MekanismClient.reset();
         }
     }
 
@@ -184,7 +169,7 @@ public class ClientTickHandler {
         UUID playerUUID = minecraft.player.getUUID();
         // Update player's state for various items; this also automatically notifies server if something changed and
         // kicks off sounds as necessary
-        ItemStack jetpack = IJetpackItem.getActiveJetpack(minecraft.player);
+        ItemAccess jetpack = IJetpackItem.getActiveJetpack(minecraft.player);
         boolean jetpackInUse = isJetpackInUse(minecraft.player, jetpack);
         Mekanism.playerState.setJetpackState(playerUUID, jetpackInUse, true);
         Mekanism.playerState.setScubaMaskState(playerUUID, isScubaMaskOn(minecraft.player), true);
@@ -209,15 +194,17 @@ public class ClientTickHandler {
             }
         }
 
-        if (!jetpack.isEmpty()) {
-            ItemStack primaryJetpack = IJetpackItem.getPrimaryJetpack(minecraft.player);
+        if (jetpack != null) {
+            ItemResource primaryJetpack = IJetpackItem.getPrimaryJetpack(minecraft.player);
             if (!primaryJetpack.isEmpty()) {
                 JetpackMode primaryMode = ((IJetpackItem) primaryJetpack.getItem()).getJetpackMode(primaryJetpack);
-                JetpackMode mode = IJetpackItem.getPlayerJetpackMode(minecraft.player, primaryMode, p -> p.input.jumping);
-                MekanismClient.updateKey(minecraft.player.input.jumping, KeySync.ASCEND);
-                double jetpackThrust = ((IJetpackItem) primaryJetpack.getItem()).getJetpackThrust(primaryJetpack);
-                if (jetpackInUse && IJetpackItem.handleJetpackMotion(minecraft.player, mode, jetpackThrust, p -> p.input.jumping)) {
-                    minecraft.player.resetFallDistance();
+                JetpackMode mode = IJetpackItem.getPlayerJetpackMode(minecraft.player, primaryMode, p -> p.input.keyPresses.jump());
+                MekanismClient.updateKey(minecraft.player.input.keyPresses.jump(), KeySync.ASCEND);
+                try (Transaction simulation = Transaction.openRoot()) {
+                    double jetpackThrust = ((IJetpackItem) jetpack.getResource().getItem()).useJetpackFuel(jetpack, primaryJetpack, simulation);
+                    if (jetpackThrust > 0 && jetpackInUse && IJetpackItem.handleJetpackMotion(minecraft.player, mode, jetpackThrust, p -> p.input.keyPresses.jump())) {
+                        minecraft.player.resetFallDistance();
+                    }
                 }
             }
         }
@@ -313,7 +300,7 @@ public class ClientTickHandler {
 
     @SubscribeEvent
     public void onFog(ViewportEvent.RenderFog event) {
-        if (visionEnhancement && event.getCamera().getEntity() instanceof Player player) {
+        if (visionEnhancement && event.getCamera().entity() instanceof Player player) {
             IModule<ModuleVisionEnhancementUnit> module = IModuleHelper.INSTANCE.getIfEnabled(player, EquipmentSlot.HEAD, MekanismModules.VISION_ENHANCEMENT_UNIT);
             if (module != null) {
                 //This near plane is the same as spectators have set for lava and powdered snow
@@ -332,82 +319,74 @@ public class ClientTickHandler {
                     event.setFarPlaneDistance(Math.min(192, scalar));
                 }
                 //Scale the distance based on the number of installed modules
-                event.scaleFarPlaneDistance(((float) Math.pow(module.getInstalledCount(), 1.25)) / module.getUntypedData().getMaxStackSize());
-                //Cancel the event to ensure our changes are applied
-                event.setCanceled(true);
+                event.scaleFarPlaneDistance((float) Math.pow(module.getInstalledCount(), 1.25) / module.getUntypedData().getMaxStackSize());
             }
         }
     }
 
     @SubscribeEvent
-    public void recipesUpdated(RecipesUpdatedEvent event) {
-        //Note: Dedicated servers first connection the server sends recipes then tags, and on reload sends tags then recipes.
-        // We ignore this fact and only clear the cache in the recipes updated event however, as the cache should already be
-        // empty on our initial connection, and even if it isn't the client has no way to query the recipes and cause the
-        // caches to be initialized before the tags are then received as we lazily initialize our recipe caches.
-        MekanismRecipeType.clearCache();
-    }
-
-    @SubscribeEvent
-    public void renderEntityPre(RenderLivingEvent.Pre<?, ?> evt) {
+    public void renderEntityPre(RenderLivingEvent.Pre<?, ?, ?> evt) {
         EntityModel<?> model = evt.getRenderer().getModel();
-        if (model instanceof HumanoidModel<?> humanoidModel) {
-            //If the entity has a biped model, then see if it is wearing a meka suit, in which case we want to hide various parts of the model
-            setModelVisibility(evt.getEntity(), humanoidModel, false);
+        if (evt.getRenderState() instanceof HumanoidRenderState state && model instanceof HumanoidModel<?> humanoidModel) {
+            //If the entity has a humanoid model, then see if it is wearing a meka suit, in which case we want to hide various parts of the model
+            setModelVisibility(state, humanoidModel, false);
         }
     }
 
     @SubscribeEvent
-    public void renderEntityPost(RenderLivingEvent.Post<?, ?> evt) {
+    public void renderEntityPost(RenderLivingEvent.Post<?, ?, ?> evt) {
         EntityModel<?> model = evt.getRenderer().getModel();
-        if (model instanceof HumanoidModel<?> humanoidModel) {
+        if (evt.getRenderState() instanceof HumanoidRenderState state && model instanceof HumanoidModel<?> humanoidModel) {
             //Undo model visibility changes we made to ensure that other entities of the same type are properly visible
-            setModelVisibility(evt.getEntity(), humanoidModel, true);
+            setModelVisibility(state, humanoidModel, true);
         }
     }
 
-    private static void setModelVisibility(LivingEntity entity, HumanoidModel<?> entityModel, boolean showModel) {
-        if (entity.getItemBySlot(EquipmentSlot.HEAD).getItem() instanceof ItemMekaSuitArmor) {
+    //TODO - 26.1: Do we need to even be calling this anymore in post? As we are adjusting the state now rather than just the model
+    private static void setModelVisibility(HumanoidRenderState state, HumanoidModel<?> entityModel, boolean showModel) {
+        if (state.headEquipment.getItem() instanceof ItemMekaSuitArmor) {
             entityModel.head.visible = showModel;
             entityModel.hat.visible = showModel;
-            if (entityModel instanceof PlayerModel<?> playerModel) {
-                playerModel.ear.visible = showModel;
+            if (state instanceof AvatarRenderState playerState) {
+                //TODO -1.21.11: Figure this out?
+                playerState.showExtraEars = showModel;
             }
         }
-        ItemStack chest = entity.getItemBySlot(EquipmentSlot.CHEST);
-        if (chest.getItem() instanceof ItemMekaSuitArmor) {
+        if (state.chestEquipment.getItem() instanceof ItemMekaSuitArmor) {
             entityModel.body.visible = showModel;
-            if (!(entity instanceof ArmorStand)) {
-                //Don't adjust arms for armor stands as the model will end up changing them anyway and then we may incorrectly activate them
+            if (!(state instanceof ArmorStandRenderState)) {
+                //Don't adjust arms for armor stands as the model will end up changing them anyway, and then we may incorrectly activate them
+                //TODO - 26.1: Is this still true? I am guessing we might be able to just disable them for the armor stand
                 entityModel.leftArm.visible = showModel;
                 entityModel.rightArm.visible = showModel;
             }
-            if (entityModel instanceof PlayerModel<?> playerModel) {
-                playerModel.cloak.visible = showModel;
-                playerModel.jacket.visible = showModel;
-                playerModel.leftSleeve.visible = showModel;
-                playerModel.rightSleeve.visible = showModel;
+            if (state instanceof AvatarRenderState playerState) {
+                playerState.showCape = showModel;
+                playerState.showJacket = showModel;
+                playerState.showLeftSleeve = showModel;
+                playerState.showRightSleeve = showModel;
             } else if (entityModel instanceof ArmorStandModel armorStandModel) {
                 armorStandModel.rightBodyStick.visible = showModel;
                 armorStandModel.leftBodyStick.visible = showModel;
                 armorStandModel.shoulderStick.visible = showModel;
             }
-        } else if (itemHidesCape(chest.getItem()) && entityModel instanceof PlayerModel<?> playerModel) {
+        } else if (itemHidesCape(state.chestEquipment.getItem()) && state instanceof AvatarRenderState playerState) {
             //Hide the player's cape if they have an HDPE elytra as it will be part of the elytra's layer and shouldn't be rendered
-            playerModel.cloak.visible = showModel;
+            //TODO - 26.1: I think the cape layer now actually has something that we might be able to integrate with that sort of checks if there is a wings layer present
+            playerState.showCape = false;
         }
-        if (entity.getItemBySlot(EquipmentSlot.LEGS).getItem() instanceof ItemMekaSuitArmor) {
+        if (state.legsEquipment.getItem() instanceof ItemMekaSuitArmor) {
             entityModel.leftLeg.visible = showModel;
             entityModel.rightLeg.visible = showModel;
-            if (entityModel instanceof PlayerModel<?> playerModel) {
-                playerModel.leftPants.visible = showModel;
-                playerModel.rightPants.visible = showModel;
+            if (state instanceof AvatarRenderState playerState) {
+                playerState.showLeftPants = showModel;
+                playerState.showRightPants = showModel;
             }
         }
     }
 
     private static boolean itemHidesCape(Item item) {
-        return item instanceof ItemHDPEElytra || item instanceof ItemJetpack || item instanceof ItemScubaTank;
+        return MekanismItems.HDPE_REINFORCED_ELYTRA.is(item) || item instanceof ItemJetpack || item instanceof ItemScubaTank;
     }
 
     private record TeleportData(InteractionHand hand, FrequencyIdentity identity, long teleportTime) {

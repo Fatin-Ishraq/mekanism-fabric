@@ -1,7 +1,6 @@
 package mekanism.client.model;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import java.util.List;
 import mekanism.client.render.MekanismRenderType;
 import mekanism.common.Mekanism;
@@ -13,16 +12,17 @@ import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.CommonColors;
+import net.minecraft.util.LightCoordsUtil;
 
-public class ModelScubaMask extends MekanismJavaModel {
+public class ModelScubaMask extends MekanismJavaModel.NoState {
 
     public static final ModelLayerLocation MASK_LAYER = new ModelLayerLocation(Mekanism.rl("scuba_mask"), "main");
-    private static final ResourceLocation MASK_TEXTURE = MekanismUtils.getResource(ResourceType.RENDER, "scuba_set.png");
+    private static final Identifier MASK_TEXTURE = MekanismUtils.getResource(ResourceType.RENDER, "scuba_set.png");
 
     private static final ModelPartData HELMET_FEED = new ModelPartData("helmetFeed", CubeListBuilder.create()
           .texOffs(88, 43)
@@ -117,14 +117,13 @@ public class ModelScubaMask extends MekanismJavaModel {
     }
 
     private final RenderType GLASS_RENDER_TYPE = MekanismRenderType.STANDARD.apply(MASK_TEXTURE);
-    private final RenderType RENDER_TYPE = renderType(MASK_TEXTURE);
+    private final RenderType RENDER_TYPE = RenderTypes.entitySolid(MASK_TEXTURE);
     private final List<ModelPart> parts;
     private final List<ModelPart> litParts;
     private final List<ModelPart> glass;
 
     public ModelScubaMask(EntityModelSet entityModelSet) {
-        super(RenderType::entitySolid);
-        ModelPart root = entityModelSet.bakeLayer(MASK_LAYER);
+        super(entityModelSet.bakeLayer(MASK_LAYER));
         parts = getRenderableParts(root, HELMET_FEED, TUBE_BACK, TUBE_L, TUBE_R, TUBE_FRONT, MOUTH_INTAKE, FIN_UPPER_R, FIN_UPPER_L,
               FIN_MID_R, FIN_MID_L, FIN_BACK, TOP_PLATE, FILTER_L, FILTER_R, FILTER_PIPE_LOWER, FILTER_PIPE_UPPER, PIPE_CORNER_F_L,
               PIPE_CORNER_F_R, PIPE_CORNER_B_R, PIPE_CORNER_B_L);
@@ -132,14 +131,12 @@ public class ModelScubaMask extends MekanismJavaModel {
         glass = getRenderableParts(root, GLASS_TOP, GLASS_FRONT, GLASS_R, GLASS_L, GLASS_BACK_R, GLASS_BACK_L);
     }
 
-    public void render(@NotNull PoseStack matrix, @NotNull MultiBufferSource renderer, int light, int overlayLight, boolean hasEffect) {
-        renderToBuffer(matrix, getVertexConsumer(renderer, RENDER_TYPE, hasEffect), light, overlayLight, 0xFFFFFFFF);
-        renderPartsToBuffer(glass, matrix, getVertexConsumer(renderer, GLASS_RENDER_TYPE, hasEffect), LightTexture.FULL_BRIGHT, overlayLight, 0x4CFFFFFF);
+    @Override
+    public void collect(PoseStack matrix, SubmitNodeCollector collector, int light, int overlayLight, boolean hasFoil) {
+        setupAnim();
+        collectParts(parts, matrix, RENDER_TYPE, collector, light, overlayLight, CommonColors.WHITE, null, hasFoil);
+        collectParts(litParts, matrix, RENDER_TYPE, collector, LightCoordsUtil.FULL_BRIGHT, overlayLight, CommonColors.WHITE, null, hasFoil);
+        collectParts(glass, matrix, GLASS_RENDER_TYPE, collector, LightCoordsUtil.FULL_BRIGHT, overlayLight, 0x4CFFFFFF, null, hasFoil);
     }
 
-    @Override
-    public void renderToBuffer(@NotNull PoseStack poseStack, @NotNull VertexConsumer vertexConsumer, int light, int overlayLight, int color) {
-        renderPartsToBuffer(parts, poseStack, vertexConsumer, light, overlayLight, color);
-        renderPartsToBuffer(litParts, poseStack, vertexConsumer, LightTexture.FULL_BRIGHT, overlayLight, color);
-    }
 }

@@ -8,8 +8,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 import mekanism.api.RelativeSide;
-import mekanism.common.attachments.component.AttachedSideConfig;
-import mekanism.common.attachments.component.AttachedSideConfig.LightConfigInfo;
+import mekanism.common.component.component.AttachedSideConfig;
+import mekanism.common.component.component.AttachedSideConfig.LightConfigInfo;
 import mekanism.common.block.interfaces.IHasTileEntity;
 import mekanism.common.lib.transmitter.TransmissionType;
 import mekanism.common.registries.MekanismBlocks;
@@ -20,13 +20,13 @@ import mekanism.common.tile.component.config.ConfigInfo;
 import mekanism.common.tile.prefab.TileEntityConfigurableMachine;
 import mekanism.generators.common.registries.GeneratorsBlocks;
 import net.minecraft.core.BlockPos;
-import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import mekanism.neoshim.neoforge.registries.DeferredHolder;
 import mekanism.neoshim.testframework.annotation.ForEachTest;
 import mekanism.neoshim.testframework.annotation.TestHolder;
 import mekanism.neoshim.testframework.gametest.EmptyTemplate;
+import mekanism.neoshim.testframework.gametest.GameTest;
 
 @ForEachTest(groups = "component.item")
 public class ItemPropertiesTest {
@@ -42,7 +42,7 @@ public class ItemPropertiesTest {
     }
 
     private static void validateSideConfigs(MekGameTestHelper helper, Collection<DeferredHolder<Block, ? extends Block>> blocks) {
-        BlockPos center = helper.absolutePos(new BlockPos(0, 2, 0));
+        BlockPos center = helper.absolutePos(new BlockPos(0, 1, 0));
         for (DeferredHolder<Block, ? extends Block> holder : blocks) {
             Block block = holder.get();
             ItemStack stack = new ItemStack(block);
@@ -71,6 +71,7 @@ public class ItemPropertiesTest {
                             ConfigInfo info = config.getConfig(type);
                             helper.assertTrue(info != null, "Config " + type.getTransmission() + " cannot be null");
                             for (RelativeSide side : entry.getValue().sideConfig().keySet()) {
+                                //noinspection DataFlowIssue (nullability checked by above assertTrue call)
                                 if (!info.isSideEnabled(side)) {
                                     helper.fail("Block " + holder.getId() + " has side config for type: " + type.getTransmission() + " on side: " +
                                                 side.name() + ", but the BE has side configs disabled on that side.");

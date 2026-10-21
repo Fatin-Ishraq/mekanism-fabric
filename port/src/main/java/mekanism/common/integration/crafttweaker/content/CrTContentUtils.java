@@ -7,23 +7,21 @@ import java.util.Map;
 import mekanism.api.MekanismAPI;
 import mekanism.api.chemical.Chemical;
 import mekanism.common.integration.crafttweaker.CrTConstants;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import mekanism.neoshim.neoforge.registries.RegisterEvent;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Helper class for registering chemicals via CraftTweaker. This is sort of akin to how ContentTweaker allows registering items/blocks via CraftTweaker
- */
+/// Helper class for registering chemicals via CraftTweaker. This is sort of akin to how ContentTweaker allows registering items/blocks via CraftTweaker
 public class CrTContentUtils {
 
-    private static Map<ResourceLocation, Chemical> queuedChemicals = new HashMap<>();
+    @Nullable
+    private static Map<Identifier, Chemical> queuedChemicals = new HashMap<>();
 
-    /**
-     * Queues a {@link Chemical} to be registered with the given registry name.
-     *
-     * @param registryName Registry name to give the {@link Chemical}.
-     * @param chemical          {@link Chemical} to queue for registration.
-     */
-    public static void queueChemicalForRegistration(ResourceLocation registryName, Chemical chemical) {
+    /// Queues a [Chemical] to be registered with the given registry name.
+    ///
+    /// @param registryName Registry name to give the [Chemical].
+    /// @param chemical     [Chemical] to queue for registration.
+    public static void queueChemicalForRegistration(Identifier registryName, Chemical chemical) {
         //Only queue our chemicals for registration on the first run of our loader
         if (queuedChemicals != null) {
             if (queuedChemicals.put(registryName, chemical) == null) {
@@ -51,8 +49,8 @@ public class CrTContentUtils {
             if (queuedChemicals != null) {//Validate it isn't null, it shouldn't be but just in case the event gets fired again or something
                 int count = queuedChemicals.size();
                 CrTConstants.CRT_LOGGER.info("Registering {} custom {}.", count, count == 1 ? "chemical" : "chemicals");
-                for (Map.Entry<ResourceLocation, Chemical> entry : queuedChemicals.entrySet()) {
-                    ResourceLocation registryName = entry.getKey();
+                for (Map.Entry<Identifier, Chemical> entry : queuedChemicals.entrySet()) {
+                    Identifier registryName = entry.getKey();
                     helper.register(registryName, entry.getValue());
                     CrTConstants.CRT_LOGGER.info("Registered Chemical: '{}'.", registryName);
                 }

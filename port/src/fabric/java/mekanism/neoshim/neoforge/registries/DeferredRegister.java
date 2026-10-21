@@ -13,7 +13,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
@@ -41,7 +41,7 @@ public class DeferredRegister<T> {
         return new DeferredRegister<>(key, namespace);
     }
 
-    public static <B> DeferredRegister<B> create(ResourceLocation registryName, String modid) {
+    public static <B> DeferredRegister<B> create(Identifier registryName, String modid) {
         return new DeferredRegister<>(ResourceKey.createRegistryKey(registryName), modid);
     }
 
@@ -62,13 +62,13 @@ public class DeferredRegister<T> {
         return this.register(name, key -> sup.get());
     }
 
-    public <I extends T> DeferredHolder<T, I> register(String name, Function<ResourceLocation, ? extends I> func) {
+    public <I extends T> DeferredHolder<T, I> register(String name, Function<Identifier, ? extends I> func) {
         if (seenRegisterEvent) {
             throw new IllegalStateException("Cannot register new entries to DeferredRegister after RegisterEvent has been fired.");
         }
         Objects.requireNonNull(name);
         Objects.requireNonNull(func);
-        ResourceLocation key = ResourceLocation.fromNamespaceAndPath(namespace, name);
+        Identifier key = Identifier.fromNamespaceAndPath(namespace, name);
         DeferredHolder<T, I> ret = createHolder(this.registryKey, key);
         if (entries.putIfAbsent(ret, () -> func.apply(key)) != null) {
             throw new IllegalArgumentException("Duplicate registration " + name);
@@ -76,27 +76,27 @@ public class DeferredRegister<T> {
         return ret;
     }
 
-    protected <I extends T> DeferredHolder<T, I> createHolder(ResourceKey<? extends Registry<T>> registryKey, ResourceLocation key) {
+    protected <I extends T> DeferredHolder<T, I> createHolder(ResourceKey<? extends Registry<T>> registryKey, Identifier key) {
         return DeferredHolder.create(registryKey, key);
     }
 
-    private final Map<ResourceLocation, ResourceLocation> aliases = new LinkedHashMap<>();
+    private final Map<Identifier, Identifier> aliases = new LinkedHashMap<>();
 
     /** Registry aliases (old id -> new id), resolved by MappedRegistryAliasMixin when a lookup misses. */
-    public void addAlias(ResourceLocation from, ResourceLocation to) {
+    public void addAlias(Identifier from, Identifier to) {
         aliases.put(from, to);
         RegistryAliases.add(registryKey, from, to);
     }
 
-    public Map<ResourceLocation, ResourceLocation> getAliases() {
+    public Map<Identifier, Identifier> getAliases() {
         return aliases;
     }
 
     public TagKey<T> createTagKey(String path) {
-        return createTagKey(ResourceLocation.fromNamespaceAndPath(namespace, path));
+        return createTagKey(Identifier.fromNamespaceAndPath(namespace, path));
     }
 
-    public TagKey<T> createTagKey(ResourceLocation location) {
+    public TagKey<T> createTagKey(Identifier location) {
         return TagKey.create(this.registryKey, location);
     }
 
@@ -116,7 +116,7 @@ public class DeferredRegister<T> {
         return this.registryKey;
     }
 
-    public ResourceLocation getRegistryName() {
+    public Identifier getRegistryName() {
         return this.registryKey.location();
     }
 
@@ -127,7 +127,7 @@ public class DeferredRegister<T> {
     @Nullable
     @SuppressWarnings("unchecked")
     public Registry<T> getRegistry() {
-        return (Registry<T>) net.minecraft.core.registries.BuiltInRegistries.REGISTRY.get(this.registryKey.location());
+        return (Registry<T>) net.minecraft.core.registries.BuiltInRegistries.REGISTRY.getValue(this.registryKey.location());
     }
 
     private void addEntries(RegisterEvent event) {

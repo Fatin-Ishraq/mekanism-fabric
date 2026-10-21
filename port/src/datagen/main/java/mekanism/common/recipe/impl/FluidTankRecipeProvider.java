@@ -11,6 +11,7 @@ import mekanism.common.recipe.pattern.RecipePattern.TripleLine;
 import mekanism.common.registration.impl.BlockRegistryObject;
 import mekanism.common.registries.MekanismBlocks;
 import mekanism.common.tags.MekanismTags;
+import net.minecraft.core.HolderGetter;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.tags.TagKey;
@@ -24,6 +25,12 @@ class FluidTankRecipeProvider implements ISubRecipeProvider {
           TripleLine.of(Pattern.INGOT, Pattern.PREVIOUS, Pattern.INGOT),
           TripleLine.of(Pattern.ALLOY, Pattern.INGOT, Pattern.ALLOY));
 
+    private final HolderGetter<Item> items;
+
+    public FluidTankRecipeProvider(HolderGetter<Item> items) {
+        this.items = items;
+    }
+
     @Override
     public void addRecipes(RecipeOutput consumer, HolderLookup.Provider registries) {
         String basePath = "fluid_tank/";
@@ -33,21 +40,21 @@ class FluidTankRecipeProvider implements ISubRecipeProvider {
                     TripleLine.of(Pattern.ALLOY, Pattern.INGOT, Pattern.ALLOY),
                     TripleLine.of(Pattern.INGOT, Pattern.EMPTY, Pattern.INGOT),
                     TripleLine.of(Pattern.ALLOY, Pattern.INGOT, Pattern.ALLOY))
-              ).key(Pattern.INGOT, Tags.Items.INGOTS_IRON)
-              .key(Pattern.ALLOY, MekanismTags.Items.ALLOYS_BASIC)
-              .build(consumer, Mekanism.rl(basePath + "basic"));
+              ).key(Pattern.INGOT, this.items, Tags.Items.INGOTS_IRON)
+              .key(Pattern.ALLOY, this.items, MekanismTags.Items.ALLOYS_BASIC)
+              .save(consumer, Mekanism.rl(basePath + "basic"));
         addTieredFluidTank(consumer, basePath, MekanismBlocks.ADVANCED_FLUID_TANK, MekanismBlocks.BASIC_FLUID_TANK, MekanismTags.Items.ALLOYS_INFUSED);
         addTieredFluidTank(consumer, basePath, MekanismBlocks.ELITE_FLUID_TANK, MekanismBlocks.ADVANCED_FLUID_TANK, MekanismTags.Items.ALLOYS_REINFORCED);
         addTieredFluidTank(consumer, basePath, MekanismBlocks.ULTIMATE_FLUID_TANK, MekanismBlocks.ELITE_FLUID_TANK, MekanismTags.Items.ALLOYS_ATOMIC);
     }
 
     private void addTieredFluidTank(RecipeOutput consumer, String basePath, BlockRegistryObject<?, ?> tank, BlockRegistryObject<?, ?> previousTank, TagKey<Item> alloyTag) {
-        String tierName = Attribute.getBaseTier(tank).getLowerName();
+        String tierName = Attribute.getBaseTierNN(tank).getLowerName();
         MekDataShapedRecipeBuilder.shapedRecipe(tank)
               .pattern(FLUID_TANK_PATTERN)
               .key(Pattern.PREVIOUS, previousTank)
-              .key(Pattern.INGOT, Tags.Items.INGOTS_IRON)
-              .key(Pattern.ALLOY, alloyTag)
-              .build(consumer, Mekanism.rl(basePath + tierName));
+              .key(Pattern.INGOT, this.items, Tags.Items.INGOTS_IRON)
+              .key(Pattern.ALLOY, this.items, alloyTag)
+              .save(consumer, Mekanism.rl(basePath + tierName));
     }
 }

@@ -1,38 +1,28 @@
 package mekanism.common.lib.inventory;
 
-import java.util.function.Predicate;
 import mekanism.common.lib.WildcardMatcher;
 import mekanism.common.util.MekanismUtils;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
+import net.minecraft.core.HolderLookup;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
 
 @FunctionalInterface
-public interface Finder extends Predicate<ItemStack> {
+public interface Finder {
 
-    Finder ANY = stack -> true;
-    Finder NONE = stack -> false;
+    boolean test(ItemResource itemType);
 
-    static Finder item(Item itemType) {
-        if (itemType == Items.AIR) {
-            return NONE;
-        }
-        return stack -> stack.is(itemType);
+    Finder ANY = _ -> true;
+    Finder NONE = _ -> false;
+
+    static boolean item(ItemResource itemType, ItemResource toCheck) {
+        return !itemType.isEmpty() && toCheck.is(itemType.value());
     }
 
-    static Finder item(ItemStack itemType) {
-        return item(itemType.getItem());
+    //TODO - 26.1 instance of WildcardMatcher/predicate param (stored on filter upon tag change)
+    static boolean tag(String tagName, ItemResource toCheck) {
+        return !toCheck.isEmpty() && toCheck.tags().anyMatch(tag -> WildcardMatcher.matches(tagName, tag));
     }
 
-    static Finder strict(ItemStack itemType) {
-        return stack -> ItemStack.isSameItemSameComponents(itemType, stack);
-    }
-
-    static Finder tag(String tagName) {
-        return stack -> !stack.isEmpty() && stack.getTags().anyMatch(tag -> WildcardMatcher.matches(tagName, tag));
-    }
-
-    static Finder modID(String modID) {
-        return stack -> !stack.isEmpty() && WildcardMatcher.matches(modID, MekanismUtils.getModId(stack));
+    static boolean modID(String modID, HolderLookup.Provider registries, ItemResource toCheck) {
+        return !toCheck.isEmpty() && WildcardMatcher.matches(modID, MekanismUtils.getModId(registries, toCheck.toStack()));
     }
 }

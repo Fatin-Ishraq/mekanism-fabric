@@ -10,10 +10,10 @@ import mekanism.common.entity.EntityRobit;
 import mekanism.common.inventory.container.MekanismContainer;
 import mekanism.common.inventory.container.SelectedWindowData.WindowType;
 import mekanism.common.network.PacketUtils;
-import mekanism.common.network.to_server.PacketGuiInteract;
-import mekanism.common.network.to_server.PacketGuiInteract.GuiInteractionEntity;
+import mekanism.common.network.to_server.PacketEntityGuiInteract;
+import mekanism.common.network.to_server.PacketEntityGuiInteract.GuiInteractionEntity;
 import mekanism.common.network.to_server.robit.PacketRobitSkin;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.resources.ResourceKey;
 
 public class GuiRobitSkinSelect extends GuiWindow {
@@ -26,26 +26,26 @@ public class GuiRobitSkinSelect extends GuiWindow {
         this.robit = robit;
         selection = addChild(new GuiRobitSkinSelectScroll(gui(), relativeX + 6, relativeY + 18, this.robit, () -> gui.getMenu().getUnlockedSkins()));
         addChild(new TranslationButton(gui, relativeX + width / 2 - 61, relativeY + 165, 60, 20, MekanismLang.BUTTON_CANCEL, this::close));
-        addChild(new TranslationButton(gui, relativeX + width / 2 + 1, relativeY + 165, 60, 20, MekanismLang.BUTTON_CONFIRM, (element, mouseX, mouseY) -> {
+        addChild(new TranslationButton(gui, relativeX + width / 2 + 1, relativeY + 165, 60, 20, MekanismLang.BUTTON_CONFIRM, (element, event, isDoubleClick) -> {
             ResourceKey<RobitSkin> selectedSkin = selection.getSelectedSkin();
-            if (selectedSkin != this.robit.getSkin()) {
+            if (selectedSkin != this.robit.getSkinId()) {
                 PacketUtils.sendToServer(new PacketRobitSkin(this.robit, selectedSkin));
             }
-            return close(element, mouseX, mouseY);
+            return close(element, event, isDoubleClick);
         }));
         gui.getMenu().startTracking(MekanismContainer.SKIN_SELECT_WINDOW, gui.getMenu());
-        PacketUtils.sendToServer(new PacketGuiInteract(GuiInteractionEntity.CONTAINER_TRACK_SKIN_SELECT, this.robit, MekanismContainer.SKIN_SELECT_WINDOW));
+        PacketUtils.sendToServer(new PacketEntityGuiInteract(GuiInteractionEntity.CONTAINER_TRACK_SKIN_SELECT, this.robit, MekanismContainer.SKIN_SELECT_WINDOW));
     }
 
     @Override
     public void close() {
         super.close();
-        PacketUtils.sendToServer(new PacketGuiInteract(GuiInteractionEntity.CONTAINER_STOP_TRACKING, robit, MekanismContainer.SKIN_SELECT_WINDOW));
+        PacketUtils.sendToServer(new PacketEntityGuiInteract(GuiInteractionEntity.CONTAINER_STOP_TRACKING, robit, MekanismContainer.SKIN_SELECT_WINDOW));
         ((MekanismContainer) ((GuiMekanism<?>) gui()).getMenu()).stopTracking(MekanismContainer.SKIN_SELECT_WINDOW);
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         drawTitleText(guiGraphics, MekanismLang.ROBIT_SKIN_SELECT.translate(), 7);
     }

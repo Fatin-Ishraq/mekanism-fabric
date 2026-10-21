@@ -3,16 +3,16 @@ package mekanism.common.tile.machine;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.util.Map;
-import mekanism.api.Action;
 import mekanism.api.AutomationType;
 import mekanism.api.IContentsListener;
-import mekanism.api.RelativeSide;
+import mekanism.api.energy.IEnergyContainer;
+import mekanism.api.inventory.IInventorySlot;
 import mekanism.common.Mekanism;
 import mekanism.common.capabilities.energy.MachineEnergyContainer;
-import mekanism.common.capabilities.holder.energy.EnergyContainerHelper;
-import mekanism.common.capabilities.holder.energy.IEnergyContainerHolder;
-import mekanism.common.capabilities.holder.slot.IInventorySlotHolder;
-import mekanism.common.capabilities.holder.slot.InventorySlotHelper;
+import mekanism.common.capabilities.holder.container.IContainerHolder;
+import mekanism.common.capabilities.holder.container.MekContainerHelper;
+import mekanism.common.capabilities.holder.single.BasicSingleHolder;
+import mekanism.common.capabilities.holder.single.ISingleContainerHolder;
 import mekanism.common.integration.computer.ComputerException;
 import mekanism.common.integration.computer.SpecialComputerMethodWrapper.ComputerIInventorySlotWrapper;
 import mekanism.common.integration.computer.annotation.ComputerMethod;
@@ -25,14 +25,19 @@ import mekanism.common.tile.interfaces.IBoundingBlock;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.NotNull;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import org.jetbrains.annotations.UnknownNullability;
 
 public class TileEntitySeismicVibrator extends TileEntityMekanism implements IBoundingBlock {
 
     public int clientPiston;
 
+    @UnknownNullability//Initialized via getInitialEnergyContainer
     private MachineEnergyContainer<TileEntitySeismicVibrator> energyContainer;
+    @UnknownNullability//Initialized via getInitialInventory
     @WrappingComputerMethod(wrapper = ComputerIInventorySlotWrapper.class, methodNames = "getEnergyItem", docPlaceholder = "energy slot")
     EnergyInventorySlot energySlot;
 
@@ -41,25 +46,22 @@ public class TileEntitySeismicVibrator extends TileEntityMekanism implements IBo
         cacheCoord();
     }
 
-    @NotNull
     @Override
-    protected IEnergyContainerHolder getInitialEnergyContainers(IContentsListener listener) {
-        EnergyContainerHelper builder = EnergyContainerHelper.forSide(facingSupplier);
-        builder.addContainer(energyContainer = MachineEnergyContainer.input(this, listener), RelativeSide.BACK);
-        return builder.build();
-    }
-
-    @NotNull
-    @Override
-    protected IInventorySlotHolder getInitialInventory(IContentsListener listener) {
-        InventorySlotHelper builder = InventorySlotHelper.forSide(facingSupplier);
-        builder.addSlot(energySlot = EnergyInventorySlot.fillOrConvert(energyContainer, this::getLevel, listener, 143, 35));
-        return builder.build();
+    protected ISingleContainerHolder<IEnergyContainer> getInitialEnergyContainer(IContentsListener listener) {
+        energyContainer = MachineEnergyContainer.input(this, listener);
+        return new BasicSingleHolder<>(energyContainer, facingSupplier, BACK_ONLY);
     }
 
     @Override
-    protected void onUpdateClient() {
-        super.onUpdateClient();
+    protected IContainerHolder<IInventorySlot> getInitialInventory(IContentsListener listener) {
+        MekContainerHelper<IInventorySlot> builder = MekContainerHelper.forSide(facingSupplier);
+        builder.addContainer(energySlot = EnergyInventorySlot.fillOrConvert(energyContainer, this::getLevel, listener, 143, 35));
+        return builder.build();
+    }
+
+    @Override
+    protected void onUpdateClient(Level level) {
+        super.onUpdateClient(level);
         if (getActive()) {
             clientPiston++;
         }
@@ -67,23 +69,23 @@ public class TileEntitySeismicVibrator extends TileEntityMekanism implements IBo
     }
 
     @Override
-    protected boolean onUpdateServer() {
-        boolean sendUpdatePacket = super.onUpdateServer();
-        energySlot.fillContainerOrConvert();
+    protected boolean onUpdateServer(ServerLevel level) {
+        boolean sendUpdatePacket = super.onUpdateServer(level);
+        energySlot.fillContainerOrConvert(null);
+        boolean isActive = false;
         if (canFunction()) {
-            long energyPerTick = energyContainer.getEnergyPerTick();
-            if (energyContainer.extract(energyPerTick, Action.SIMULATE, AutomationType.INTERNAL) == energyPerTick) {
-                setActive(true);
-                energyContainer.extract(energyPerTick, Action.EXECUTE, AutomationType.INTERNAL);
-                if (ticker % (2 * SharedConstants.TICKS_PER_SECOND) == 0) {//Every two seconds allow for a new vibration to be sent
-                    level.gameEvent(null, MekanismGameEvents.SEISMIC_VIBRATION, worldPosition);
+            int energyPerTick = energyContainer.getEnergyPerTick();
+            try (Transaction transaction = Transaction.openRoot()) {
+                if (energyContainer.extract(energyPerTick, transaction, AutomationType.INTERNAL) == energyPerTick) {
+                    isActive = true;
+                    transaction.commit();
+                    if (ticker % (2 * SharedConstants.TICKS_PER_SECOND) == 0) {//Every two seconds allow for a new vibration to be sent
+                        level.gameEvent(null, MekanismGameEvents.SEISMIC_VIBRATION, worldPosition);
+                    }
                 }
-            } else {
-                setActive(false);
             }
-        } else {
-            setActive(false);
         }
+        setActive(isActive);
         updateActiveVibrators();
         return sendUpdatePacket;
     }
@@ -102,7 +104,7 @@ public class TileEntitySeismicVibrator extends TileEntityMekanism implements IBo
         Mekanism.activeVibrators.remove(getTileGlobalPos());
     }
 
-    public MachineEnergyContainer<TileEntitySeismicVibrator> getEnergyContainer() {
+    public MachineEnergyContainer<TileEntitySeismicVibrator> energyContainer() {
         return energyContainer;
     }
 
@@ -132,8 +134,9 @@ public class TileEntitySeismicVibrator extends TileEntityMekanism implements IBo
     @ComputerMethod
     BlockState getBlockAt(int chunkRelativeX, int y, int chunkRelativeZ) throws ComputerException {
         validateVibrating();
+        Level level = validateLevel();
         if (level.isOutsideBuildHeight(y)) {
-            throw new ComputerException("Y '%d' is out of range must be between %d and %d. (Inclusive)", y, level.getMinBuildHeight(), level.getMaxBuildHeight() - 1);
+            throw new ComputerException("Y '%d' is out of range must be between %d and %d. (Inclusive)", y, level.getMinY(), level.getMaxY());
         }
         BlockPos targetPos = getVerticalPos(chunkRelativeX, y, chunkRelativeZ);
         return level.getBlockState(targetPos);
@@ -142,9 +145,10 @@ public class TileEntitySeismicVibrator extends TileEntityMekanism implements IBo
     @ComputerMethod(methodDescription = "Get a column info, table key is the Y level")
     Map<Integer, BlockState> getColumnAt(int chunkRelativeX, int chunkRelativeZ) throws ComputerException {
         validateVibrating();
+        Level level = validateLevel();
         Int2ObjectMap<BlockState> blocks = new Int2ObjectOpenHashMap<>();
-        BlockPos minPos = getVerticalPos(chunkRelativeX, level.getMinBuildHeight(), chunkRelativeZ);
-        for (BlockPos pos : BlockPos.betweenClosed(minPos, new BlockPos(minPos.getX(), level.getMaxBuildHeight(), minPos.getZ()))) {
+        BlockPos minPos = getVerticalPos(chunkRelativeX, level.getMinY(), chunkRelativeZ);
+        for (BlockPos pos : BlockPos.betweenClosed(minPos, new BlockPos(minPos.getX(), level.getMaxY() + 1, minPos.getZ()))) {
             blocks.put(pos.getY(), level.getBlockState(pos));
         }
         return blocks;

@@ -7,40 +7,42 @@ import java.util.Arrays;
 import java.util.stream.Stream;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
 import mekanism.neoshim.neoforge.fluids.FluidType;
+import mekanism.neoshim.neoforge.fluids.crafting.display.FluidStackSlotDisplay;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
+import net.minecraft.core.component.DataComponentExactPredicate;
 import net.minecraft.core.component.DataComponentMap;
-import net.minecraft.core.component.DataComponentPredicate;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.HolderSetCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.crafting.display.SlotDisplay;
 import net.minecraft.world.level.material.Fluid;
 
 public final class DataComponentFluidIngredient extends FluidIngredient {
 
     public static final MapCodec<DataComponentFluidIngredient> CODEC = RecordCodecBuilder.mapCodec(builder -> builder.group(
-          HolderSetCodec.create(Registries.FLUID, BuiltInRegistries.FLUID.holderByNameCodec(), false).fieldOf("fluids").forGetter(DataComponentFluidIngredient::fluids),
-          DataComponentPredicate.CODEC.fieldOf("components").forGetter(DataComponentFluidIngredient::components),
+          HolderSetCodec.create(Registries.FLUID, BuiltInRegistries.FLUID.holderByNameCodec(), false).fieldOf("fluids").forGetter(DataComponentFluidIngredient::fluidSet),
+          DataComponentExactPredicate.CODEC.fieldOf("components").forGetter(DataComponentFluidIngredient::components),
           Codec.BOOL.optionalFieldOf("strict", false).forGetter(DataComponentFluidIngredient::isStrict)
     ).apply(builder, DataComponentFluidIngredient::new));
     public static final StreamCodec<RegistryFriendlyByteBuf, DataComponentFluidIngredient> STREAM_CODEC = StreamCodec.composite(
-          ByteBufCodecs.holderSet(Registries.FLUID), DataComponentFluidIngredient::fluids,
-          DataComponentPredicate.STREAM_CODEC, DataComponentFluidIngredient::components,
+          ByteBufCodecs.holderSet(Registries.FLUID), DataComponentFluidIngredient::fluidSet,
+          DataComponentExactPredicate.STREAM_CODEC, DataComponentFluidIngredient::components,
           ByteBufCodecs.BOOL, DataComponentFluidIngredient::isStrict,
           DataComponentFluidIngredient::new);
-    public static final FluidIngredientTypes.Type<DataComponentFluidIngredient> TYPE = FluidIngredientTypes.register(
-          ResourceLocation.fromNamespaceAndPath("neoforge", "components"), CODEC, STREAM_CODEC);
+    public static final FluidIngredientType<DataComponentFluidIngredient> TYPE = FluidIngredientTypes.register(
+          Identifier.fromNamespaceAndPath("neoforge", "components"), CODEC, STREAM_CODEC);
 
     private final HolderSet<Fluid> fluids;
-    private final DataComponentPredicate components;
+    private final DataComponentExactPredicate components;
     private final boolean strict;
     private final FluidStack[] stacks;
 
-    public DataComponentFluidIngredient(HolderSet<Fluid> fluids, DataComponentPredicate components, boolean strict) {
+    public DataComponentFluidIngredient(HolderSet<Fluid> fluids, DataComponentExactPredicate components, boolean strict) {
         this.fluids = fluids;
         this.components = components;
         this.strict = strict;
@@ -61,8 +63,13 @@ public final class DataComponentFluidIngredient extends FluidIngredient {
     }
 
     @Override
-    protected Stream<FluidStack> generateStacks() {
-        return Arrays.stream(stacks);
+    protected Stream<Holder<Fluid>> generateFluids() {
+        return fluids.stream();
+    }
+
+    @Override
+    public SlotDisplay display() {
+        return new SlotDisplay.Composite(Arrays.stream(stacks).<SlotDisplay>map(FluidStackSlotDisplay::new).toList());
     }
 
     @Override
@@ -71,7 +78,7 @@ public final class DataComponentFluidIngredient extends FluidIngredient {
     }
 
     @Override
-    public FluidIngredientTypes.Type<?> getType() {
+    public FluidIngredientType<?> getType() {
         return TYPE;
     }
 
@@ -86,11 +93,11 @@ public final class DataComponentFluidIngredient extends FluidIngredient {
                               && other.strict == strict;
     }
 
-    public HolderSet<Fluid> fluids() {
+    public HolderSet<Fluid> fluidSet() {
         return fluids;
     }
 
-    public DataComponentPredicate components() {
+    public DataComponentExactPredicate components() {
         return components;
     }
 
@@ -103,21 +110,21 @@ public final class DataComponentFluidIngredient extends FluidIngredient {
     }
 
     @SafeVarargs
-    public static FluidIngredient of(boolean strict, DataComponentMap map, Holder<Fluid>... fluids) {
-        return of(strict, DataComponentPredicate.allOf(map), fluids);
+    public static FluidIngredient of(boolean strict, DataComponentMap map, net.minecraft.core.Holder<Fluid>... fluids) {
+        return of(strict, DataComponentExactPredicate.allOf(map), fluids);
     }
 
     @SafeVarargs
-    public static FluidIngredient of(boolean strict, DataComponentPredicate predicate, Holder<Fluid>... fluids) {
+    public static FluidIngredient of(boolean strict, DataComponentExactPredicate predicate, Holder<Fluid>... fluids) {
         return of(strict, predicate, HolderSet.direct(fluids));
     }
 
     @SuppressWarnings("deprecation")
-    public static FluidIngredient of(boolean strict, DataComponentPredicate predicate, Fluid... fluids) {
+    public static FluidIngredient of(boolean strict, DataComponentExactPredicate predicate, Fluid... fluids) {
         return of(strict, predicate, HolderSet.direct(Arrays.stream(fluids).map(Fluid::builtInRegistryHolder).toList()));
     }
 
-    public static FluidIngredient of(boolean strict, DataComponentPredicate predicate, HolderSet<Fluid> fluids) {
+    public static FluidIngredient of(boolean strict, DataComponentExactPredicate predicate, HolderSet<Fluid> fluids) {
         return new DataComponentFluidIngredient(fluids, predicate, strict);
     }
 }

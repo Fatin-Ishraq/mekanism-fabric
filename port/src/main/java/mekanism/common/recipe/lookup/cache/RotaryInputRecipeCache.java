@@ -3,20 +3,21 @@ package mekanism.common.recipe.lookup.cache;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import mekanism.api.chemical.Chemical;
 import mekanism.api.chemical.ChemicalStack;
 import mekanism.api.recipes.RotaryRecipe;
 import mekanism.common.recipe.MekanismRecipeType;
 import mekanism.common.recipe.lookup.cache.type.ChemicalInputCache;
 import mekanism.common.recipe.lookup.cache.type.FluidInputCache;
+import net.minecraft.core.TypedInstance;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.Fluid;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-/**
- * Similar in concept to {@link SingleInputRecipeCache} except specialized to handle Rotary Condensentrator recipes for the purposes of being able to handle both the gas
- * to fluid and fluid to chemical directions.
- */
+/// Similar in concept to [SingleInputRecipeCache] except specialized to handle Rotary Condensentrator recipes for the purposes of being able to handle both the gas to
+/// fluid and fluid to chemical directions.
 public class RotaryInputRecipeCache extends AbstractInputRecipeCache<RotaryRecipe> {
 
     private final ChemicalInputCache<RotaryRecipe> chemicalInputCache = new ChemicalInputCache<>();
@@ -37,38 +38,32 @@ public class RotaryInputRecipeCache extends AbstractInputRecipeCache<RotaryRecip
         complexFluidInputRecipes.clear();
     }
 
-    /**
-     * Checks if there is a matching recipe that has the given fluid input.
-     *
-     * @param world World.
-     * @param input Recipe input.
-     *
-     * @return {@code true} if there is a match, {@code false} if there isn't.
-     */
-    public boolean containsInput(@Nullable Level world, FluidStack input) {
+    /// Checks if there is a matching recipe that has the given fluid input.
+    ///
+    /// @param world World.
+    /// @param input Recipe input.
+    ///
+    /// @return `true` if there is a match, `false` if there isn't.
+    public boolean containsInputFluid(@Nullable Level world, TypedInstance<Fluid> input) {
         return containsInput(world, input, RotaryRecipe::getFluidInput, fluidInputCache, complexFluidInputRecipes);
     }
 
-    /**
-     * Checks if there is a matching recipe that has the given chemical input.
-     *
-     * @param world World.
-     * @param input Recipe input.
-     *
-     * @return {@code true} if there is a match, {@code false} if there isn't.
-     */
-    public boolean containsInput(@Nullable Level world, ChemicalStack input) {
+    /// Checks if there is a matching recipe that has the given chemical input.
+    ///
+    /// @param world World.
+    /// @param input Recipe input.
+    ///
+    /// @return `true` if there is a match, `false` if there isn't.
+    public boolean containsInputChemical(@Nullable Level world, TypedInstance<Chemical> input) {
         return containsInput(world, input, RotaryRecipe::getChemicalInput, chemicalInputCache, complexChemicalInputRecipes);
     }
 
-    /**
-     * Finds the first recipe that matches the given fluid input.
-     *
-     * @param world World.
-     * @param input Recipe input.
-     *
-     * @return Recipe matching the given fluid input, or {@code null} if no recipe matches.
-     */
+    /// Finds the first recipe that matches the given fluid input.
+    ///
+    /// @param world World.
+    /// @param input Recipe input.
+    ///
+    /// @return Recipe matching the given fluid input, or `null` if no recipe matches.
     @Nullable
     public RotaryRecipe findFirstRecipe(@Nullable Level world, FluidStack input) {
         if (fluidInputCache.isEmpty(input)) {
@@ -90,14 +85,12 @@ public class RotaryInputRecipeCache extends AbstractInputRecipeCache<RotaryRecip
         return null;
     }
 
-    /**
-     * Finds the first recipe that matches the given chemical input.
-     *
-     * @param world World.
-     * @param input Recipe input.
-     *
-     * @return Recipe matching the given chemical input, or {@code null} if no recipe matches.
-     */
+    /// Finds the first recipe that matches the given chemical input.
+    ///
+    /// @param world World.
+    /// @param input Recipe input.
+    ///
+    /// @return Recipe matching the given chemical input, or `null` if no recipe matches.
     @Nullable
     public RotaryRecipe findFirstRecipe(@Nullable Level world, ChemicalStack input) {
         if (chemicalInputCache.isEmpty(input)) {

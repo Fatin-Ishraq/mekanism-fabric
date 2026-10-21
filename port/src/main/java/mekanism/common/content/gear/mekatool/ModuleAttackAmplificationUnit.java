@@ -5,8 +5,6 @@ import io.netty.buffer.ByteBuf;
 import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
-import mekanism.api.annotations.NothingNullByDefault;
-import mekanism.api.annotations.ParametersAreNotNullByDefault;
 import mekanism.api.gear.ICustomModule;
 import mekanism.api.gear.IModule;
 import mekanism.api.gear.IModuleContainer;
@@ -15,19 +13,20 @@ import mekanism.api.text.IHasTextComponent;
 import mekanism.api.text.TextComponentUtil;
 import mekanism.common.Mekanism;
 import mekanism.common.MekanismLang;
+import net.minecraft.core.TypedInstance;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.ByIdMap;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Item;
 
-@ParametersAreNotNullByDefault
 public record ModuleAttackAmplificationUnit(AttackDamage attackDamage) implements ICustomModule<ModuleAttackAmplificationUnit> {
 
-    public static final ResourceLocation ATTACK_DAMAGE = Mekanism.rl("bonus_attack_damage");
+    public static final Identifier ATTACK_DAMAGE = Mekanism.rl("bonus_attack_damage");
 
     public ModuleAttackAmplificationUnit(IModule<ModuleAttackAmplificationUnit> module) {
         this(module.<AttackDamage>getConfigOrThrow(ATTACK_DAMAGE).get());
@@ -38,13 +37,13 @@ public record ModuleAttackAmplificationUnit(AttackDamage attackDamage) implement
     }
 
     @Override
-    public void addHUDStrings(IModule<ModuleAttackAmplificationUnit> module, IModuleContainer moduleContainer, ItemStack stack, Player player, Consumer<Component> hudStringAdder) {
+    public <ITEM extends TypedInstance<Item> & DataComponentGetter> void addHUDStrings(IModule<ModuleAttackAmplificationUnit> module, IModuleContainer moduleContainer,
+          ITEM instance, Player player, Consumer<Component> hudStringAdder) {
         if (module.isEnabled()) {
             hudStringAdder.accept(MekanismLang.MODULE_DAMAGE.translateColored(EnumColor.DARK_GRAY, EnumColor.INDIGO, getDamage()));
         }
     }
 
-    @NothingNullByDefault
     public enum AttackDamage implements IHasTextComponent, StringRepresentable {
         OFF(0),
         LOW(4),

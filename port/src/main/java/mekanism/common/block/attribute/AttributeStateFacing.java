@@ -12,17 +12,11 @@ import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.level.block.state.properties.Property;
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-public class AttributeStateFacing implements AttributeState {
-
-    private final DirectionProperty facingProperty;
-    private final FacePlacementType placementType;
-    private final boolean canRotate;
+public record AttributeStateFacing(EnumProperty<Direction> facingProperty, FacePlacementType placementType, boolean canRotate) implements AttributeState {
 
     public AttributeStateFacing() {
         this(true);
@@ -32,79 +26,54 @@ public class AttributeStateFacing implements AttributeState {
         this(BlockStateProperties.HORIZONTAL_FACING, canRotate);
     }
 
-    public AttributeStateFacing(DirectionProperty facingProperty) {
+    public AttributeStateFacing(EnumProperty<Direction> facingProperty) {
         this(facingProperty, true);
     }
 
-    public AttributeStateFacing(DirectionProperty facingProperty, boolean canRotate) {
+    public AttributeStateFacing(EnumProperty<Direction> facingProperty, boolean canRotate) {
         this(facingProperty, FacePlacementType.PLAYER_LOCATION, canRotate);
     }
 
-    public AttributeStateFacing(DirectionProperty facingProperty, FacePlacementType placementType) {
+    public AttributeStateFacing(EnumProperty<Direction> facingProperty, FacePlacementType placementType) {
         this(facingProperty, placementType, true);
     }
 
-    public AttributeStateFacing(DirectionProperty facingProperty, FacePlacementType placementType, boolean canRotate) {
-        this.facingProperty = facingProperty;
-        this.placementType = placementType;
-        this.canRotate = canRotate;
-    }
-
-    public boolean canRotate() {
-        return canRotate;
-    }
-
     public Direction getDirection(BlockState state) {
-        return state.getValue(getFacingProperty());
+        return state.getValue(facingProperty());
     }
 
-    public BlockState setDirection(@NotNull BlockState state, Direction newDirection) {
-        return supportsDirection(newDirection) ? state.setValue(getFacingProperty(), newDirection) : state;
+    public BlockState setDirection(BlockState state, Direction newDirection) {
+        return supportsDirection(newDirection) ? state.setValue(facingProperty(), newDirection) : state;
     }
 
-    @NotNull
-    public DirectionProperty getFacingProperty() {
-        return facingProperty;
-    }
-
-    @NotNull
-    public FacePlacementType getPlacementType() {
-        return placementType;
-    }
-
-    public Collection<Direction> getSupportedDirections() {
-        return getFacingProperty().getPossibleValues();
+    public Collection<Direction> supportedDirections() {
+        return facingProperty().getPossibleValues();
     }
 
     public boolean supportsDirection(Direction direction) {
-        return getSupportedDirections().contains(direction);
+        return supportedDirections().contains(direction);
     }
 
     @Override
     public void fillBlockStateContainer(Block block, List<Property<?>> properties) {
-        properties.add(getFacingProperty());
+        properties.add(facingProperty());
     }
 
     @Override
     public BlockState copyStateData(BlockState oldState, BlockState newState) {
         AttributeStateFacing newStateFacingAttribute = Attribute.get(newState, AttributeStateFacing.class);
         if (newStateFacingAttribute != null) {
-            DirectionProperty oldFacingProperty = Attribute.getOrThrow(oldState, AttributeStateFacing.class).getFacingProperty();
-            newState = newState.setValue(newStateFacingAttribute.getFacingProperty(), oldState.getValue(oldFacingProperty));
+            EnumProperty<Direction> oldFacingProperty = Attribute.getOrThrow(oldState, AttributeStateFacing.class).facingProperty();
+            newState = newState.setValue(newStateFacingAttribute.facingProperty(), oldState.getValue(oldFacingProperty));
         }
         return newState;
     }
 
     @Override
-    @Contract("null, _, _, _, _ -> null")
-    public BlockState getStateForPlacement(@Nullable BlockState state, @NotNull LevelAccessor world, @NotNull BlockPos pos, @Nullable Player player,
-          @NotNull Direction face) {
-        if (state == null) {
-            return null;
-        }
-        AttributeStateFacing blockFacing = Attribute.get(state, AttributeStateFacing.class);
+    public BlockState getStateForPlacement(BlockState state, LevelAccessor world, BlockPos pos, @Nullable Player player, Direction face) {
+        AttributeStateFacing blockFacing = Attribute.getOrThrow(state, AttributeStateFacing.class);
         Direction newDirection = Direction.SOUTH;
-        if (blockFacing.getPlacementType() == FacePlacementType.PLAYER_LOCATION) {
+        if (blockFacing.placementType() == FacePlacementType.PLAYER_LOCATION) {
             //TODO: Somehow weight this stuff towards context.getFace(), so that it has a higher likelihood of going with the face that was clicked on
             if (blockFacing.supportsDirection(Direction.DOWN) && blockFacing.supportsDirection(Direction.UP)) {
                 float rotationPitch = player == null ? 0 : player.getXRot();
@@ -132,8 +101,7 @@ public class AttributeStateFacing implements AttributeState {
             newDirection = blockFacing.supportsDirection(face) ? face : Direction.NORTH;
         }
 
-        state = blockFacing.setDirection(state, newDirection);
-        return state;
+        return blockFacing.setDirection(state, newDirection);
     }
 
     public static BlockState rotate(BlockState state, LevelAccessor world, BlockPos pos, Rotation rotation) {
@@ -143,7 +111,7 @@ public class AttributeStateFacing implements AttributeState {
     public static BlockState rotate(BlockState state, Rotation rotation) {
         AttributeStateFacing blockFacing = Attribute.get(state, AttributeStateFacing.class);
         if (blockFacing != null && blockFacing.canRotate()) {
-            return rotate(blockFacing, blockFacing.getFacingProperty(), state, rotation);
+            return rotate(blockFacing, blockFacing.facingProperty(), state, rotation);
         }
         return state;
     }
@@ -151,20 +119,20 @@ public class AttributeStateFacing implements AttributeState {
     public static BlockState mirror(BlockState state, Mirror mirror) {
         AttributeStateFacing blockFacing = Attribute.get(state, AttributeStateFacing.class);
         if (blockFacing != null && blockFacing.canRotate()) {
-            DirectionProperty property = blockFacing.getFacingProperty();
+            EnumProperty<Direction> property = blockFacing.facingProperty();
             return rotate(blockFacing, property, state, mirror.getRotation(state.getValue(property)));
         }
         return state;
     }
 
-    private static BlockState rotate(AttributeStateFacing blockFacing, DirectionProperty property, BlockState state, Rotation rotation) {
+    private static BlockState rotate(AttributeStateFacing blockFacing, EnumProperty<Direction> property, BlockState state, Rotation rotation) {
         return blockFacing.setDirection(state, rotation.rotate(state.getValue(property)));
     }
 
     public enum FacePlacementType {
-        /** Set the face based on the player's relative location to the placement location. */
+        /// Set the face based on the player's relative location to the placement location.
         PLAYER_LOCATION,
-        /** Set the face based on the direction of the block face selected. */
+        /// Set the face based on the direction of the block face selected.
         SELECTED_FACE
     }
 }

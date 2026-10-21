@@ -1,30 +1,37 @@
 package mekanism.client.gui.element;
 
+import com.mojang.blaze3d.pipeline.BlendFunction;
+import com.mojang.blaze3d.pipeline.ColorTargetState;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.platform.DestFactor;
+import com.mojang.blaze3d.platform.SourceFactor;
 import java.util.function.BooleanSupplier;
-
-import com.mojang.blaze3d.platform.GlStateManager.DestFactor;
-import com.mojang.blaze3d.platform.GlStateManager.SourceFactor;
-import com.mojang.blaze3d.systems.RenderSystem;
 import mekanism.client.gui.IGuiWrapper;
+import mekanism.common.Mekanism;
 import mekanism.common.inventory.warning.ISupportsWarning;
 import mekanism.common.inventory.warning.WarningTracker.WarningType;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
-public abstract class GuiInsetElement<DATA_SOURCE> extends GuiSideHolder implements ISupportsWarning<GuiInsetElement<DATA_SOURCE>> {
+public abstract class GuiInsetElement<DATA_SOURCE extends @Nullable Object> extends GuiSideHolder implements ISupportsWarning<GuiInsetElement<DATA_SOURCE>> {
+
+    private static final RenderPipeline WARNING_PIPELINE = RenderPipeline.builder(RenderPipelines.GUI_TEXTURED_SNIPPET)
+          .withLocation(Mekanism.rl("pipeline/gui_textured_dst_color"))
+          .withColorTargetState(new ColorTargetState(new BlendFunction(SourceFactor.DST_COLOR, DestFactor.ZERO)))
+          .build();
 
     protected final int border;
     protected final int innerWidth;
     protected final int innerHeight;
     protected final DATA_SOURCE dataSource;
-    protected final ResourceLocation overlay;
+    protected final Identifier overlay;
 
     @Nullable
     protected BooleanSupplier warningSupplier;
 
-    public GuiInsetElement(ResourceLocation overlay, IGuiWrapper gui, DATA_SOURCE dataSource, int x, int y, int height, int innerSize, boolean left) {
+    public GuiInsetElement(Identifier overlay, IGuiWrapper gui, DATA_SOURCE dataSource, int x, int y, int height, int innerSize, boolean left) {
         super(gui, x, y, height, left, false);
         this.overlay = overlay;
         this.dataSource = dataSource;
@@ -37,7 +44,7 @@ public abstract class GuiInsetElement<DATA_SOURCE> extends GuiSideHolder impleme
     }
 
     @Override
-    public GuiInsetElement<DATA_SOURCE> warning(@NotNull WarningType type, @NotNull BooleanSupplier warningSupplier) {
+    public GuiInsetElement<DATA_SOURCE> warning(WarningType type, BooleanSupplier warningSupplier) {
         this.warningSupplier = ISupportsWarning.compound(this.warningSupplier, gui().trackWarning(type, warningSupplier));
         return this;
     }
@@ -68,27 +75,24 @@ public abstract class GuiInsetElement<DATA_SOURCE> extends GuiSideHolder impleme
         return innerHeight;
     }
 
-    protected ResourceLocation getOverlay() {
+    protected Identifier getOverlay() {
         return overlay;
     }
 
     @Override
-    protected void draw(@NotNull GuiGraphics guiGraphics) {
+    protected void draw(GuiGraphicsExtractor guiGraphics) {
         boolean warning = warningSupplier != null && warningSupplier.getAsBoolean();
         if (warning) {
-            drawUncolored(guiGraphics);
+            guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, getResource(), relativeX, relativeY, width, height);
             //Draw the warning overlay (multiply-blended)
-            RenderSystem.enableBlend();
-            RenderSystem.blendFunc(SourceFactor.DST_COLOR, DestFactor.ZERO);
-            guiGraphics.blit(WARNING_TEXTURE, relativeX, relativeY, 0, 0, width, height, 256, 256);
-            RenderSystem.disableBlend();
+            guiGraphics.blit(WARNING_PIPELINE, WARNING_TEXTURE, relativeX, relativeY, 0, 0, width, height, 256, 256);
         } else {
             super.draw(guiGraphics);
         }
     }
 
     @Override
-    public void drawBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void drawBackground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         super.drawBackground(guiGraphics, mouseX, mouseY, partialTicks);
         //Draw the button background
         if (buttonBackground != ButtonBackground.NONE) {
@@ -98,7 +102,7 @@ public abstract class GuiInsetElement<DATA_SOURCE> extends GuiSideHolder impleme
         drawBackgroundOverlay(guiGraphics);
     }
 
-    protected void drawBackgroundOverlay(@NotNull GuiGraphics guiGraphics) {
-        guiGraphics.blit(getOverlay(), getButtonX(), getButtonY(), 0, 0, innerWidth, innerHeight, innerWidth, innerHeight);
+    protected void drawBackgroundOverlay(GuiGraphicsExtractor guiGraphics) {
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, getOverlay(), getButtonX(), getButtonY(), 0, 0, innerWidth, innerHeight, innerWidth, innerHeight);
     }
 }

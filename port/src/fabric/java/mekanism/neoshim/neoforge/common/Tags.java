@@ -1,7 +1,7 @@
 package mekanism.neoshim.neoforge.common;
 
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.entity.EntityType;
@@ -42,7 +42,7 @@ public class Tags {
         public static final TagKey<DamageType> IS_TECHNICAL = TagKey.create(Registries.DAMAGE_TYPE, c("is_technical"));
     }
 
-    private static ResourceLocation c(String path) {
-        return ResourceLocation.fromNamespaceAndPath("c", path);
+    private static Identifier c(String path) {
+        return Identifier.fromNamespaceAndPath("c", path);
     }
 }

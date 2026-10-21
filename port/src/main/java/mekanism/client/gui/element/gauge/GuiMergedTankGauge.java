@@ -3,42 +3,42 @@ package mekanism.client.gui.element.gauge;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
-import mekanism.api.chemical.IMekanismChemicalHandler;
-import mekanism.api.fluid.IMekanismFluidHandler;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.recipe_viewer.interfaces.IRecipeViewerIngredientHelper;
 import mekanism.common.capabilities.merged.MergedTank;
+import mekanism.common.lib.multiblock.IMultiblockContents;
 import mekanism.common.lib.transmitter.TransmissionType;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.network.chat.Component;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-public class GuiMergedTankGauge<HANDLER extends IMekanismFluidHandler & IMekanismChemicalHandler> extends GuiGauge<Void> implements IRecipeViewerIngredientHelper {
+public class GuiMergedTankGauge extends GuiGauge<@Nullable Void> implements IRecipeViewerIngredientHelper {
 
     private final Supplier<MergedTank> mergedTankSupplier;
-    private final Supplier<HANDLER> handlerSupplier;
+    private final Supplier<IMultiblockContents> handlerSupplier;
 
     private final GuiFluidGauge fluidGauge;
     private final GuiChemicalGauge chemicalGauge;
 
+    @Nullable
     private Component label;
 
-    public GuiMergedTankGauge(Supplier<MergedTank> mergedTankSupplier, Supplier<HANDLER> handlerSupplier, GaugeType type, IGuiWrapper gui, int x, int y) {
+    public GuiMergedTankGauge(Supplier<MergedTank> mergedTankSupplier, Supplier<IMultiblockContents> handlerSupplier, GaugeType type, IGuiWrapper gui, int x, int y) {
         this(mergedTankSupplier, handlerSupplier, type, gui, x, y, type.getGaugeOverlay().getWidth() + 2, type.getGaugeOverlay().getHeight() + 2);
     }
 
-    public GuiMergedTankGauge(Supplier<MergedTank> mergedTankSupplier, Supplier<HANDLER> handlerSupplier, GaugeType type, IGuiWrapper gui, int x, int y, int width,
+    public GuiMergedTankGauge(Supplier<MergedTank> mergedTankSupplier, Supplier<IMultiblockContents> handlerSupplier, GaugeType type, IGuiWrapper gui, int x, int y, int width,
           int height) {
         super(type, gui, x, y, width, height);
         this.mergedTankSupplier = mergedTankSupplier;
         this.handlerSupplier = handlerSupplier;
-        fluidGauge = addPositionOnlyChild(new GuiFluidGauge(() -> this.mergedTankSupplier.get().getFluidTank(), () -> this.handlerSupplier.get().getFluidTanks(null), type, gui, x, y, width, height));
-        chemicalGauge = addPositionOnlyChild(new GuiChemicalGauge(() -> this.mergedTankSupplier.get().getChemicalTank(), () -> this.handlerSupplier.get().getChemicalTanks(null), type, gui, x, y, width, height));
+        fluidGauge = addPositionOnlyChild(new GuiFluidGauge(() -> this.mergedTankSupplier.get().getFluidTank(), () -> this.handlerSupplier.get().getFluidTanks(), type, gui, x, y, width, height));
+        chemicalGauge = addPositionOnlyChild(new GuiChemicalGauge(() -> this.mergedTankSupplier.get().getChemicalTank(), () -> this.handlerSupplier.get().getChemicalTanks(), type, gui, x, y, width, height));
     }
 
-    public GuiMergedTankGauge<HANDLER> setLabel(Component label) {
+    public GuiMergedTankGauge setLabel(Component label) {
         this.label = label;
         return this;
     }
@@ -54,23 +54,24 @@ public class GuiMergedTankGauge<HANDLER extends IMekanismFluidHandler & IMekanis
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean isDoubleClick) {
         GuiTankGauge<?, ?> currentGauge = getCurrentGaugeNoFallback();
         if (currentGauge == null) {
             //If all the tanks are currently empty, pass the click event to all of them;
             // if multiple types are somehow stored in the dropper, insertion checks should prevent them from being inserted at the same time
-            return fluidGauge.mouseClicked(mouseX, mouseY, button) | chemicalGauge.mouseClicked(mouseX, mouseY, button);
+            return fluidGauge.mouseClicked(event, isDoubleClick) | chemicalGauge.mouseClicked(event, isDoubleClick);
         }
         //Otherwise, just send the click event to the corresponding gauge
-        return currentGauge.mouseClicked(mouseX, mouseY, button);
+        return currentGauge.mouseClicked(event, isDoubleClick);
     }
 
     @Override
-    protected void applyRenderColor(GuiGraphics guiGraphics) {
+    protected int getRenderColor() {
         GuiTankGauge<?, ?> currentGauge = getCurrentGaugeNoFallback();
         if (currentGauge != null) {
-            currentGauge.applyRenderColor(guiGraphics);
+            return currentGauge.getRenderColor();
         }
+        return -1;
     }
 
     @Override
@@ -102,11 +103,13 @@ public class GuiMergedTankGauge<HANDLER extends IMekanismFluidHandler & IMekanis
         return getCurrentGauge().getTooltipText();
     }
 
+    @Nullable
     @Override
     public Component getLabel() {
         return label;
     }
 
+    @Nullable
     @Override
     public TransmissionType getTransmission() {
         return getCurrentGauge().getTransmission();

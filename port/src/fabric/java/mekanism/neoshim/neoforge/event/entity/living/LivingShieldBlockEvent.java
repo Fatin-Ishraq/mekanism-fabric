@@ -8,17 +8,19 @@ import net.minecraft.world.entity.LivingEntity;
 public class LivingShieldBlockEvent extends LivingEvent implements ICancellableEvent {
 
     private final DamageContainer container;
+    private final float originalBlockedDamage;
     private final boolean originalBlocked;
     private boolean blocked;
     private float dmgBlocked;
-    private float shieldDamage = -1;
+    private int shieldDamage = -1;
 
-    public LivingShieldBlockEvent(LivingEntity blocker, DamageContainer container, boolean originalBlockedState) {
+    public LivingShieldBlockEvent(LivingEntity blocker, DamageContainer container, float originalBlockedDamage, boolean originalBlockedState) {
         super(blocker);
         this.container = container;
+        this.originalBlockedDamage = originalBlockedDamage;
         this.originalBlocked = originalBlockedState;
         this.blocked = originalBlockedState;
-        this.dmgBlocked = container.getNewDamage();
+        this.dmgBlocked = originalBlockedDamage;
     }
 
     public DamageContainer getDamageContainer() {
@@ -30,22 +32,22 @@ public class LivingShieldBlockEvent extends LivingEvent implements ICancellableE
     }
 
     public float getOriginalBlockedDamage() {
-        return container.getNewDamage();
+        return originalBlockedDamage;
     }
 
     public float getBlockedDamage() {
         return dmgBlocked;
     }
 
-    public float shieldDamage() {
-        return blocked ? (shieldDamage >= 0 ? shieldDamage : dmgBlocked) : 0;
+    public int shieldDamage() {
+        return blocked ? (shieldDamage >= 0 ? shieldDamage : Math.round(dmgBlocked)) : 0;
     }
 
     public void setBlockedDamage(float blocked) {
         this.dmgBlocked = Math.clamp(blocked, 0, container.getNewDamage());
     }
 
-    public void setShieldDamage(float damage) {
+    public void setShieldDamage(int damage) {
         this.shieldDamage = damage;
     }
 

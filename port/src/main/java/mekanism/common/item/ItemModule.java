@@ -1,8 +1,7 @@
 package mekanism.common.item;
 
-import java.util.List;
 import java.util.Set;
-import java.util.function.Supplier;
+import java.util.function.Consumer;
 import mekanism.api.gear.IModuleHelper;
 import mekanism.api.gear.ModuleData;
 import mekanism.api.text.EnumColor;
@@ -13,51 +12,52 @@ import mekanism.common.MekanismLang;
 import mekanism.common.content.gear.IModuleItem;
 import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Util;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.item.component.TooltipDisplay;
 
 public class ItemModule extends Item implements IModuleItem {
 
-    private final Supplier<Holder<ModuleData<?>>> moduleDataSupplier;
+    private final Holder<ModuleData<?>> moduleData;
 
-    public ItemModule(Supplier<Holder<ModuleData<?>>> moduleDataSupplier, Properties properties) {
-        super(properties);
-        this.moduleDataSupplier = moduleDataSupplier;
+    public ItemModule(Holder<ModuleData<?>> moduleData, Properties properties) {
+        super(properties.overrideDescription(moduleData.unwrap().map(
+              //Note: In theory it will always take this path, but in case for some reason a direct holder is passed, we support querying it from the value instead
+              //TODO - 26.1: Do we want to expose a constant for the translation key prefix? (Maybe doing so for all of our custom translation keys?)
+              key -> Util.makeDescriptionId("module", key.identifier()),
+              ModuleData::getTranslationKey
+        )));
+        this.moduleData = moduleData;
     }
 
     @Override
     public Holder<ModuleData<?>> getModuleData() {
-        return moduleDataSupplier.get();
+        return moduleData;
     }
 
     @Override
-    public void appendHoverText(@NotNull ItemStack stack, @NotNull Item.TooltipContext context, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        Holder<ModuleData<?>> moduleData = getModuleData();
+    @Deprecated
+    public void appendHoverText(ItemStack stack, Item.TooltipContext context, TooltipDisplay tooltipDisplay, Consumer<Component> tooltipAdder, TooltipFlag flag) {
+        super.appendHoverText(stack, context, tooltipDisplay, tooltipAdder, flag);
         if (MekKeyHandler.isKeyPressed(MekanismKeyHandler.detailsKey)) {
-            tooltip.add(MekanismLang.MODULE_SUPPORTED.translateColored(EnumColor.BRIGHT_GREEN));
+            tooltipAdder.accept(MekanismLang.MODULE_SUPPORTED.translateColored(EnumColor.BRIGHT_GREEN));
             for (Item item : IModuleHelper.INSTANCE.getSupportedItems(moduleData)) {
-                tooltip.add(MekanismLang.GENERIC_LIST.translate(item.getName(new ItemStack(item))));
+                tooltipAdder.accept(MekanismLang.GENERIC_LIST.translate(item.getName(new ItemStack(item))));
             }
             Set<ModuleData<?>> conflicting = IModuleHelper.INSTANCE.getConflicting(moduleData);
             if (!conflicting.isEmpty()) {
-                tooltip.add(MekanismLang.MODULE_CONFLICTING.translateColored(EnumColor.RED));
+                tooltipAdder.accept(MekanismLang.MODULE_CONFLICTING.translateColored(EnumColor.RED));
                 for (ModuleData<?> module : conflicting) {
-                    tooltip.add(MekanismLang.GENERIC_LIST.translate(module));
+                    tooltipAdder.accept(MekanismLang.GENERIC_LIST.translate(module));
                 }
             }
         } else {
             ModuleData<?> data = moduleData.value();
-            tooltip.add(TextComponentUtil.translate(data.getDescriptionTranslationKey()));
-            tooltip.add(MekanismLang.MODULE_STACKABLE.translateColored(EnumColor.GRAY, EnumColor.AQUA, data.getMaxStackSize()));
-            tooltip.add(MekanismLang.HOLD_FOR_SUPPORTED_ITEMS.translateColored(EnumColor.GRAY, EnumColor.INDIGO, MekanismKeyHandler.detailsKey.getTranslatedKeyMessage()));
+            tooltipAdder.accept(TextComponentUtil.translate(data.getDescriptionTranslationKey()));
+            tooltipAdder.accept(MekanismLang.MODULE_STACKABLE.translateColored(EnumColor.GRAY, EnumColor.AQUA, data.getMaxStackSize()));
+            tooltipAdder.accept(MekanismLang.HOLD_FOR_SUPPORTED_ITEMS.translateColored(EnumColor.GRAY, EnumColor.INDIGO, MekanismKeyHandler.detailsKey.getTranslatedKeyMessage()));
         }
-    }
-
-    @NotNull
-    @Override
-    public String getDescriptionId() {
-        return getModuleData().value().getTranslationKey();
     }
 }

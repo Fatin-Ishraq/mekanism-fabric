@@ -6,12 +6,16 @@ import mekanism.client.gui.tooltip.TooltipUtils;
 import mekanism.client.render.MekanismRenderer;
 import mekanism.common.MekanismLang;
 import mekanism.common.inventory.container.QIOItemViewerContainer;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.input.MouseButtonEvent;
+import org.jspecify.annotations.Nullable;
 
 public class GuiTargetDirectionTab extends GuiInsetToggleElement<QIOItemViewerContainer> {
 
+    @Nullable
     private static final Tooltip QIO_TRANSFER_TO_WINDOW = TooltipUtils.create(MekanismLang.QIO_TRANSFER_TO_WINDOW);
+    @Nullable
     private static final Tooltip QIO_TRANSFER_TO_FREQUENCY = TooltipUtils.create(MekanismLang.QIO_TRANSFER_TO_FREQUENCY);
 
     public GuiTargetDirectionTab(IGuiWrapper gui, QIOItemViewerContainer holder, int y) {
@@ -25,12 +29,12 @@ public class GuiTargetDirectionTab extends GuiInsetToggleElement<QIOItemViewerCo
     }
 
     @Override
-    protected void colorTab(GuiGraphics guiGraphics) {
-        MekanismRenderer.color(guiGraphics, SpecialColors.TAB_TARGET_DIRECTION);
+    protected int getTabColor(GuiGraphicsExtractor guiGraphics) {
+        return MekanismRenderer.color(SpecialColors.TAB_TARGET_DIRECTION);
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY, int button) {
+    public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
         dataSource.toggleTargetDirection();
     }
 }

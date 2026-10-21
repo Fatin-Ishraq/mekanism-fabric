@@ -18,7 +18,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import mekanism.neoshim.bus.api.IEventBus;
 import mekanism.neoshim.neoforge.event.BuildCreativeModeTabContentsEvent;
-import org.jetbrains.annotations.NotNull;
 
 public class CreativeTabDeferredRegister extends MekanismDeferredRegister<CreativeModeTab> {
 
@@ -35,26 +34,22 @@ public class CreativeTabDeferredRegister extends MekanismDeferredRegister<Creati
     }
 
     @Override
-    public void register(@NotNull IEventBus bus) {
+    public void register(IEventBus bus) {
         super.register(bus);
         bus.addListener(addToExistingTabs);
     }
 
-    /**
-     * @apiNote We manually require the title and icon to be passed so that we ensure all tabs have one.
-     */
+    /// @apiNote We manually require the title and icon to be passed so that we ensure all tabs have one.
     public MekanismDeferredHolder<CreativeModeTab, CreativeModeTab> registerMain(ILangEntry title, Holder<Item> icon, UnaryOperator<CreativeModeTab.Builder> operator) {
         return register(getNamespace(), title, icon, operator);
     }
 
-    /**
-     * @apiNote We manually require the title and icon to be passed so that we ensure all tabs have one.
-     */
+    /// @apiNote We manually require the title and icon to be passed so that we ensure all tabs have one.
     public MekanismDeferredHolder<CreativeModeTab, CreativeModeTab> register(String name, ILangEntry title, Holder<Item> icon, UnaryOperator<CreativeModeTab.Builder> operator) {
         return register(name, () -> {
-            //FABRIC: FabricItemGroup.builder() instead of NeoForge's no-arg builder; withTabFactory (subclass for the label color) is NeoForge-only, so the
-            // MekanismCreativeTab label color is registered on the built tab instead
-            CreativeModeTab.Builder builder = net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup.builder()
+            //FABRIC: FabricCreativeModeTab.builder() instead of NeoForge's no-arg builder; withTabFactory (subclass for the label color) is NeoForge-only, so the
+            // Mekanism label color is registered on the built tab instead
+            CreativeModeTab.Builder builder = net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab.builder()
                   .title(title.translate())
                   .icon(() -> new ItemStack(icon));
             CreativeModeTab tab = operator.apply(builder).build();
@@ -120,18 +115,6 @@ public class CreativeTabDeferredRegister extends MekanismDeferredRegister<Creati
             return true;
         }
     }
-
-    public static class MekanismCreativeTab extends CreativeModeTab {
-
-        //FABRIC: NeoForge's CreativeModeTab(Builder) constructor does not exist; this class is unused on Fabric (see register)
-        protected MekanismCreativeTab(CreativeModeTab.Builder builder) {
-            super(Row.TOP, 0, Type.CATEGORY, net.minecraft.network.chat.Component.empty(), () -> ItemStack.EMPTY, (parameters, output) -> {
-            });
-        }
-
-        @Override
-        public int getLabelColor() {
-            return SpecialColors.TEXT_TITLE.argb();
-        }
-    }
+    //FABRIC: MekanismCreativeTab (NeoForge's withTabFactory subclass) removed; the CreativeModeTab constructor is private in 26.1 and the label color
+    // goes through ICreativeModeTabExtension instead
 }

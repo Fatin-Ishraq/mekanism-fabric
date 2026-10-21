@@ -32,8 +32,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class BuildCommand {
 
@@ -104,7 +103,9 @@ public class BuildCommand {
         while (!openSet.isEmpty()) {
             BlockPos ptr = openSet.poll();
             if (isMekanismBlock(world, chunkMap, ptr)) {
-                Clearable.tryClear(WorldUtils.getTileEntity(world, chunkMap, ptr));
+                if (WorldUtils.getTileEntity(world, chunkMap, ptr) instanceof Clearable clearable) {
+                    clearable.clearContent();
+                }
                 world.setBlock(ptr, world.getFluidState(ptr).createLegacyBlock(), Block.UPDATE_ALL | Block.UPDATE_SUPPRESS_DROPS);
                 for (Direction side : EnumUtils.DIRECTIONS) {
                     BlockPos offset = ptr.relative(side);
@@ -116,10 +117,10 @@ public class BuildCommand {
         }
     }
 
-    private static boolean isMekanismBlock(@Nullable LevelAccessor world, @NotNull Long2ObjectMap<ChunkAccess> chunkMap, @NotNull BlockPos pos) {
+    private static boolean isMekanismBlock(@Nullable LevelAccessor world, Long2ObjectMap<ChunkAccess> chunkMap, BlockPos pos) {
         return WorldUtils.getBlockState(world, chunkMap, pos)
-              .map(state -> state.getBlockHolder().getKey())
-              .filter(key -> key.location().getNamespace().startsWith(Mekanism.MODID))
+              .map(state -> state.typeHolder().getKey())
+              .filter(key -> key.identifier().getNamespace().startsWith(Mekanism.MODID))
               .isPresent();
     }
 }

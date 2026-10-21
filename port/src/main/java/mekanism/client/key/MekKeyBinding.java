@@ -4,13 +4,11 @@ import com.mojang.blaze3d.platform.InputConstants;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
-import mekanism.api.annotations.ParametersAreNotNullByDefault;
 import net.minecraft.client.KeyMapping;
 import mekanism.neoshim.neoforge.client.settings.IKeyConflictContext;
 import mekanism.neoshim.neoforge.client.settings.KeyModifier;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-@ParametersAreNotNullByDefault
 public class MekKeyBinding extends KeyMapping {
 
     @Nullable
@@ -22,7 +20,7 @@ public class MekKeyBinding extends KeyMapping {
     private final boolean repeating;
     private boolean lastState;
 
-    MekKeyBinding(String description, IKeyConflictContext keyConflictContext, KeyModifier keyModifier, InputConstants.Key key, String category,
+    MekKeyBinding(String description, IKeyConflictContext keyConflictContext, KeyModifier keyModifier, InputConstants.Key key, KeyMapping.Category category,
           @Nullable BiConsumer<KeyMapping, Boolean> onKeyDown, @Nullable Consumer<KeyMapping> onKeyUp, @Nullable BooleanSupplier toggleable, boolean repeating) {
         super(description, key.getType(), key.getValue(), category);//FABRIC: NeoForge KeyMapping ctor with conflict context/modifier
         setKeyConflictContext(keyConflictContext);

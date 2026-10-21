@@ -5,7 +5,6 @@ import it.unimi.dsi.fastutil.shorts.Short2ObjectMaps;
 import it.unimi.dsi.fastutil.shorts.Short2ObjectOpenHashMap;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.UnaryOperator;
 import mekanism.common.block.attribute.AttributeTier;
 import mekanism.common.block.interfaces.IHasTileEntity;
 import mekanism.common.block.prefab.BlockBase.BlockBaseModel;
@@ -24,7 +23,7 @@ import mekanism.common.util.WorldUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
@@ -33,14 +32,16 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.level.pathfinder.PathComputationType;
+import net.minecraft.world.level.redstone.Orientation;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.BooleanOp;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.EntityCollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
 public abstract class BlockTransmitter<TILE extends TileEntityTransmitter> extends BlockBaseModel<BlockTypeTile<TILE>> implements IHasTileEntity<TILE> {
 
@@ -48,15 +49,17 @@ public abstract class BlockTransmitter<TILE extends TileEntityTransmitter> exten
     //Max retained size packing it like this 163,987B
     private static final Short2ObjectMap<VoxelShape> cachedShapes = Short2ObjectMaps.synchronize(new Short2ObjectOpenHashMap<>());
 
-    protected BlockTransmitter(BlockTypeTile<TILE> type) {
-        this(type, properties -> {
+    protected BlockTransmitter(BlockTypeTile<TILE> type, BlockBehaviour.Properties properties, @Nullable MapColor mapColor) {
+        if (mapColor == null) {
             AttributeTier<?> attributeTier = type.get(AttributeTier.class);
-            return attributeTier == null ? properties : properties.mapColor(attributeTier.tier().getBaseTier().getMapColor());
-        });
-    }
-
-    protected BlockTransmitter(BlockTypeTile<TILE> type, UnaryOperator<BlockBehaviour.Properties> propertiesModifier) {
-        super(type, propertiesModifier.apply(BlockBehaviour.Properties.of().strength(1, 6).pushReaction(PushReaction.BLOCK)));
+            if (attributeTier != null) {
+                mapColor = attributeTier.tier().getBaseTier().getMapColor();
+            }
+        }
+        if (mapColor != null) {
+            properties.mapColor(mapColor);
+        }
+        super(type, properties.strength(1, 6).pushReaction(PushReaction.BLOCK));
     }
 
     @Override
@@ -64,24 +67,25 @@ public abstract class BlockTransmitter<TILE extends TileEntityTransmitter> exten
         return type.getTileType();
     }
 
+    //TODO - 26.1: https://github.com/mekanism/Mekanism/commit/ba9d4fa1c10c3d3c4802eabcef19b79170fdee78 switched from neighbor block updates to neighbor block entity updates
+    // Check other overriders and figure out how to adjust them for orientation and the like
     @Override
-    protected void neighborChanged(@NotNull BlockState state, @NotNull Level world, @NotNull BlockPos pos, @NotNull Block neighborBlock, @NotNull BlockPos neighborPos,
-          boolean isMoving) {
-        TileEntityTransmitter tile = WorldUtils.getTileEntity(TileEntityTransmitter.class, world, pos);
+    protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block block, @Nullable Orientation orientation, boolean movedByPiston) {
+        super.neighborChanged(state, level, pos, block, orientation, movedByPiston);
+        TileEntityTransmitter tile = WorldUtils.getTileEntity(TileEntityTransmitter.class, level, pos);
         if (tile != null) {
-            Direction side = Direction.getNearest(neighborPos.getX() - pos.getX(), neighborPos.getY() - pos.getY(), neighborPos.getZ() - pos.getZ());
-            tile.onNeighborBlockChange(side);
+            //TODO - 26.1: Figure out orientation
+            tile.onNeighborBlockChange(orientation == null ? null : orientation.getSide());
         }
     }
 
     @Override
-    protected boolean isPathfindable(@NotNull BlockState state, @NotNull PathComputationType type) {
+    protected boolean isPathfindable(BlockState state, PathComputationType type) {
         return false;
     }
 
-    @NotNull
     @Override
-    protected VoxelShape getShape(@NotNull BlockState state, @NotNull BlockGetter world, @NotNull BlockPos pos, @NotNull CollisionContext context) {
+    protected VoxelShape getShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext context) {
         if (!context.isHoldingItem(MekanismItems.CONFIGURATOR.value())) {
             return getRealShape(world, pos);
         }
@@ -98,22 +102,22 @@ public abstract class BlockTransmitter<TILE extends TileEntityTransmitter> exten
         //TODO: Try to cache some of this? At the very least the collision boxes
         AdvancedRayTraceResult result = MultipartUtils.collisionRayTrace(entityContext.getEntity(), pos, tile.getCollisionBoxes());
         if (result != null && result.valid()) {
-            return result.bounds;
+            return result.bounds();
         }
         //If we failed to figure it out somehow, just fall back to the center. This should never happen
         return getCenter();
     }
 
-    @NotNull
     @Override
-    protected VoxelShape getOcclusionShape(@NotNull BlockState state, @NotNull BlockGetter world, @NotNull BlockPos pos) {
+    protected VoxelShape getOcclusionShape(BlockState state) {
+        //TODO - 26.1: can we do this?
         //Override this so that we ALWAYS have the full collision box, even if a configurator is being held
-        return getRealShape(world, pos);
+        //return getRealShape(world, pos);
+        return getCenter();
     }
 
-    @NotNull
     @Override
-    protected VoxelShape getCollisionShape(@NotNull BlockState state, @NotNull BlockGetter world, @NotNull BlockPos pos, @NotNull CollisionContext context) {
+    protected VoxelShape getCollisionShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext context) {
         //Override this so that we ALWAYS have the full collision box, even if a configurator is being held
         return getRealShape(world, pos);
     }
@@ -167,14 +171,13 @@ public abstract class BlockTransmitter<TILE extends TileEntityTransmitter> exten
         return shape;
     }
 
-    @NotNull
     @Override
-    protected ItemInteractionResult useItemOn(@NotNull ItemStack stack, @NotNull BlockState state, @NotNull Level world, @NotNull BlockPos pos,
-          @NotNull Player player, @NotNull InteractionHand hand, @NotNull BlockHitResult hit) {
+    protected InteractionResult useItemOn(ItemStack stack, BlockState state, Level world, BlockPos pos,
+          Player player, InteractionHand hand, BlockHitResult hit) {
         if (player.isShiftKeyDown() && MekanismUtils.canUseAsWrench(stack)) {
             BlockEntity tile = WorldUtils.getTileEntity(world, pos);
             if (tile instanceof ITileRadioactive tileRadioactive && tileRadioactive.getRadiationScale() > 0) {
-                return ItemInteractionResult.FAIL;
+                return InteractionResult.FAIL;
             }
         }
         return super.useItemOn(stack, state, world, pos, player, hand, hit);

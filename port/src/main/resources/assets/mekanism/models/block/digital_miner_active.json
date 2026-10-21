@@ -8,9 +8,9 @@
 		"3": "mekanism:block/models/ports",
 		"4": "mekanism:block/models/ports_led",
 		"5": "mekanism:block/models/leds",
-		"6": "mekanism:block/models/digital_miner_screen_cmd",
-		"7": "mekanism:block/models/digital_miner_screen_hello",
-		"8": "mekanism:block/models/digital_miner_screen_blank",
+		"screen_cmd": "mekanism:block/models/digital_miner_screen_cmd",
+		"screen_hello": "mekanism:block/models/digital_miner_screen_hello",
+		"screen_blank": "mekanism:block/models/digital_miner_screen_blank",
 		"particle": "mekanism:block/models/digital_miner"
 	},
 	"elements": [
@@ -681,10 +681,7 @@
 				"west": {"uv": [0, 0, 1, 1], "texture": "#5"},
 				"down": {"uv": [0, 0, 1, 1], "texture": "#5"}
 			},
-			"neoforge_data": {
-				"block_light": 15,
-				"sky_light": 15
-			}
+      "light_emission": 15
 		},
 		{
 			"name": "led2",
@@ -698,10 +695,7 @@
 				"west": {"uv": [0, 0, 1, 1], "texture": "#5"},
 				"down": {"uv": [0, 0, 1, 1], "texture": "#5"}
 			},
-			"neoforge_data": {
-				"block_light": 15,
-				"sky_light": 15
-			}
+      "light_emission": 15
 		},
 		{
 			"name": "led3",
@@ -715,10 +709,7 @@
 				"west": {"uv": [0, 0, 1, 1], "texture": "#5"},
 				"down": {"uv": [0, 0, 1, 1], "texture": "#5"}
 			},
-			"neoforge_data": {
-				"block_light": 15,
-				"sky_light": 15
-			}
+      "light_emission": 15
 		},
 		{
 			"name": "port3b_led",
@@ -727,10 +718,7 @@
 			"faces": {
 				"west": {"uv": [8, 8, 16, 16], "texture": "#4"}
 			},
-			"neoforge_data": {
-				"block_light": 15,
-				"sky_light": 15
-			}
+      "light_emission": 15
 		},
 		{
 			"name": "port2a_led",
@@ -739,10 +727,7 @@
 			"faces": {
 				"east": {"uv": [8, 8, 16, 16], "texture": "#4"}
 			},
-			"neoforge_data": {
-				"block_light": 15,
-				"sky_light": 15
-			}
+      "light_emission": 15
 		},
 		{
 			"name": "port1_led",
@@ -751,10 +736,7 @@
 			"faces": {
 				"down": {"uv": [8, 8, 16, 16], "texture": "#4", "cullface": "down"}
 			},
-			"neoforge_data": {
-				"block_light": 15,
-				"sky_light": 15
-			}
+      "light_emission": 15
 		},
 		{
 			"name": "port_back_led",
@@ -763,10 +745,7 @@
 			"faces": {
 				"south": {"uv": [0, 0, 8, 8], "texture": "#4"}
 			},
-			"neoforge_data": {
-				"block_light": 15,
-				"sky_light": 15
-			}
+      "light_emission": 15
 		},
 		{
 			"name": "port_top_led",
@@ -775,46 +754,34 @@
 			"faces": {
 				"up": {"uv": [0, 0, 8, 8], "texture": "#4"}
 			},
-			"neoforge_data": {
-				"block_light": 15,
-				"sky_light": 15
-			}
+      "light_emission": 15
 		},
 		{
 			"name": "monitor1_on",
 			"from": [17, 18, -13.02],
 			"to": [29, 26, -13.02],
 			"faces": {
-				"north": {"uv": [0, 0, 12, 8], "texture": "#7"}
+				"north": {"uv": [0, 0, 12, 8], "texture": "#screen_hello"}
 			},
-			"neoforge_data": {
-				"block_light": 15,
-				"sky_light": 15
-			}
+      "light_emission": 15
 		},
 		{
 			"name": "monitor2_on",
 			"from": [-13, 18, -13.02],
 			"to": [-1, 26, -13.02],
 			"faces": {
-				"north": {"uv": [0, 0, 12, 8], "texture": "#6"}
+				"north": {"uv": [0, 0, 12, 8], "texture": "#screen_cmd"}
 			},
-			"neoforge_data": {
-				"block_light": 15,
-				"sky_light": 15
-			}
+      "light_emission": 15
 		},
 		{
 			"name": "monitor3_on",
 			"from": [2, 18, -13.02],
 			"to": [14, 26, -13.02],
 			"faces": {
-				"north": {"uv": [0, 0, 12, 8], "texture": "#8"}
+				"north": {"uv": [0, 0, 12, 8], "texture": "#screen_blank"}
 			},
-			"neoforge_data": {
-				"block_light": 15,
-				"sky_light": 15
-			}
+      "light_emission": 15
 		}
 	],
 	"display": {

@@ -7,7 +7,8 @@ import java.util.function.Predicate;
 import java.util.stream.Stream;
 import mekanism.neoshim.bus.api.Event;
 import mekanism.neoshim.fml.event.IModBusEvent;
-import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.ItemLike;
@@ -15,18 +16,32 @@ import net.minecraft.world.level.ItemLike;
 /** Collected at init by the bridge and applied through Fabric's DefaultItemComponentEvents.MODIFY. */
 public class ModifyDefaultComponentsEvent extends Event implements IModBusEvent {
 
-    public record Modification(Predicate<Item> filter, Consumer<DataComponentPatch.Builder> patch) {
+    @FunctionalInterface
+    public interface Initializer {
+
+        void run(DataComponentMap.Builder builder, HolderLookup.Provider registries, Item item);
+    }
+
+    public record Modification(Predicate<Item> filter, Initializer initializer) {
     }
 
     private final List<Modification> modifications = new ArrayList<>();
 
-    public void modify(ItemLike item, Consumer<DataComponentPatch.Builder> patch) {
+    public void modify(ItemLike item, Initializer initializer) {
         Item target = item.asItem();
-        modifications.add(new Modification(i -> i == target, patch));
+        modifications.add(new Modification(i -> i == target, initializer));
     }
 
-    public void modifyMatching(Predicate<? super Item> predicate, Consumer<DataComponentPatch.Builder> patch) {
-        modifications.add(new Modification(predicate::test, patch));
+    public void modify(ItemLike item, Consumer<DataComponentMap.Builder> patch) {
+        modify(item, (builder, registries, target) -> patch.accept(builder));
+    }
+
+    public void modifyMatching(Predicate<? super Item> predicate, Initializer initializer) {
+        modifications.add(new Modification(predicate::test, initializer));
+    }
+
+    public void modifyMatching(Predicate<? super Item> predicate, Consumer<DataComponentMap.Builder> patch) {
+        modifyMatching(predicate, (builder, registries, target) -> patch.accept(builder));
     }
 
     public Stream<Item> getAllItems() {

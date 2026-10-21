@@ -1,14 +1,12 @@
 package mekanism.common.inventory.container.slot;
 
-import java.util.function.Consumer;
 import java.util.function.IntSupplier;
 import mekanism.common.inventory.container.IGUIWindow;
 import mekanism.common.inventory.container.SelectedWindowData;
 import mekanism.common.inventory.slot.BasicInventorySlot;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class VirtualInventoryContainerSlot extends InventoryContainerSlot implements IVirtualSlot {
 
@@ -22,11 +20,12 @@ public class VirtualInventoryContainerSlot extends InventoryContainerSlot implem
     @Nullable
     private IGUIWindow window;
 
-    public VirtualInventoryContainerSlot(BasicInventorySlot slot, SelectedWindowData windowData, @Nullable SlotOverlay slotOverlay, Consumer<ItemStack> uncheckedSetter) {
-        super(slot, 0, 0, ContainerSlotType.IGNORED, slotOverlay, null, uncheckedSetter);
+    public VirtualInventoryContainerSlot(BasicInventorySlot slot, SelectedWindowData windowData, @Nullable SlotOverlay slotOverlay) {
+        super(slot, 0, 0, ContainerSlotType.IGNORED, slotOverlay, null);
         this.windowData = windowData;
     }
 
+    @Nullable
     @Override
     public IGUIWindow getLinkedWindow() {
         return window;
@@ -50,13 +49,12 @@ public class VirtualInventoryContainerSlot extends InventoryContainerSlot implem
     }
 
     @Override
-    public void updateRenderInfo(@NotNull ItemStack stackToRender, boolean shouldDrawOverlay, @Nullable String tooltipOverride) {
+    public void updateRenderInfo(ItemStack stackToRender, boolean shouldDrawOverlay, @Nullable String tooltipOverride) {
         this.stackToRender = stackToRender;
         this.shouldDrawOverlay = shouldDrawOverlay;
         this.tooltipOverride = tooltipOverride;
     }
 
-    @NotNull
     @Override
     public ItemStack getStackToRender() {
         return stackToRender;

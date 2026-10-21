@@ -17,9 +17,11 @@ import mekanism.common.content.qio.filter.QIOTagFilter;
 import mekanism.common.content.transporter.SorterItemStackFilter;
 import mekanism.common.content.transporter.SorterModIDFilter;
 import mekanism.common.content.transporter.SorterTagFilter;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
+import org.jspecify.annotations.Nullable;
 
 public abstract class BaseFilter<FILTER extends BaseFilter<FILTER>> implements IFilter<FILTER> {
 
@@ -41,8 +43,12 @@ public abstract class BaseFilter<FILTER extends BaseFilter<FILTER>> implements I
         }, BaseFilter::isEnabled);
     }
 
+    private static final Supplier<HolderLookup.@Nullable Provider> NO_ACCESS = () -> null;
+
     //Enabled by default
     private boolean enabled = true;
+    //late init, once added to a manager
+    protected Supplier<HolderLookup.@Nullable Provider> registryAccess = NO_ACCESS;
 
     protected BaseFilter() {
     }
@@ -67,7 +73,7 @@ public abstract class BaseFilter<FILTER extends BaseFilter<FILTER>> implements I
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) {
             return true;
         } else if (o == null || getClass() != o.getClass()) {
@@ -87,6 +93,11 @@ public abstract class BaseFilter<FILTER extends BaseFilter<FILTER>> implements I
     @Override
     public final void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    @Override
+    public void setRegistryAccess(Supplier<HolderLookup.@Nullable Provider> registryAccess) {
+        this.registryAccess = registryAccess;
     }
 
     public static IFilter<?> fromType(FilterType filterType) {

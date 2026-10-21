@@ -14,6 +14,7 @@ import mekanism.common.registries.MekanismItems;
 import mekanism.common.resource.BlockResourceInfo;
 import mekanism.common.tags.MekanismTags;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.tags.TagKey;
@@ -21,6 +22,12 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 
 class StorageRecipeProvider implements ISubRecipeProvider {
+
+    private final HolderGetter<Item> items;
+
+    public StorageRecipeProvider(HolderGetter<Item> items) {
+        this.items = items;
+    }
 
     @Override
     public void addRecipes(RecipeOutput consumer, HolderLookup.Provider registries) {
@@ -39,7 +46,7 @@ class StorageRecipeProvider implements ISubRecipeProvider {
     private void addNuggetRecipe(RecipeOutput consumer, Holder<Item> nugget, Holder<Item> ingot, String basePath, String name) {
         ExtendedShapelessRecipeBuilder.shapelessRecipe(nugget, 9)
               .addIngredient(ingot)
-              .build(consumer, Mekanism.rl(basePath + name));
+              .save(consumer, Mekanism.rl(basePath + name));
     }
 
     private void addStorageBlockRecipes(RecipeOutput consumer) {
@@ -55,14 +62,14 @@ class StorageRecipeProvider implements ISubRecipeProvider {
         ExtendedShapedRecipeBuilder.shapedRecipe(MekanismBlocks.CHARCOAL_BLOCK)
               .pattern(MekanismRecipeProvider.STORAGE_PATTERN)
               .key(Pattern.CONSTANT, Items.CHARCOAL)
-              .build(consumer, Mekanism.rl(basePath + BlockResourceInfo.CHARCOAL.getRegistrySuffix()));
+              .save(consumer, Mekanism.rl(basePath + BlockResourceInfo.CHARCOAL.getRegistrySuffix()));
         //Salt
         ExtendedShapedRecipeBuilder.shapedRecipe(MekanismBlocks.SALT_BLOCK)
               .pattern(RecipePattern.createPattern(
                     DoubleLine.of(Pattern.CONSTANT, Pattern.CONSTANT),
                     DoubleLine.of(Pattern.CONSTANT, Pattern.CONSTANT))
-              ).key(Pattern.CONSTANT, MekanismTags.Items.DUSTS_SALT)
-              .build(consumer, Mekanism.rl(basePath + "salt"));
+              ).key(Pattern.CONSTANT, this.items, MekanismTags.Items.DUSTS_SALT)
+              .save(consumer, Mekanism.rl(basePath + "salt"));
     }
 
     private void addStorageBlockRecipe(RecipeOutput consumer, BlockRegistryObject<BlockResource, ?> block, Holder<Item> ingot, TagKey<Item> ingotTag,
@@ -75,7 +82,7 @@ class StorageRecipeProvider implements ISubRecipeProvider {
         ExtendedShapedRecipeBuilder.shapedRecipe(block)
               .pattern(MekanismRecipeProvider.TYPED_STORAGE_PATTERN)
               .key(Pattern.PREVIOUS, ingot)
-              .key(Pattern.CONSTANT, ingotTag)
-              .build(consumer, Mekanism.rl(basePath + suffix));
+              .key(Pattern.CONSTANT, this.items, ingotTag)
+              .save(consumer, Mekanism.rl(basePath + suffix));
     }
 }

@@ -1,10 +1,7 @@
 package mekanism.client.gui;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.BufferUploader;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat.Mode;
 import java.util.ArrayDeque;
@@ -27,24 +24,26 @@ import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
 import mekanism.common.util.StatUtils;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
+import org.joml.Matrix3x2fStack;
 import org.joml.Matrix4f;
 
 //TODO: Do we Automatically want to go through nested things if there is only one option and potentially not even allow opening it?
 // For now no as it might be confusing to people what the menu is relating to especially on the Meka-Tool but it is worth thinking more about
 public class GuiRadialSelector extends Screen {
 
-    private static final ResourceLocation BACK_BUTTON = MekanismUtils.getResource(ResourceType.GUI_RADIAL, "back.png");
+    private static final Identifier BACK_BUTTON = MekanismUtils.getResource(ResourceType.GUI_RADIAL, "back.png");
     private static final float DRAWS = 300;
 
     private static final float INNER = 40, OUTER = 100;
@@ -56,13 +55,13 @@ public class GuiRadialSelector extends Screen {
     private final Supplier<Player> playerSupplier;
     private final EquipmentSlot slot;
 
-    @NotNull
     private RadialData<?> radialData;
+    @Nullable
     private IRadialMode selection = null;
     private boolean overBackButton = false;
     private boolean updateOnClose = true;
 
-    public GuiRadialSelector(EquipmentSlot slot, @NotNull RadialData<?> radialData, Supplier<Player> playerSupplier) {
+    public GuiRadialSelector(EquipmentSlot slot, RadialData<?> radialData, Supplier<Player> playerSupplier) {
         super(MekanismLang.RADIAL_SCREEN.translate());
         this.slot = slot;
         this.radialData = radialData;
@@ -70,14 +69,15 @@ public class GuiRadialSelector extends Screen {
     }
 
     @Override
-    public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         // center of screen
         float centerX = guiGraphics.guiWidth() / 2F;
         float centerY = guiGraphics.guiHeight() / 2F;
         render(guiGraphics, mouseX, mouseY, centerX, centerY, radialData);
     }
 
-    private <MODE extends IRadialMode> void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float centerX, float centerY, RadialData<MODE> radialData) {
+    //TODO - 26.1: rendering
+    private <MODE extends IRadialMode> void render(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float centerX, float centerY, RadialData<MODE> radialData) {
         // Calculate number of available modes to switch between
         List<MODE> modes = radialData.getModes();
         int activeModes = modes.size();
@@ -93,11 +93,11 @@ public class GuiRadialSelector extends Screen {
         }
         float angleSize = 360F / activeModes;
 
-        PoseStack pose = guiGraphics.pose();
-        pose.pushPose();
-        pose.translate(centerX, centerY, 0);
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
+        Matrix3x2fStack matrix = guiGraphics.pose();
+        matrix.pushMatrix();
+        matrix.translate(centerX, centerY);
+        //RenderSystem.enableBlend();
+        //RenderSystem.defaultBlendFunc();
 
         // draw base
         // Note: While there might be slightly better performance only drawing part of the Torus given
@@ -157,7 +157,7 @@ public class GuiRadialSelector extends Screen {
                 drawTorus(guiGraphics, 0, 360, 0, SELECT_RADIUS_WITH_PARENT, 0.3F, 0.3F, 0.3F, 0.5F);
             }
             // draw icon
-            guiGraphics.blit(BACK_BUTTON, -12, -18, 24, 24, 0, 0, 18, 18, 18, 18);
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, BACK_BUTTON, -12, -18, 0, 0, 24, 24, 18, 18, 18, 18);
             textToDraw.add(new PositionedText(0, 0, MekanismLang.BACK.translate()));
         } else {
             overBackButton = false;
@@ -171,7 +171,7 @@ public class GuiRadialSelector extends Screen {
             float x = Mth.cos(angle) * MIDDLE_DISTANCE;
             float y = Mth.sin(angle) * MIDDLE_DISTANCE;
             // draw icon
-            guiGraphics.blit(mode.icon(), Math.round(x - 12), Math.round(y - 20), 24, 24, 0, 0, 18, 18, 18, 18);
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, mode.icon(), Math.round(x - 12), Math.round(y - 20), 0, 0, 24, 24, 18, 18, 18, 18);
             // queue label
             textToDraw.add(new PositionedText(x, y, mode.sliceName()));
         }
@@ -180,21 +180,22 @@ public class GuiRadialSelector extends Screen {
             // Labels (has to be separate from icons or the icons occasionally will get extra artifacts for some reason and also then we can't batch them)
             boolean whiteRadialText = MekanismConfig.client.whiteRadialText.get();
             for (PositionedText toDraw : textToDraw) {
-                pose.pushPose();
-                pose.translate(toDraw.x, toDraw.y, 0);
-                pose.scale(0.6F, 0.6F, 0.6F);
+                matrix.pushMatrix();
+                matrix.translate(toDraw.x, toDraw.y);
+                matrix.scale(0.6F, 0.6F);
                 Component text = toDraw.text;
                 if (whiteRadialText) {
                     text = text.copy().withStyle(ChatFormatting.RESET);
                 }
-                GuiUtils.drawStringNoFlush(guiGraphics, font, text, -font.width(text) / 2F, 8, 0xCCFFFFFF, true);
-                pose.popPose();
+                float x = -font.width(text) / 2F;
+                guiGraphics.text(font, text, (int) x, (int) (float) 8, 0xCCFFFFFF, true);
+                matrix.popMatrix();
             }
             //Flush and actually render out the labels
-            guiGraphics.flush();
+            //guiGraphics.flush();
         }
 
-        pose.popPose();
+        matrix.popMatrix();
     }
 
     @Override
@@ -206,7 +207,7 @@ public class GuiRadialSelector extends Screen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyEvent event) {
         // handle & ignore all key events
         return true;
     }
@@ -235,7 +236,7 @@ public class GuiRadialSelector extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean isDoubleClick) {
         updateSelection(radialData);
         return true;
     }
@@ -245,27 +246,30 @@ public class GuiRadialSelector extends Screen {
         return false;
     }
 
-    private void drawTorus(GuiGraphics guiGraphics, float startAngle, float sizeAngle, float red, float green, float blue, float alpha) {
+    private void drawTorus(GuiGraphicsExtractor guiGraphics, float startAngle, float sizeAngle, float red, float green, float blue, float alpha) {
         drawTorus(guiGraphics, startAngle, sizeAngle, INNER, OUTER, red, green, blue, alpha);
     }
 
-    private void drawTorus(GuiGraphics guiGraphics, float startAngle, float sizeAngle, float inner, float outer, float red, float green, float blue, float alpha) {
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
-        //Note: We still use the tesselator as that is what GuiGraphics#innerBlit does, and we also need to be able to use a custom vertex mode
-        BufferBuilder vertexBuffer = Tesselator.getInstance().begin(Mode.TRIANGLE_STRIP, DefaultVertexFormat.POSITION_COLOR);
-        Matrix4f matrix4f = guiGraphics.pose().last().pose();
-        float draws = DRAWS * (sizeAngle / 360F);
-        for (int i = 0; i <= draws; i++) {
-            float degrees = startAngle + (i / DRAWS) * 360;
-            float angle = Mth.DEG_TO_RAD * degrees;
-            float cos = Mth.cos(angle);
-            float sin = Mth.sin(angle);
-            vertexBuffer.addVertex(matrix4f, outer * cos, outer * sin, 0)
-                  .setColor(red, green, blue, alpha);
-            vertexBuffer.addVertex(matrix4f, inner * cos, inner * sin, 0)
-                  .setColor(red, green, blue, alpha);
+    //TODO - 26.1: rendering
+    private void drawTorus(GuiGraphicsExtractor guiGraphics, float startAngle, float sizeAngle, float inner, float outer, float red, float green, float blue, float alpha) {
+        //RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        //Note: We still use the tesselator as that is what GuiGraphicsExtractor#innerBlit does, and we also need to be able to use a custom vertex mode
+        if (false) {
+            BufferBuilder vertexBuffer = Tesselator.getInstance().begin(Mode.TRIANGLE_STRIP, DefaultVertexFormat.POSITION_COLOR);
+            Matrix4f matrix4f = null;//FIXME guiGraphics.pose().last().pose();
+            float draws = DRAWS * (sizeAngle / 360F);
+            for (int i = 0; i <= draws; i++) {
+                float degrees = startAngle + (i / DRAWS) * 360;
+                float angle = Mth.DEG_TO_RAD * degrees;
+                float cos = Mth.cos(angle);
+                float sin = Mth.sin(angle);
+                vertexBuffer.addVertex(matrix4f, outer * cos, outer * sin, 0)
+                      .setColor(red, green, blue, alpha);
+                vertexBuffer.addVertex(matrix4f, inner * cos, inner * sin, 0)
+                      .setColor(red, green, blue, alpha);
+            }
+            //BufferUploader.drawWithShader(vertexBuffer.buildOrThrow());
         }
-        BufferUploader.drawWithShader(vertexBuffer.buildOrThrow());
     }
 
     @Nullable
@@ -291,7 +295,7 @@ public class GuiRadialSelector extends Screen {
                 selection = null;
             } else if (!selection.equals(getCurrent(radialData))) {
                 //Only bother syncing if we don't already have that mode selected
-                List<ResourceLocation> path = new ArrayList<>(parents.size());
+                List<Identifier> path = new ArrayList<>(parents.size());
                 RadialData<?> previousParent = null;
                 for (RadialData<?> parent : parents) {
                     if (previousParent != null) {

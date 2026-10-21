@@ -17,16 +17,14 @@ import mekanism.generators.common.config.MekanismGeneratorsConfig;
 import mekanism.generators.common.content.turbine.TurbineMultiblockData;
 import mekanism.generators.common.content.turbine.TurbineValidator;
 import mekanism.generators.common.tile.turbine.TileEntityTurbineCasing;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
 
 public class GuiTurbineStats extends GuiMekanismTile<TileEntityTurbineCasing, EmptyTileContainer<TileEntityTurbineCasing>> {
 
     public GuiTurbineStats(EmptyTileContainer<TileEntityTurbineCasing> container, Inventory inv, Component title) {
-        super(container, inv, title);
-        imageWidth += 14;
+        super(container, inv, title, DEFAULT_IMAGE_WIDTH + 14, DEFAULT_IMAGE_HEIGHT);
     }
 
     @Override
@@ -38,7 +36,7 @@ public class GuiTurbineStats extends GuiMekanismTile<TileEntityTurbineCasing, Em
             EnergyDisplay producing;
             TurbineMultiblockData multiblock = tile.getMultiblock();
             if (multiblock.isFormed()) {
-                storing = EnergyDisplay.of(multiblock.energyContainer);
+                storing = EnergyDisplay.of(multiblock.energyContainer());
 
                 double steamPerBlade = MekanismConfig.general.maxEnergyPerSteam.get() / (double) TurbineValidator.MAX_BLADES;
                 int bladeCount = Math.min(multiblock.blades, multiblock.coils * MekanismGeneratorsConfig.generators.turbineBladesPerCoil.get());
@@ -53,7 +51,7 @@ public class GuiTurbineStats extends GuiMekanismTile<TileEntityTurbineCasing, Em
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         renderTitleText(guiGraphics);
         TurbineMultiblockData multiblock = tile.getMultiblock();
         if (multiblock.isFormed()) {
@@ -67,13 +65,13 @@ public class GuiTurbineStats extends GuiMekanismTile<TileEntityTurbineCasing, Em
             boolean ventsLimiting = lowerVolume * dispersers * MekanismGeneratorsConfig.generators.turbineDisperserChemicalFlow.get()
                                     > vents * MekanismGeneratorsConfig.generators.turbineVentChemicalFlow.get();
             drawScrollingString(guiGraphics, GeneratorsLang.TURBINE_STEAM_FLOW.translate(), 0, 40, TextAlignment.LEFT, subheadingTextColor(), 6, false);
-            drawScrollingString(guiGraphics, GeneratorsLang.TURBINE_DISPERSERS.translate(dispersers, dispersersLimiting ? limiting : ""), 4, 49, TextAlignment.LEFT, titleTextColor(), getXSize() - 4, 6, false);
-            drawScrollingString(guiGraphics, GeneratorsLang.TURBINE_VENTS.translate(vents, ventsLimiting ? limiting : ""), 4, 58, TextAlignment.LEFT, titleTextColor(), getXSize() - 4, 6, false);
+            drawScrollingString(guiGraphics, GeneratorsLang.TURBINE_DISPERSERS.translate(dispersers, dispersersLimiting ? limiting : ""), 4, 49, TextAlignment.LEFT, titleTextColor(), this.getImageWidth() - 4, 6, false);
+            drawScrollingString(guiGraphics, GeneratorsLang.TURBINE_VENTS.translate(vents, ventsLimiting ? limiting : ""), 4, 58, TextAlignment.LEFT, titleTextColor(), this.getImageWidth() - 4, 6, false);
             int coils = multiblock.coils;
             int blades = multiblock.blades;
             drawScrollingString(guiGraphics, GeneratorsLang.TURBINE_PRODUCTION.translate(), 0, 72, TextAlignment.LEFT, subheadingTextColor(), 6, false);
-            drawScrollingString(guiGraphics, GeneratorsLang.TURBINE_BLADES.translate(blades, coils * 4 > blades ? limiting : ""), 4, 81, TextAlignment.LEFT, titleTextColor(), getXSize() - 4, 6, false);
-            drawScrollingString(guiGraphics, GeneratorsLang.TURBINE_COILS.translate(coils, coils * 4 < blades ? limiting : ""), 4, 90, TextAlignment.LEFT, titleTextColor(), getXSize() - 4, 6, false);
+            drawScrollingString(guiGraphics, GeneratorsLang.TURBINE_BLADES.translate(blades, coils * 4 > blades ? limiting : ""), 4, 81, TextAlignment.LEFT, titleTextColor(), this.getImageWidth() - 4, 6, false);
+            drawScrollingString(guiGraphics, GeneratorsLang.TURBINE_COILS.translate(coils, coils * 4 < blades ? limiting : ""), 4, 90, TextAlignment.LEFT, titleTextColor(), this.getImageWidth() - 4, 6, false);
             drawScrollingString(guiGraphics, GeneratorsLang.TURBINE_MAX_PRODUCTION.translate(EnergyDisplay.of(multiblock.getMaxProduction())), 0, 104, TextAlignment.LEFT, titleTextColor(), 6, false);
             drawScrollingString(guiGraphics, GeneratorsLang.TURBINE_MAX_WATER_OUTPUT.translate(TextUtils.format(multiblock.getMaxWaterOutput())), 0, 113, TextAlignment.LEFT, titleTextColor(), 6, false);
         }

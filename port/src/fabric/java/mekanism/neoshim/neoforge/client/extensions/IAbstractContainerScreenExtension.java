@@ -11,4 +11,25 @@ public interface IAbstractContainerScreenExtension {
     default Slot getSlotUnderMouse() {
         return ((AbstractContainerScreen<?>) this).hoveredSlot;
     }
+
+    @Nullable
+    default Slot getHoveredSlot() {
+        return ((AbstractContainerScreen<?>) this).hoveredSlot;
+    }
+
+    default int getLeftPos() {
+        return ((AbstractContainerScreen<?>) this).leftPos;
+    }
+
+    default int getTopPos() {
+        return ((AbstractContainerScreen<?>) this).topPos;
+    }
+
+    default int getImageWidth() {
+        return ((AbstractContainerScreen<?>) this).imageWidth;
+    }
+
+    default int getImageHeight() {
+        return ((AbstractContainerScreen<?>) this).imageHeight;
+    }
 }

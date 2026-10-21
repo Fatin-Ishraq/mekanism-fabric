@@ -1,16 +1,17 @@
 package mekanism.common.item;
 
-import java.util.List;
 import java.util.function.Consumer;
+import mekanism.common.component.containers.type.ContainerType;
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.registration.impl.CreativeTabDeferredRegister.ICustomCreativeTabContents;
+import mekanism.common.util.ItemAccessUtils;
 import mekanism.common.util.StorageUtils;
 import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.item.component.TooltipDisplay;
 
 public class ItemEnergized extends Item implements ICustomCreativeTabContents {
 
@@ -19,29 +20,30 @@ public class ItemEnergized extends Item implements ICustomCreativeTabContents {
     }
 
     @Override
-    public boolean isBarVisible(@NotNull ItemStack stack) {
-        //If we are currently stacked, don't display the bar as it will overlap the stack count
-        return stack.getCount() == 1;
+    public boolean isBarVisible(ItemStack stack) {
+        return StorageUtils.isEnergyBarVisible(stack);
     }
 
     @Override
-    public int getBarWidth(@NotNull ItemStack stack) {
+    public int getBarWidth(ItemStack stack) {
         return StorageUtils.getEnergyBarWidth(stack);
     }
 
     @Override
-    public int getBarColor(@NotNull ItemStack stack) {
+    public int getBarColor(ItemStack stack) {
         return MekanismConfig.client.energyColor.get();
     }
 
     @Override
-    public void appendHoverText(@NotNull ItemStack stack, @NotNull Item.TooltipContext context, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        StorageUtils.addStoredEnergy(stack, tooltip, true);
+    @Deprecated
+    public void appendHoverText(ItemStack stack, Item.TooltipContext context, TooltipDisplay tooltipDisplay, Consumer<Component> tooltipAdder, TooltipFlag flag) {
+        super.appendHoverText(stack, context, tooltipDisplay, tooltipAdder, flag);
+        StorageUtils.addStoredEnergy(ItemAccessUtils.sideEffectFreeAccess(stack), tooltipAdder, true);
     }
 
     @Override
     public void addItems(Holder<Item> item, Consumer<ItemStack> tabOutput) {
-        tabOutput.accept(StorageUtils.getFilledEnergyVariant(item));
+        tabOutput.accept(ContainerType.ENERGY.getFilledVariant(item, null));
     }
 
     @Override

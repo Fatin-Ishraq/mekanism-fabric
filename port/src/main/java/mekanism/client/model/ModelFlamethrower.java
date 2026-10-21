@@ -1,7 +1,6 @@
 package mekanism.client.model;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import java.util.List;
 import mekanism.common.Mekanism;
 import mekanism.common.util.MekanismUtils;
@@ -12,15 +11,16 @@ import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.CommonColors;
 
-public class ModelFlamethrower extends MekanismJavaModel {
+public class ModelFlamethrower extends MekanismJavaModel.NoState {
 
     public static final ModelLayerLocation FLAMETHROWER_LAYER = new ModelLayerLocation(Mekanism.rl("flamethrower"), "main");
-    private static final ResourceLocation FLAMETHROWER_TEXTURE = MekanismUtils.getResource(ResourceType.RENDER, "flamethrower.png");
+    private static final Identifier FLAMETHROWER_TEXTURE = MekanismUtils.getResource(ResourceType.RENDER, "flamethrower.png");
 
     private static final ModelPartData RING_BOTTOM = new ModelPartData("RingBottom", CubeListBuilder.create()
           .texOffs(19, 14)
@@ -120,23 +120,19 @@ public class ModelFlamethrower extends MekanismJavaModel {
               BARREL_RING_2, FLAME, FLAME_STRUT, HYDROGEN_DECOR, HYDROGEN);
     }
 
-    private final RenderType RENDER_TYPE = renderType(FLAMETHROWER_TEXTURE);
+    private final RenderType RENDER_TYPE = RenderTypes.entitySolid(FLAMETHROWER_TEXTURE);
     private final List<ModelPart> parts;
 
     public ModelFlamethrower(EntityModelSet entityModelSet) {
-        super(RenderType::entitySolid);
-        ModelPart root = entityModelSet.bakeLayer(FLAMETHROWER_LAYER);
+        super(entityModelSet.bakeLayer(FLAMETHROWER_LAYER));
         parts = getRenderableParts(root, RING_BOTTOM, RING_TOP, RING, AXLE, AXLE_B_LEFT, AXLE_B_RIGHT, AXLE_T_RIGHT, AXLE_T_LEFT, GRASP, GRASP_ROD,
               SUPPORT_CENTER, SUPPORT_FRONT, SUPPORT_REAR, LARGE_BARREL, LARGE_BARREL_DECOR, LARGE_BARREL_DECOR_2, BARREL, BARREL_RING, BARREL_RING_2,
               FLAME, FLAME_STRUT, HYDROGEN_DECOR, HYDROGEN);
     }
 
-    public void render(@NotNull PoseStack matrix, @NotNull MultiBufferSource renderer, int light, int overlayLight, boolean hasEffect) {
-        renderToBuffer(matrix, getVertexConsumer(renderer, RENDER_TYPE, hasEffect), light, overlayLight, 0xFFFFFFFF);
-    }
-
     @Override
-    public void renderToBuffer(@NotNull PoseStack poseStack, @NotNull VertexConsumer vertexConsumer, int light, int overlayLight, int color) {
-        renderPartsToBuffer(parts, poseStack, vertexConsumer, light, overlayLight, color);
+    public void collect(PoseStack poseStack, SubmitNodeCollector collector, int light, int overlayLight, boolean hasFoil) {
+        setupAnim();
+        collectParts(parts, poseStack, RENDER_TYPE, collector, light, overlayLight, CommonColors.WHITE, null, hasFoil);
     }
 }

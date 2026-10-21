@@ -10,6 +10,7 @@ import mekanism.common.registries.MekanismItems;
 import mekanism.common.resource.PrimaryResource;
 import mekanism.common.resource.ResourceType;
 import mekanism.common.tags.MekanismTags;
+import net.minecraft.core.HolderGetter;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.tags.ItemTags;
@@ -19,11 +20,17 @@ import mekanism.neoshim.neoforge.common.Tags;
 
 class TierInstallerRecipeProvider implements ISubRecipeProvider {
 
+    private final HolderGetter<Item> items;
+
+    public TierInstallerRecipeProvider(HolderGetter<Item> items) {
+        this.items = items;
+    }
+
     @Override
     public void addRecipes(RecipeOutput consumer, HolderLookup.Provider registries) {
         String basePath = "tier_installer/";
         addTierInstallerRecipe(consumer, basePath, MekanismItems.BASIC_TIER_INSTALLER, Tags.Items.INGOTS_IRON, MekanismTags.Items.ALLOYS_BASIC, MekanismTags.Items.CIRCUITS_BASIC);
-        addTierInstallerRecipe(consumer, basePath, MekanismItems.ADVANCED_TIER_INSTALLER, MekanismTags.Items.PROCESSED_RESOURCES.get(ResourceType.INGOT, PrimaryResource.OSMIUM), MekanismTags.Items.ALLOYS_INFUSED, MekanismTags.Items.CIRCUITS_ADVANCED);
+        addTierInstallerRecipe(consumer, basePath, MekanismItems.ADVANCED_TIER_INSTALLER, MekanismTags.Items.getProcessedResource(ResourceType.INGOT, PrimaryResource.OSMIUM), MekanismTags.Items.ALLOYS_INFUSED, MekanismTags.Items.CIRCUITS_ADVANCED);
         addTierInstallerRecipe(consumer, basePath, MekanismItems.ELITE_TIER_INSTALLER, Tags.Items.INGOTS_GOLD, MekanismTags.Items.ALLOYS_REINFORCED, MekanismTags.Items.CIRCUITS_ELITE);
         addTierInstallerRecipe(consumer, basePath, MekanismItems.ULTIMATE_TIER_INSTALLER, Tags.Items.GEMS_DIAMOND, MekanismTags.Items.ALLOYS_ATOMIC, MekanismTags.Items.CIRCUITS_ULTIMATE);
     }
@@ -32,10 +39,10 @@ class TierInstallerRecipeProvider implements ISubRecipeProvider {
           TagKey<Item> alloyTag, TagKey<Item> circuitTag) {
         ExtendedShapedRecipeBuilder.shapedRecipe(tierInstaller)
               .pattern(MekanismRecipeProvider.TIER_PATTERN)
-              .key(Pattern.PREVIOUS, ItemTags.PLANKS)
-              .key(Pattern.CIRCUIT, circuitTag)
-              .key(Pattern.INGOT, ingotTag)
-              .key(Pattern.ALLOY, alloyTag)
-              .build(consumer, Mekanism.rl(basePath + tierInstaller.value().getToTier().getLowerName()));
+              .key(Pattern.PREVIOUS, this.items, ItemTags.PLANKS)
+              .key(Pattern.CIRCUIT, this.items, circuitTag)
+              .key(Pattern.INGOT, this.items, ingotTag)
+              .key(Pattern.ALLOY, this.items, alloyTag)
+              .save(consumer, Mekanism.rl(basePath + tierInstaller.value().getToTier().getLowerName()));
     }
 }

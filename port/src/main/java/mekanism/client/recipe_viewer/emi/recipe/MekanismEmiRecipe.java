@@ -1,5 +1,6 @@
 package mekanism.client.recipe_viewer.emi.recipe;
 
+import dev.emi.emi.api.neoforge.NeoForgeEmiStack;
 import dev.emi.emi.api.recipe.EmiRecipe;
 import dev.emi.emi.api.recipe.EmiRecipeCategory;
 import dev.emi.emi.api.stack.EmiIngredient;
@@ -10,8 +11,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.chemical.ChemicalStack;
+import mekanism.api.chemical.ChemicalStackTemplate;
 import mekanism.api.recipes.ingredients.ChemicalStackIngredient;
 import mekanism.api.recipes.ingredients.FluidStackIngredient;
 import mekanism.api.recipes.ingredients.ItemStackIngredient;
@@ -28,13 +29,13 @@ import mekanism.client.recipe_viewer.emi.widget.MekanismEmiWidget;
 import mekanism.client.recipe_viewer.emi.widget.MekanismTankEmiWidget;
 import net.minecraft.client.gui.components.events.AbstractContainerEventHandler;
 import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.crafting.RecipeHolder;
-import mekanism.neoshim.neoforge.fluids.FluidStack;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.fluids.FluidStackTemplate;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public abstract class MekanismEmiRecipe<RECIPE> extends AbstractContainerEventHandler implements EmiRecipe, IGuiWrapper {
 
     private final List<EmiIngredient> inputs = new ArrayList<>();
@@ -42,18 +43,18 @@ public abstract class MekanismEmiRecipe<RECIPE> extends AbstractContainerEventHa
     private final List<EmiStack> outputs = new ArrayList<>();
     private final List<EmiIngredient> renderOutputs = new ArrayList<>();
     private final EmiRecipeCategory category;
-    private final ResourceLocation id;
+    private final Identifier id;
     protected final RECIPE recipe;
     private final int xOffset;
     private final int yOffset;
     private final int width;
     private final int height;
 
-    public MekanismEmiRecipe(MekanismEmiRecipeCategory category, ResourceLocation id, RECIPE recipe) {
+    public MekanismEmiRecipe(MekanismEmiRecipeCategory category, Identifier id, RECIPE recipe) {
         this(category, id, recipe, category.xOffset(), category.yOffset(), category.width(), category.height());
     }
 
-    public MekanismEmiRecipe(EmiRecipeCategory category, ResourceLocation id, RECIPE recipe, int xOffset, int yOffset, int width, int height) {
+    public MekanismEmiRecipe(EmiRecipeCategory category, Identifier id, RECIPE recipe, int xOffset, int yOffset, int width, int height) {
         this.category = category;
         this.recipe = recipe;
         this.id = id;
@@ -99,15 +100,15 @@ public abstract class MekanismEmiRecipe<RECIPE> extends AbstractContainerEventHa
         catalysts.add(ingredient(RecipeViewerUtils.getStacksFor(ingredient, true)));
     }
 
-    protected void addItemOutputDefinition(List<ItemStack> definition) {
-        addOutputDefinition(definition.stream().map(EmiStack::of).toList());
+    protected void addItemOutputDefinition(List<ItemStackTemplate> definition) {
+        addOutputDefinition(definition.stream().map(ItemStackTemplate::create).map(EmiStack::of).toList());
     }
 
-    protected void addFluidOutputDefinition(List<FluidStack> definition) {
-        addOutputDefinition(definition.stream().map(mekanism.fabric.compat.recipeviewer.EmiFluids::of).toList());//FABRIC: NeoForgeEmiStack is NeoForge-only
+    protected void addFluidOutputDefinition(List<FluidStackTemplate> definition) {
+        addOutputDefinition(definition.stream().map(FluidStackTemplate::create).map(NeoForgeEmiStack::of).toList());
     }
 
-    protected void addChemicalOutputDefinition(List<ChemicalStack> definition) {
+    protected void addChemicalOutputDefinition(List<ChemicalStackTemplate> definition) {
         addOutputDefinition(definition.stream().<EmiStack>map(ChemicalEmiStack::new).toList());
     }
 
@@ -146,9 +147,8 @@ public abstract class MekanismEmiRecipe<RECIPE> extends AbstractContainerEventHa
         return category;
     }
 
-    @Nullable
     @Override
-    public ResourceLocation getId() {
+    public Identifier getId() {
         return id;
     }
 
@@ -201,10 +201,8 @@ public abstract class MekanismEmiRecipe<RECIPE> extends AbstractContainerEventHa
         return () -> RecipeViewerUtils.getCurrent(stacks);
     }
 
-    /**
-     * @apiNote x and y are based on the values set in the tile, as the GUI then shifts the slots by one to account for the border. This method is mostly meant as a
-     * helper to make keeping track of the positioning numbers easier.
-     */
+    /// @apiNote x and y are based on the values set in the tile, as the GUI then shifts the slots by one to account for the border. This method is mostly meant as a
+    /// helper to make keeping track of the positioning numbers easier.
     protected SlotWidget addSlot(WidgetHolder widgetHolder, SlotType type, int x, int y, EmiIngredient ingredient) {
         GuiSlot slot = addSlot(widgetHolder, type, x, y);
         return initItem(widgetHolder, slot.getX(), slot.getY(), ingredient);
@@ -240,7 +238,7 @@ public abstract class MekanismEmiRecipe<RECIPE> extends AbstractContainerEventHa
     }
 
     protected EmiIngredient fluidIngredient(FluidStackIngredient ingredient) {
-        return EmiIngredient.of(ingredient.getRepresentations().stream().map(mekanism.fabric.compat.recipeviewer.EmiFluids::of).toList());//FABRIC: NeoForgeEmiStack is NeoForge-only
+        return EmiIngredient.of(ingredient.getRepresentations().stream().map(NeoForgeEmiStack::of).toList());
     }
 
     protected EmiIngredient chemicalIngredient(ChemicalStackIngredient ingredient) {
@@ -254,7 +252,7 @@ public abstract class MekanismEmiRecipe<RECIPE> extends AbstractContainerEventHa
         }
         List<ChemicalEmiStack> list = new ArrayList<>(representations.size());
         for (ChemicalStack stack : representations) {
-            list.add(new ChemicalEmiStack(stack.getChemicalHolder(), stack.getAmount() * scalar));
+            list.add(new ChemicalEmiStack(stack.typeHolder(), (long) stack.amount() * scalar));
         }
         return EmiIngredient.of(list);
     }

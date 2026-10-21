@@ -5,21 +5,19 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
-import mekanism.api.Action;
 import mekanism.api.IContentsListener;
-import mekanism.api.chemical.IChemicalHandler;
-import mekanism.api.heat.IHeatHandler;
+import mekanism.api.chemical.ChemicalResource;
+import mekanism.api.chemical.IChemicalTank;
+import mekanism.api.fluid.IFluidTank;
 import mekanism.api.text.EnumColor;
 import mekanism.common.MekanismLang;
-import mekanism.common.attachments.containers.ContainerType;
 import mekanism.common.capabilities.Capabilities;
-import mekanism.common.capabilities.heat.CachedAmbientTemperature;
-import mekanism.common.capabilities.holder.chemical.IChemicalTankHolder;
-import mekanism.common.capabilities.holder.fluid.IFluidTankHolder;
-import mekanism.common.capabilities.holder.heat.IHeatCapacitorHolder;
+import mekanism.common.capabilities.holder.container.IContainerHolder;
+import mekanism.common.component.containers.type.ContainerType;
+import mekanism.common.component.containers.type.IContainerType;
+import mekanism.common.integration.computer.ComputerException;
 import mekanism.common.integration.computer.annotation.ComputerMethod;
 import mekanism.common.lib.multiblock.MultiblockData.AdvancedCapabilityOutputTarget;
-import mekanism.common.util.WorldUtils;
 import mekanism.generators.common.block.attribute.AttributeStateFissionPortMode;
 import mekanism.generators.common.block.attribute.AttributeStateFissionPortMode.FissionPortMode;
 import mekanism.generators.common.registries.GeneratorsBlocks;
@@ -28,16 +26,16 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import mekanism.neoshim.neoforge.capabilities.BlockCapability;
 import mekanism.neoshim.neoforge.capabilities.BlockCapabilityCache;
-import mekanism.neoshim.neoforge.fluids.FluidStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import org.jspecify.annotations.Nullable;
 
 public class TileEntityFissionReactorPort extends TileEntityFissionReactorCasing {
 
-    private final Map<Direction, BlockCapabilityCache<IChemicalHandler, @Nullable Direction>> capabilityCaches = new EnumMap<>(Direction.class);
+    private final Map<Direction, BlockCapabilityCache<ResourceHandler<ChemicalResource>, @Nullable Direction>> capabilityCaches = new EnumMap<>(Direction.class);
     private final List<BlockCapability<?, @Nullable Direction>> portCapabilities = List.of(
           Capabilities.CHEMICAL.block(),
           Capabilities.FLUID.block()
@@ -49,47 +47,26 @@ public class TileEntityFissionReactorPort extends TileEntityFissionReactorCasing
         delaySupplier = NO_DELAY;
     }
 
-    @Nullable
     @Override
-    public IHeatHandler getAdjacent(@NotNull Direction side) {
-        if (canHandleHeat() && getHeatCapacitorCount(side) > 0) {
-            if (WorldUtils.getBlockState(level, getBlockPos().relative(side))
-                  .filter(state -> !state.is(GeneratorsBlocks.FISSION_REACTOR_PORT))
-                  .isPresent()) {
-                return getAdjacentUnchecked(side);
-            }
-        }
-        return null;
-    }
-
-    @NotNull
-    @Override
-    public IChemicalTankHolder getInitialChemicalTanks(IContentsListener listener) {
-        return side -> getMultiblock().getChemicalTanks(getMode());
-    }
-
-    @NotNull
-    @Override
-    protected IFluidTankHolder getInitialFluidTanks(IContentsListener listener) {
-        return side -> getMode() == FissionPortMode.INPUT ? getMultiblock().getFluidTanks(side) : Collections.emptyList();
-    }
-
-    @NotNull
-    @Override
-    protected IHeatCapacitorHolder getInitialHeatCapacitors(IContentsListener listener, CachedAmbientTemperature ambientTemperature) {
-        return side -> getMultiblock().getHeatCapacitors(side);
+    public IContainerHolder<IChemicalTank> getInitialChemicalTanks(IContentsListener listener) {
+        return _ -> getMultiblock().getChemicalTanks(getMode());
     }
 
     @Override
-    public boolean persists(ContainerType<?, ?, ?> type) {
-        if (type == ContainerType.HEAT || type == ContainerType.CHEMICAL || type == ContainerType.FLUID) {
+    protected IContainerHolder<IFluidTank> getInitialFluidTanks(IContentsListener listener) {
+        return _ -> getMode() == FissionPortMode.INPUT ? getMultiblock().getValveFluidTanks(getBlockPos()) : Collections.emptyList();
+    }
+
+    @Override
+    public boolean persists(IContainerType<?, ?> type) {
+        if (type == ContainerType.CHEMICAL || type == ContainerType.FLUID) {
             return false;
         }
         return super.persists(type);
     }
 
-    public void addChemicalTargetCapability(List<AdvancedCapabilityOutputTarget<IChemicalHandler, FissionPortMode>> outputTargets, Direction side) {
-        BlockCapabilityCache<IChemicalHandler, @Nullable Direction> cache = capabilityCaches.get(side);
+    public void addChemicalTargetCapability(List<AdvancedCapabilityOutputTarget<ResourceHandler<ChemicalResource>, FissionPortMode>> outputTargets, Direction side) {
+        BlockCapabilityCache<ResourceHandler<ChemicalResource>, @Nullable Direction> cache = capabilityCaches.get(side);
         if (cache == null) {
             cache = Capabilities.CHEMICAL.createCache((ServerLevel) level, worldPosition.relative(side), side.getOpposite());
             capabilityCaches.put(side, cache);
@@ -102,8 +79,7 @@ public class TileEntityFissionReactorPort extends TileEntityFissionReactorCasing
         return getBlockState().getValue(AttributeStateFissionPortMode.modeProperty);
     }
 
-    @ComputerMethod
-    void setMode(FissionPortMode mode) {
+    void setMode(Level level, FissionPortMode mode) {
         if (mode != getMode()) {
             level.setBlockAndUpdate(worldPosition, getBlockState().setValue(AttributeStateFissionPortMode.modeProperty, mode));
             invalidateCapabilitiesAll(portCapabilities);
@@ -111,32 +87,13 @@ public class TileEntityFissionReactorPort extends TileEntityFissionReactorCasing
     }
 
     @Override
-    public InteractionResult onSneakRightClick(Player player) {
-        if (!isRemote()) {
+    public InteractionResult onSneakRightClick(Level level, Player player) {
+        if (!level.isClientSide()) {
             FissionPortMode mode = getMode().getNext();
-            setMode(mode);
-            player.displayClientMessage(MekanismLang.BOILER_VALVE_MODE_CHANGE.translateColored(EnumColor.GRAY, mode), true);
+            setMode(level, mode);
+            player.sendOverlayMessage(MekanismLang.BOILER_VALVE_MODE_CHANGE.translateColored(EnumColor.GRAY, mode));
         }
         return InteractionResult.SUCCESS;
-    }
-
-    @NotNull
-    @Override
-    public FluidStack insertFluid(int tank, @NotNull FluidStack stack, Direction side, @NotNull Action action) {
-        return handleValves(stack, action, super.insertFluid(tank, stack, side, action));
-    }
-
-    @NotNull
-    @Override
-    public FluidStack insertFluid(@NotNull FluidStack stack, Direction side, @NotNull Action action) {
-        return handleValves(stack, action, super.insertFluid(stack, side, action));
-    }
-
-    private FluidStack handleValves(@NotNull FluidStack stack, @NotNull Action action, @NotNull FluidStack remainder) {
-        if (action.execute() && remainder.getAmount() < stack.getAmount()) {
-            getMultiblock().triggerValveTransfer(this);
-        }
-        return remainder;
     }
 
     @Override
@@ -151,13 +108,18 @@ public class TileEntityFissionReactorPort extends TileEntityFissionReactorCasing
     }
 
     @ComputerMethod
-    void incrementMode() {
+    void incrementMode() throws ComputerException {
         setMode(getMode().getNext());
     }
 
     @ComputerMethod
-    void decrementMode() {
+    void decrementMode() throws ComputerException {
         setMode(getMode().getPrevious());
+    }
+
+    @ComputerMethod
+    void setMode(FissionPortMode mode) throws ComputerException {
+        setMode(validateLevel(), mode);
     }
     //End methods IComputerTile
 }

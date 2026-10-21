@@ -12,8 +12,8 @@ public class UsernameCache {
     @Nullable
     public static String getLastKnownUsername(UUID uuid) {
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-        if (server != null && server.getProfileCache() != null) {
-            return server.getProfileCache().get(uuid).map(com.mojang.authlib.GameProfile::getName).orElse(null);
+        if (server != null) {
+            return server.services().nameToIdCache().get(uuid).map(net.minecraft.server.players.NameAndId::name).orElse(null);
         }
         return null;
     }

@@ -26,14 +26,12 @@ import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import mekanism.neoshim.neoforge.common.Tags;
-import mekanism.neoshim.neoforge.common.data.ExistingFileHelper;
 import mekanism.neoshim.neoforge.registries.DeferredHolder;
-import org.jetbrains.annotations.Nullable;
 
 public class AdditionsTagProvider extends BaseTagProvider {
 
-    public AdditionsTagProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider, @Nullable ExistingFileHelper existingFileHelper) {
-        super(output, lookupProvider, MekanismAdditions.MODID, existingFileHelper);
+    public AdditionsTagProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider) {
+        super(output, lookupProvider, MekanismAdditions.MODID);
     }
 
     @Override

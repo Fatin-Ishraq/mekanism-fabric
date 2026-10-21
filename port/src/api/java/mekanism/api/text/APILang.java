@@ -1,16 +1,12 @@
 package mekanism.api.text;
 
 import mekanism.api.MekanismAPI;
-import mekanism.api.annotations.NothingNullByDefault;
-import net.minecraft.Util;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Util;
 
-/**
- * Lang entries declared in the API and provided by Mekanism.
- *
- * @apiNote These should only be accessed via their corresponding users, except for use in making it easier to not miss any entries in the DataGenerators
- */
-@NothingNullByDefault
+/// Lang entries declared in the API and provided by Mekanism.
+///
+/// @apiNote These should only be accessed via their corresponding users, except for use in making it easier to not miss any entries in the DataGenerators
 public enum APILang implements ILangEntry {
     //Upgrades
     UPGRADE_SPEED("upgrade", "speed"),
@@ -69,8 +65,9 @@ public enum APILang implements ILangEntry {
     CHEMICAL_ATTRIBUTE_COOLANT_EFFICIENCY("chemical", "attribute.coolant.efficiency"),
     CHEMICAL_ATTRIBUTE_COOLANT_ENTHALPY("chemical", "attribute.coolant.heat_capacity"),
     CHEMICAL_ATTRIBUTE_COOLANT_TEMPERATURE("chemical", "attribute.coolant.temperature"),
-    CHEMICAL_ATTRIBUTE_FUEL_BURN_TICKS("chemical", "attribute.fuel.burn_ticks"),
+    CHEMICAL_ATTRIBUTE_FUEL_MAX_BURN("chemical", "attribute.fuel.max_burn"),
     CHEMICAL_ATTRIBUTE_FUEL_ENERGY_DENSITY("chemical", "attribute.fuel.energy_density"),
+    CHEMICAL_ATTRIBUTE_FUEL_ENERGY_MAX_TOTAL("chemical", "attribute.fuel.energy_max_total"),
     //Security
     PUBLIC("security", "public"),
     TRUSTED("security", "trusted"),
@@ -82,7 +79,8 @@ public enum APILang implements ILangEntry {
     private final String key;
 
     APILang(String type, String path) {
-        this(Util.makeDescriptionId(type, ResourceLocation.fromNamespaceAndPath(MekanismAPI.MEKANISM_MODID, path)));
+        //TODO - 26.1: Evaluate replacing usages of makeDescriptionId with Identifier#toLanguageKey?
+        this(Util.makeDescriptionId(type, Identifier.fromNamespaceAndPath(MekanismAPI.MEKANISM_MODID, path)));
     }
 
     APILang(String key) {

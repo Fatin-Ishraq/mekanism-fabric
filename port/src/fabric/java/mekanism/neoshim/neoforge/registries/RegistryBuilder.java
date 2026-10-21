@@ -7,7 +7,7 @@ import net.minecraft.core.DefaultedMappedRegistry;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 /** Builds a static registry via Fabric's {@link FabricRegistryBuilder}; it is added to {@code BuiltInRegistries.REGISTRY} immediately. */
@@ -15,7 +15,7 @@ public class RegistryBuilder<T> {
 
     private final ResourceKey<? extends Registry<T>> registryKey;
     @Nullable
-    private ResourceLocation defaultKey;
+    private Identifier defaultKey;
     private boolean sync = false;
     private boolean intrusiveHolders = false;
     private int maxId = -1;
@@ -24,7 +24,7 @@ public class RegistryBuilder<T> {
         this.registryKey = registryKey;
     }
 
-    public RegistryBuilder<T> defaultKey(ResourceLocation key) {
+    public RegistryBuilder<T> defaultKey(Identifier key) {
         this.defaultKey = key;
         return this;
     }

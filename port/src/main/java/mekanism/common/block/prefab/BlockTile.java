@@ -1,7 +1,6 @@
 package mekanism.common.block.prefab;
 
 import java.util.function.Function;
-import java.util.function.UnaryOperator;
 import mekanism.common.block.attribute.Attribute;
 import mekanism.common.block.attribute.AttributeGui;
 import mekanism.common.block.attribute.AttributeParticleFX;
@@ -19,24 +18,25 @@ import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.redstone.Orientation;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class BlockTile<TILE extends TileEntityMekanism, TYPE extends BlockTypeTile<TILE>> extends BlockBase<TYPE> implements IHasTileEntity<TILE> {
 
-    public BlockTile(TYPE type, UnaryOperator<BlockBehaviour.Properties> propertiesModifier) {
-        this(type, propertiesModifier.apply(BlockBehaviour.Properties.of().strength(3.5F, 16).requiresCorrectToolForDrops()));
+    //TODO - 26.1: Re-evaluate usages of this and maybe decide to inline properties to call sites?
+    public static BlockBehaviour.Properties defaultProperties(BlockBehaviour.Properties properties) {
         //TODO - 1.18: Figure out what the resistance should be (it used to be different in 1.12)
+        return properties.strength(3.5F, 16).requiresCorrectToolForDrops();
     }
 
     public BlockTile(TYPE type, BlockBehaviour.Properties properties) {
@@ -48,37 +48,36 @@ public class BlockTile<TILE extends TileEntityMekanism, TYPE extends BlockTypeTi
         return type.getTileType();
     }
 
-    @NotNull
     @Override
-    protected ItemInteractionResult useItemOn(@NotNull ItemStack stack, @NotNull BlockState state, @NotNull Level world, @NotNull BlockPos pos, @NotNull Player player,
-          @NotNull InteractionHand hand, @NotNull BlockHitResult hit) {
+    protected InteractionResult useItemOn(ItemStack stack, BlockState state, Level world, BlockPos pos, Player player,
+          InteractionHand hand, BlockHitResult hit) {
         if (stack.isEmpty()) {
-            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+            return InteractionResult.TRY_WITH_EMPTY_HAND;
         }
         TileEntityMekanism tile = WorldUtils.getTileEntity(TileEntityMekanism.class, world, pos);
         if (tile == null) {
             //No tile, we can just skip trying to use without an item
-            return ItemInteractionResult.SKIP_DEFAULT_BLOCK_INTERACTION;
-        } else if (world.isClientSide) {
+            return InteractionResult.TRY_WITH_EMPTY_HAND;
+        } else if (world.isClientSide()) {
             return genericClientActivated(stack, tile);
         }
-        return tile.tryWrench(state, player, stack).getInteractionResult();
+        InteractionResult wrenchResult = tile.tryWrench(world, state, player, stack).getInteractionResult();
+        return wrenchResult == InteractionResult.PASS ? InteractionResult.TRY_WITH_EMPTY_HAND : wrenchResult;
     }
 
-    @NotNull
     @Override
-    protected InteractionResult useWithoutItem(@NotNull BlockState state, @NotNull Level world, @NotNull BlockPos pos, @NotNull Player player, @NotNull BlockHitResult hit) {
+    protected InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult hit) {
         TileEntityMekanism tile = WorldUtils.getTileEntity(TileEntityMekanism.class, world, pos);
         if (tile == null) {
             return InteractionResult.PASS;
-        } else if (world.isClientSide) {
+        } else if (world.isClientSide()) {
             return Attribute.has(this, AttributeGui.class) ? InteractionResult.SUCCESS : InteractionResult.PASS;
         }
         return tile.openGui(player);
     }
 
     @Override
-    public void animateTick(@NotNull BlockState state, @NotNull Level world, @NotNull BlockPos pos, @NotNull RandomSource random) {
+    public void animateTick(BlockState state, Level world, BlockPos pos, RandomSource random) {
         super.animateTick(state, world, pos, random);
         if (MekanismConfig.client.machineEffects.get()) {
             AttributeParticleFX particleFX = type.get(AttributeParticleFX.class);
@@ -102,28 +101,38 @@ public class BlockTile<TILE extends TileEntityMekanism, TYPE extends BlockTypeTi
     }
 
     @Override
-    protected void neighborChanged(@NotNull BlockState state, @NotNull Level world, @NotNull BlockPos pos, @NotNull Block neighborBlock, @NotNull BlockPos neighborPos,
-          boolean isMoving) {
-        if (!world.isClientSide) {
-            TileEntityMekanism tile = WorldUtils.getTileEntity(TileEntityMekanism.class, world, pos);
+    public void onNeighborChange(BlockState state, LevelReader level, BlockPos pos, BlockPos neighborPos) {
+        if (!level.isClientSide()) {
+            TileEntityMekanism tile = WorldUtils.getTileEntity(TileEntityMekanism.class, level, pos);
             if (tile != null) {
-                tile.onNeighborChange(neighborBlock, neighborPos);
+                tile.onNeighborChange(level, neighborPos);
             }
         }
     }
 
     @Override
-    protected boolean isSignalSource(@NotNull BlockState state) {
+    protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block block, @Nullable Orientation orientation, boolean movedByPiston) {
+        super.neighborChanged(state, level, pos, block, orientation, movedByPiston);
+        if (!level.isClientSide()) {
+            TileEntityMekanism tile = WorldUtils.getTileEntity(TileEntityMekanism.class, level, pos);
+            if (tile != null) {
+                tile.updatePower(level);
+            }
+        }
+    }
+
+    @Override
+    protected boolean isSignalSource(BlockState state) {
         return type.has(AttributeRedstoneEmitter.class);
     }
 
     @Override
-    public boolean canConnectRedstone(@NotNull BlockState state, @NotNull BlockGetter world, @NotNull BlockPos pos, @Nullable Direction side) {
+    public boolean canConnectRedstone(BlockState state, BlockGetter world, BlockPos pos, @Nullable Direction side) {
         return type.has(AttributeRedstoneEmitter.class) || super.canConnectRedstone(state, world, pos, side);
     }
 
     @Override
-    protected int getSignal(@NotNull BlockState state, @NotNull BlockGetter world, @NotNull BlockPos pos, @NotNull Direction side) {
+    protected int getSignal(BlockState state, BlockGetter world, BlockPos pos, Direction side) {
         AttributeRedstoneEmitter<TileEntityMekanism> redstoneEmitter = type.get(AttributeRedstoneEmitter.class);
         if (redstoneEmitter != null) {
             TileEntityMekanism tile = WorldUtils.getTileEntity(TileEntityMekanism.class, world, pos);
@@ -135,10 +144,6 @@ public class BlockTile<TILE extends TileEntityMekanism, TYPE extends BlockTypeTi
     }
 
     public static class BlockTileModel<TILE extends TileEntityMekanism, BLOCK extends BlockTypeTile<TILE>> extends BlockTile<TILE, BLOCK> implements IStateFluidLoggable {
-
-        public BlockTileModel(BLOCK type, UnaryOperator<BlockBehaviour.Properties> propertiesModifier) {
-            super(type, propertiesModifier);
-        }
 
         public BlockTileModel(BLOCK type, BlockBehaviour.Properties properties) {
             super(type, properties);

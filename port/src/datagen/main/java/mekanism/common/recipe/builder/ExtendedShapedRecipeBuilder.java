@@ -6,21 +6,22 @@ import it.unimi.dsi.fastutil.chars.CharOpenHashSet;
 import it.unimi.dsi.fastutil.chars.CharSet;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.common.recipe.pattern.RecipePattern;
 import mekanism.common.registration.impl.BlockRegistryObject;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderSet;
 import net.minecraft.data.recipes.RecipeBuilder;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.ShapedRecipe;
 import net.minecraft.world.item.crafting.ShapedRecipePattern;
 
-@NothingNullByDefault
 public class ExtendedShapedRecipeBuilder extends BaseRecipeBuilder<ExtendedShapedRecipeBuilder> {
 
     private final Char2ObjectMap<Ingredient> key = new Char2ObjectArrayMap<>(9);
@@ -61,7 +62,11 @@ public class ExtendedShapedRecipeBuilder extends BaseRecipeBuilder<ExtendedShape
         return this;
     }
 
-    public ExtendedShapedRecipeBuilder key(char symbol, TagKey<Item> tag) {
+    public ExtendedShapedRecipeBuilder key(char symbol, HolderGetter<Item> lookup, TagKey<Item> tag) {
+        return key(symbol, lookup.getOrThrow(tag));
+    }
+
+    public ExtendedShapedRecipeBuilder key(char symbol, HolderSet<Item> tag) {
         return key(symbol, Ingredient.of(tag));
     }
 
@@ -93,7 +98,7 @@ public class ExtendedShapedRecipeBuilder extends BaseRecipeBuilder<ExtendedShape
     }
 
     @Override
-    protected void validate(ResourceLocation id) {
+    protected void ensureValid(ResourceKey<Recipe<?>> id) {
         if (pattern.isEmpty()) {
             throw new IllegalStateException("No pattern is defined for shaped recipe " + id + "!");
         }
@@ -117,16 +122,15 @@ public class ExtendedShapedRecipeBuilder extends BaseRecipeBuilder<ExtendedShape
 
     @Override
     protected Recipe<?> asRecipe() {
-        return wrapRecipe(new ShapedRecipe(
-              Objects.requireNonNullElse(this.group, ""),
-              RecipeBuilder.determineBookCategory(this.category),
+        return wrapRecipe(
+              RecipeBuilder.createCraftingCommonInfo(this.showNotification),
+              RecipeBuilder.createCraftingBookInfo(this.category, this.group),
               ShapedRecipePattern.of(this.key, this.pattern),
-              resultStack(),
-              this.showNotification
-        ));
+              resultStack()
+        );
     }
 
-    protected Recipe<?> wrapRecipe(ShapedRecipe recipe) {
-        return recipe;
+    protected Recipe<?> wrapRecipe(Recipe.CommonInfo commonInfo, CraftingRecipe.CraftingBookInfo bookInfo, ShapedRecipePattern pattern, ItemStackTemplate result) {
+        return new ShapedRecipe(commonInfo, bookInfo, pattern, result);
     }
 }

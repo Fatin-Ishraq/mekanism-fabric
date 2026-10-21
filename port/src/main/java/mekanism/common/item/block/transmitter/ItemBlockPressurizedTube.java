@@ -1,6 +1,6 @@
 package mekanism.common.item.block.transmitter;
 
-import java.util.List;
+import java.util.function.Consumer;
 import mekanism.api.text.EnumColor;
 import mekanism.common.MekanismLang;
 import mekanism.common.block.attribute.Attribute;
@@ -13,32 +13,36 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.item.component.TooltipDisplay;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
 
 public class ItemBlockPressurizedTube extends ItemBlockTooltip<BlockSmallTransmitter<TileEntityPressurizedTube>> {
 
+    private final TubeTier tier;
+
     public ItemBlockPressurizedTube(BlockSmallTransmitter<TileEntityPressurizedTube> block, Item.Properties properties) {
+        tier = Attribute.getTierNN(block, TubeTier.class);
         super(block, true, properties);
     }
 
-    @NotNull
     @Override
     public TubeTier getTier() {
-        return Attribute.getTier(getBlock(), TubeTier.class);
+        return tier;
     }
 
     @Override
-    protected void addDetails(@NotNull ItemStack stack, @NotNull Item.TooltipContext context, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        super.addDetails(stack, context, tooltip, flag);
-        tooltip.add(MekanismLang.CAPABLE_OF_TRANSFERRING.translateColored(EnumColor.DARK_GRAY));
-        tooltip.add(MekanismLang.CHEMICALS.translateColored(EnumColor.PURPLE, MekanismLang.MEKANISM));
+    protected void addDetails(ItemStack stack, ItemAccess itemAccess, Item.TooltipContext context, TooltipDisplay tooltipDisplay,
+          Consumer<Component> tooltipAdder, TooltipFlag flag) {
+        super.addDetails(stack, itemAccess, context, tooltipDisplay, tooltipAdder, flag);
+        tooltipAdder.accept(MekanismLang.CAPABLE_OF_TRANSFERRING.translateColored(EnumColor.DARK_GRAY));
+        tooltipAdder.accept(MekanismLang.CHEMICALS.translateColored(EnumColor.PURPLE, MekanismLang.MEKANISM));
     }
 
     @Override
-    protected void addStats(@NotNull ItemStack stack, @NotNull Item.TooltipContext context, @NotNull List<Component> tooltip, @NotNull TooltipFlag flag) {
-        super.addStats(stack, context, tooltip, flag);
-        TubeTier tier = getTier();
-        tooltip.add(MekanismLang.CAPACITY_MB_PER_TICK.translateColored(EnumColor.INDIGO, EnumColor.GRAY, TextUtils.format(tier.getTubeCapacity())));
-        tooltip.add(MekanismLang.PUMP_RATE_MB.translateColored(EnumColor.INDIGO, EnumColor.GRAY, TextUtils.format(tier.getTubePullAmount())));
+    protected void addStats(ItemStack stack, ItemAccess itemAccess, Item.TooltipContext context, TooltipDisplay tooltipDisplay,
+          Consumer<Component> tooltipAdder, TooltipFlag flag) {
+        super.addStats(stack, itemAccess, context, tooltipDisplay, tooltipAdder, flag);
+        tooltipAdder.accept(MekanismLang.CAPACITY_MB_PER_TICK.translateColored(EnumColor.INDIGO, EnumColor.GRAY, TextUtils.format(tier.getCapacity())));
+        tooltipAdder.accept(MekanismLang.PUMP_RATE_MB.translateColored(EnumColor.INDIGO, EnumColor.GRAY, TextUtils.format(tier.getTransferRate())));
     }
 }

@@ -1,8 +1,5 @@
 package mekanism.common.tile.machine;
 
-import com.mojang.serialization.DataResult;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
@@ -14,6 +11,7 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -21,39 +19,38 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
-import mekanism.api.Action;
 import mekanism.api.AutomationType;
 import mekanism.api.IContentsListener;
 import mekanism.api.MekanismAPI;
 import mekanism.api.RelativeSide;
 import mekanism.api.SerializationConstants;
 import mekanism.api.Upgrade;
+import mekanism.api.energy.IEnergyContainer;
 import mekanism.api.inventory.IInventorySlot;
+import mekanism.api.resource.IMekanismResourceHandler;
 import mekanism.common.CommonWorldTickHandler;
 import mekanism.common.Mekanism;
-import mekanism.common.attachments.FilterAware;
-import mekanism.common.attachments.OverflowAware;
 import mekanism.common.base.MekFakePlayer;
 import mekanism.common.block.BlockBounding;
 import mekanism.common.capabilities.Capabilities;
 import mekanism.common.capabilities.energy.MinerEnergyContainer;
-import mekanism.common.capabilities.holder.energy.EnergyContainerHelper;
-import mekanism.common.capabilities.holder.energy.IEnergyContainerHolder;
-import mekanism.common.capabilities.holder.slot.IInventorySlotHolder;
-import mekanism.common.capabilities.holder.slot.InventorySlotHelper;
+import mekanism.common.capabilities.holder.container.IContainerHolder;
+import mekanism.common.capabilities.holder.container.MekContainerHelper;
+import mekanism.common.capabilities.holder.single.BasicSingleHolder;
+import mekanism.common.capabilities.holder.single.ISingleContainerHolder;
+import mekanism.common.component.FilterAware;
+import mekanism.common.component.OverflowAware;
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.content.filter.SortableFilterManager;
 import mekanism.common.content.miner.MinerFilter;
 import mekanism.common.content.miner.MinerRegionCache;
 import mekanism.common.content.miner.ThreadMinerSearch;
 import mekanism.common.content.miner.ThreadMinerSearch.State;
-import mekanism.common.content.network.transmitter.LogisticalTransporterBase;
 import mekanism.common.integration.computer.ComputerException;
 import mekanism.common.integration.computer.SpecialComputerMethodWrapper.ComputerIInventorySlotWrapper;
 import mekanism.common.integration.computer.annotation.ComputerMethod;
 import mekanism.common.integration.computer.annotation.WrappingComputerMethod;
 import mekanism.common.integration.computer.computercraft.ComputerConstants;
-import mekanism.common.integration.energy.EnergyCompatUtils;
 import mekanism.common.inventory.container.MekanismContainer;
 import mekanism.common.inventory.container.sync.SyncableBoolean;
 import mekanism.common.inventory.container.sync.SyncableEnum;
@@ -65,8 +62,6 @@ import mekanism.common.inventory.slot.BasicInventorySlot;
 import mekanism.common.inventory.slot.EnergyInventorySlot;
 import mekanism.common.item.gear.ItemAtomicDisassembler;
 import mekanism.common.lib.chunkloading.IChunkLoader;
-import mekanism.common.lib.inventory.Finder;
-import mekanism.common.lib.inventory.HashedItem;
 import mekanism.common.lib.inventory.TransitRequest;
 import mekanism.common.lib.inventory.TransitRequest.TransitResponse;
 import mekanism.common.registries.MekanismBlocks;
@@ -79,24 +74,19 @@ import mekanism.common.tile.interfaces.IHasVisualization;
 import mekanism.common.tile.interfaces.ITileFilterHolder;
 import mekanism.common.util.InventoryUtils;
 import mekanism.common.util.MekanismUtils;
-import mekanism.common.util.NBTUtils;
 import mekanism.common.util.StackUtils;
 import mekanism.common.util.UpgradeUtils;
 import mekanism.common.util.WorldUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder.Reference;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.Vec3i;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -107,17 +97,24 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.LevelEvent;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.redstone.Redstone;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import mekanism.neoshim.neoforge.capabilities.BlockCapability;
 import mekanism.neoshim.neoforge.capabilities.BlockCapabilityCache;
 import mekanism.neoshim.neoforge.common.NeoForge;
-import mekanism.neoshim.neoforge.event.level.BlockEvent;
-import mekanism.neoshim.neoforge.items.IItemHandler;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.event.level.block.BreakBlockEvent;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.ResourceHandlerUtil;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.resource.ResourceStack;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jetbrains.annotations.UnknownNullability;
+import org.jspecify.annotations.Nullable;
 
 public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunkLoader, IBoundingBlock, ITileFilterHolder<MinerFilter<?>>, IHasVisualization {
 
@@ -125,16 +122,16 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     public static final int DEFAULT_RADIUS = 10;
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private final SortableFilterManager<MinerFilter<?>> filterManager = new SortableFilterManager<MinerFilter<?>>((Class) MinerFilter.class, this::markForSave);
+    private final SortableFilterManager<MinerFilter<?>> filterManager = new SortableFilterManager<MinerFilter<?>>((Class) MinerFilter.class, this::markForSave, this::getLevel);
     private Long2ObjectMap<BitSet> oresToMine = Long2ObjectMaps.emptyMap();
     public ThreadMinerSearch searcher = new ThreadMinerSearch(this);
 
     @Nullable
-    private BlockCapabilityCache<IItemHandler, @Nullable Direction> pullInventory;
+    private BlockCapabilityCache<ResourceHandler<ItemResource>, @Nullable Direction> pullInventory;
     @Nullable
-    private BlockCapabilityCache<IItemHandler, @Nullable Direction> selfEjectInventory;
+    private BlockCapabilityCache<ResourceHandler<ItemResource>, @Nullable Direction> selfEjectInventory;
     @Nullable
-    private BlockCapabilityCache<IItemHandler, @Nullable Direction> ejectInventory;
+    private BlockCapabilityCache<ResourceHandler<ItemResource>, @Nullable Direction> ejectInventory;
 
     private int radius;
     private boolean inverse;
@@ -148,7 +145,7 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
 
     private final Predicate<ItemStack> overflowCollector = this::trackOverflow;
     //Note: Linked map to ensure each call to save is in the same order so that there is more uniformity
-    private final Object2IntSortedMap<HashedItem> overflow = new Object2IntLinkedOpenHashMap<>();
+    private final Object2IntSortedMap<ItemResource> overflow = new Object2IntLinkedOpenHashMap<>();
     private boolean hasOverflow;
     private boolean recheckOverflow;
 
@@ -166,47 +163,48 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     @Nullable
     private ChunkPos targetChunk;
 
+    @UnknownNullability//Initialized via getInitialEnergyContainer
     private MinerEnergyContainer energyContainer;
-    private List<IInventorySlot> mainSlots;
+    private final List<IInventorySlot> mainSlots;
+    /// For in inserting to input slots and stacking before going to empty slots
+    private final IMekanismResourceHandler<ItemResource, IInventorySlot> directMainHandler;
+    @UnknownNullability//Initialized via getInitialInventory
     @WrappingComputerMethod(wrapper = ComputerIInventorySlotWrapper.class, methodNames = "getEnergyItem", docPlaceholder = "energy slot")
     EnergyInventorySlot energySlot;
 
     public TileEntityDigitalMiner(BlockPos pos, BlockState state) {
+        mainSlots = new ArrayList<>();
         super(MekanismBlocks.DIGITAL_MINER, pos, state);
         radius = DEFAULT_RADIUS;
+        directMainHandler = () -> mainSlots;
     }
 
-    @NotNull
     @Override
-    protected IEnergyContainerHolder getInitialEnergyContainers(IContentsListener listener) {
-        EnergyContainerHelper builder = EnergyContainerHelper.forSide(facingSupplier);
-        builder.addContainer(energyContainer = MinerEnergyContainer.input(this, listener), RelativeSide.LEFT, RelativeSide.RIGHT, RelativeSide.BOTTOM);
-        return builder.build();
+    protected ISingleContainerHolder<IEnergyContainer> getInitialEnergyContainer(IContentsListener listener) {
+        energyContainer = MinerEnergyContainer.input(this, listener);
+        return new BasicSingleHolder<>(energyContainer, facingSupplier, EnumSet.of(RelativeSide.LEFT, RelativeSide.RIGHT, RelativeSide.BOTTOM));
     }
 
-    @NotNull
     @Override
-    protected IInventorySlotHolder getInitialInventory(IContentsListener listener) {
-        mainSlots = new ArrayList<>();
+    protected IContainerHolder<IInventorySlot> getInitialInventory(IContentsListener listener) {
         IContentsListener mainSlotListener = () -> {
             listener.onContentsChanged();
             //Ensure we recheck if our overflow can fit anywhere
             recheckOverflow = true;
         };
-        InventorySlotHelper builder = InventorySlotHelper.forSide(facingSupplier, side -> side == RelativeSide.TOP, side -> side == RelativeSide.BACK);
+        MekContainerHelper<IInventorySlot> builder = MekContainerHelper.forSide(facingSupplier, side -> side == RelativeSide.TOP, side -> side == RelativeSide.BACK);
         //Allow insertion manually or internally, or if it is a replace stack
-        BiPredicate<@NotNull ItemStack, @NotNull AutomationType> canInsert = (stack, automationType) -> automationType != AutomationType.EXTERNAL || isReplaceTarget(stack.getItem());
+        BiPredicate<ItemResource, AutomationType> canInsert = (itemType, automationType) -> !automationType.isExternal() || isReplaceTarget(itemType);
         //Allow extraction if it is manual or for internal usage, or if it is not a replace stack
-        //Note: We don't currently use internal for extraction anywhere here as we just shrink replace stacks directly
-        BiPredicate<@NotNull ItemStack, @NotNull AutomationType> canExtract = (stack, automationType) -> automationType != AutomationType.EXTERNAL || !isReplaceTarget(stack.getItem());
+        BiPredicate<ItemResource, AutomationType> canExtract = (itemType, automationType) -> !automationType.isExternal() || !isReplaceTarget(itemType);
         for (int slotY = 0; slotY < 3; slotY++) {
             for (int slotX = 0; slotX < 9; slotX++) {
                 BasicInventorySlot slot = BasicInventorySlot.at(canExtract, canInsert, mainSlotListener, 8 + slotX * 18, 92 + slotY * 18);
-                builder.addSlot(slot, RelativeSide.BACK, RelativeSide.TOP);
+                builder.addContainer(slot, RelativeSide.BACK, RelativeSide.TOP);
                 mainSlots.add(slot);
             }
         }
-        builder.addSlot(energySlot = EnergyInventorySlot.fillOrConvert(energyContainer, this::getLevel, listener, 152, 20));
+        builder.addContainer(energySlot = EnergyInventorySlot.fillOrConvert(energyContainer, this::getLevel, listener, 152, 20));
         return builder.build();
     }
 
@@ -221,14 +219,14 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     }
 
     @Override
-    protected void onUpdateClient() {
-        super.onUpdateClient();
+    protected void onUpdateClient(Level level) {
+        super.onUpdateClient(level);
         closeInvalidScreens();
     }
 
     @Override
-    protected boolean onUpdateServer() {
-        boolean sendUpdatePacket = super.onUpdateServer();
+    protected boolean onUpdateServer(ServerLevel level) {
+        boolean sendUpdatePacket = super.onUpdateServer(level);
         closeInvalidScreens();
         if (!initCalc) {
             //If it had finished searching, and we didn't initialize things yet,
@@ -236,62 +234,68 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
             if (searcher.state == State.FINISHED) {
                 boolean prevRunning = running;
                 reset();
-                start();
+                start(level);
                 running = prevRunning;
             }
             initCalc = true;
         }
 
-        energySlot.fillContainerOrConvert();
+        energySlot.fillContainerOrConvert(null);
 
         if (recheckOverflow) {
             //Try adding any overflow stacks we have before we actually try to process as if we have some overflow we can't add
             // then we will skip functioning and avoid draining energy.
             // Note: We may not have any overflow stacks, in which case this will effectively NO-OP
             // We also mark needing to recheck if the overflow can fit as false as we will know if we can or can't currently add it all
-            tryAddOverflow();
+            try (Transaction transaction = Transaction.openRoot()) {
+                tryAddOverflow(transaction);
+                transaction.commit();
+            }
         }
+
+        boolean isActive = false;
 
         //Note: If we have any overflow don't function or use any energy until the overflow has been dealt with
         if (!hasOverflow && canFunction() && running && searcher.state == State.FINISHED && !oresToMine.isEmpty()) {
-            long energyPerTick = energyContainer.getEnergyPerTick();
-            if (energyContainer.extract(energyPerTick, Action.SIMULATE, AutomationType.INTERNAL) == energyPerTick) {
-                setActive(true);
-                if (delay > 0) {
-                    delay--;
+            int energyPerTick = energyContainer.getEnergyPerTick();
+            try (Transaction transaction = Transaction.openRoot()) {
+                if (energyContainer.extract(energyPerTick, transaction, AutomationType.INTERNAL) == energyPerTick) {
+                    isActive = true;
+                    if (delay > 0) {
+                        delay--;
+                    }
+                    //TODO: Eventually we may want to avoid draining energy if we can't function due to a missing replace stack or the normal drops
+                    // being too much to fit
+                    if (delay == 0) {
+                        tryMineBlock(level, transaction);
+                        delay = getDelay();
+                    }
+                    transaction.commit();
                 }
-                //TODO: Eventually we may want to avoid draining energy if we can't function due to a missing replace stack or the normal drops
-                // being too much to fit
-                energyContainer.extract(energyPerTick, Action.EXECUTE, AutomationType.INTERNAL);
-                if (delay == 0) {
-                    tryMineBlock();
-                    delay = getDelay();
-                }
-            } else {
-                setActive(false);
             }
-        } else {
-            setActive(false);
         }
+        setActive(isActive);
 
         if (doEject && delayTicks == 0) {
             Direction direction = getDirection();
             Direction oppositeDirection = direction.getOpposite();
             BlockPos ejectPos = getBlockPos().above().relative(oppositeDirection);
             if (selfEjectInventory == null) {
-                selfEjectInventory = Capabilities.ITEM.createCache((ServerLevel) level, ejectPos, oppositeDirection);
+                selfEjectInventory = Capabilities.ITEM.createCache(level, ejectPos, oppositeDirection);
             }
-            IItemHandler ejectHandler = selfEjectInventory.getCapability();
+            ResourceHandler<ItemResource> ejectHandler = selfEjectInventory.getCapability();
             if (ejectInventory == null) {
-                ejectInventory = Capabilities.ITEM.createCache((ServerLevel) level, ejectPos.relative(oppositeDirection), direction);
+                ejectInventory = Capabilities.ITEM.createCache(level, ejectPos.relative(oppositeDirection), direction);
             }
-            IItemHandler targetHandler = ejectInventory.getCapability();
+            ResourceHandler<ItemResource> targetHandler = ejectInventory.getCapability();
             if (ejectHandler != null && targetHandler != null) {
-                TransitRequest ejectMap = InventoryUtils.getEjectItemMap(ejectHandler, mainSlots);
-                if (!ejectMap.isEmpty()) {
-                    TransitResponse response = ejectMap.eject(this, ejectPos, targetHandler, 0, LogisticalTransporterBase::getColor);
-                    if (!response.isEmpty()) {
-                        response.useAll();
+                try (Transaction transaction = Transaction.openRoot()) {
+                    TransitRequest ejectMap = InventoryUtils.getEjectItemMap(ejectHandler, mainSlots, transaction);
+                    if (!ejectMap.isEmpty()) {
+                        TransitResponse response = ejectMap.eject(this, ejectPos, targetHandler, 1, null, transaction);
+                        if (response.useAll(transaction)) {
+                            transaction.commit();
+                        }
                     }
                 }
             }
@@ -351,7 +355,7 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     private void setSilkTouch(boolean newSilkTouch) {
         if (silkTouch != newSilkTouch) {
             silkTouch = newSilkTouch;
-            if (hasLevel() && !isRemote()) {
+            if (level != null && !level.isClientSide()) {
                 energyContainer.updateMinerEnergyPerTick();
             }
         }
@@ -390,7 +394,7 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     }
 
     public void setRadiusFromPacket(int newRadius) {
-        setRadius(Mth.clamp(newRadius, 0, MekanismConfig.general.minerMaxRadius.get()));
+        setRadius(Math.clamp(newRadius, 0, MekanismConfig.general.minerMaxRadius.get()));
         //Send a packet to update the visual renderer
         //TODO: Only do this if the renderer is actually active
         sendUpdatePacket();
@@ -400,17 +404,17 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     private void setRadius(int newRadius) {
         if (radius != newRadius && newRadius >= 0) {
             radius = newRadius;
-            if (hasLevel() && !isRemote()) {
+            if (level != null && !level.isClientSide()) {
                 energyContainer.updateMinerEnergyPerTick();
                 // If the radius changed, and we're on the server, go ahead and refresh the chunk set
-                getChunkLoader().refreshChunkTickets();
+                getChunkLoader().refreshChunkTickets(level, worldPosition);
             }
         }
     }
 
     public void setMinYFromPacket(int newMinY) {
         if (level != null) {
-            setMinY(Mth.clamp(newMinY, level.getMinBuildHeight(), getMaxY()));
+            setMinY(Math.clamp(newMinY, level.getMinY(), getMaxY()));
             //Send a packet to update the visual renderer
             //TODO: Only do this if the renderer is actually active
             sendUpdatePacket();
@@ -421,7 +425,7 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     private void setMinY(int newMinY) {
         if (minY != newMinY) {
             minY = newMinY;
-            if (hasLevel() && !isRemote()) {
+            if (level != null && !level.isClientSide()) {
                 energyContainer.updateMinerEnergyPerTick();
             }
         }
@@ -429,7 +433,7 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
 
     public void setMaxYFromPacket(int newMaxY) {
         if (level != null) {
-            setMaxY(Mth.clamp(newMaxY, getMinY(), level.getMaxBuildHeight() - 1));
+            setMaxY(Math.clamp(newMaxY, getMinY(), level.getMaxY()));
             //Send a packet to update the visual renderer
             //TODO: Only do this if the renderer is actually active
             sendUpdatePacket();
@@ -440,16 +444,16 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     private void setMaxY(int newMaxY) {
         if (maxY != newMaxY) {
             maxY = newMaxY;
-            if (hasLevel() && !isRemote()) {
+            if (level != null && !level.isClientSide()) {
                 energyContainer.updateMinerEnergyPerTick();
             }
         }
     }
 
-    private void tryMineBlock() {
+    private void tryMineBlock(ServerLevel level, TransactionContext transaction) {
         BlockPos startingPos = getStartingPos();
         int diameter = getDiameter();
-        long target = targetChunk == null ? ChunkPos.INVALID_CHUNK_POS : targetChunk.toLong();
+        long target = targetChunk == null ? ChunkPos.INVALID_CHUNK_POS : targetChunk.pack();
         for (ObjectIterator<Long2ObjectMap.Entry<BitSet>> iterator = Long2ObjectMaps.fastIterator(oresToMine); iterator.hasNext(); ) {
             Long2ObjectMap.Entry<BitSet> entry = iterator.next();
             long chunk = entry.getLongKey();
@@ -477,7 +481,7 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
                 } else if (currentChunk == null) {
                     //Lazy init the current chunk so that if it is empty, and we are just going to remove it
                     // we don't need to try and load it
-                    updateTargetChunk(currentChunk = new ChunkPos(chunk));
+                    updateTargetChunk(currentChunk = ChunkPos.unpack(chunk));
                     target = chunk;
                 }
                 BlockPos pos = getOffsetForIndex(startingPos, diameter, index);
@@ -495,43 +499,48 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
                         }
                         //If our hasFilter state matches our inversion state, that means we should try to mine
                         // the block, so we check if we can mine it
-                        if (inverse == (matchingFilter == null) && canMine(state, pos)) {
-                            //If we can, then validate we can fit the drops and try to see if we can replace it properly as well
-                            List<ItemStack> drops = getDrops((ServerLevel) level, state, pos);
-                            if (canInsert(drops)) {
-                                CommonWorldTickHandler.fallbackItemCollector = overflowCollector;
-                                if (setReplace(state, pos, matchingFilter)) {
-                                    add(drops);
-                                    //Try to add any drops that might have been caused by breaking the block but didn't show up in the loot table.
-                                    // This mainly will be the case for some single block multiblocks and also for storage containers like chests
-                                    tryAddOverflow();
-                                    missingStack = ItemStack.EMPTY;
-                                    level.levelEvent(LevelEvent.PARTICLES_DESTROY_BLOCK, pos, Block.getId(state));
-                                    //Remove the block from our list of blocks to mine, and reduce the number of blocks we have to mine
-                                    cachedToMine--;
-                                    chunkToMine.clear(index);
-                                    if (chunkToMine.isEmpty()) {
-                                        // if we are out of stored elements then we remove this chunk and continue to check other chunks
-                                        // remove it so that we don't have to check the chunk next time around
-                                        iterator.remove();
-                                        // we no longer have a chunk we are targeting, so remove it. We might get a new chunk to target
-                                        // next time we try to mine but there is no reason to keep the old chunk in memory in the meantime
-                                        updateTargetChunk(null);
+                        if (inverse == (matchingFilter == null) && canMine(level, state, pos)) {
+                            try (Transaction subTransaction = Transaction.open(transaction)) {
+                                //If we can, then validate we can fit the drops and try to see if we can replace it properly as well
+                                List<ItemStack> drops = getDrops(level, state, pos, subTransaction);
+                                if (tryInsert(drops, subTransaction)) {
+                                    CommonWorldTickHandler.fallbackItemCollector = overflowCollector;
+                                    //Validate if we can replace the block with the replace stack that we will extract
+                                    if (setReplace(level, state, pos, matchingFilter, subTransaction)) {
+                                        //Try to add any drops that might have been caused by breaking the block but didn't show up in the loot table.
+                                        // This mainly will be the case for some single block multiblocks and also for storage containers like chests
+                                        tryAddOverflow(subTransaction);
+                                        //Commit the transaction to actually insert the items that we checked if we could fit
+                                        // and to actually remove the item we tried to use to replace the block
+                                        subTransaction.commit();
+                                        missingStack = ItemStack.EMPTY;
+                                        level.levelEvent(LevelEvent.PARTICLES_DESTROY_BLOCK, pos, Block.getId(state));
+                                        //Remove the block from our list of blocks to mine, and reduce the number of blocks we have to mine
+                                        cachedToMine--;
+                                        chunkToMine.clear(index);
+                                        if (chunkToMine.isEmpty()) {
+                                            // if we are out of stored elements then we remove this chunk and continue to check other chunks
+                                            // remove it so that we don't have to check the chunk next time around
+                                            iterator.remove();
+                                            // we no longer have a chunk we are targeting, so remove it. We might get a new chunk to target
+                                            // next time we try to mine but there is no reason to keep the old chunk in memory in the meantime
+                                            updateTargetChunk(null);
+                                        }
                                     }
+                                    //Reset the global fallback collector to null as we are done collecting for this miner and block
+                                    CommonWorldTickHandler.fallbackItemCollector = null;
                                 }
-                                //Reset the global fallback collector to null as we are done collecting for this miner and block
-                                CommonWorldTickHandler.fallbackItemCollector = null;
                             }
                             //Exit out. We either mined the block or don't have room so there is no reason to continue checking
                             return;
                         } else if (MekanismAPI.debug) {
-                            Mekanism.logger.error("Filter failed or can't mine: {} @ {} {}", state, getWorldNN().dimension().location(), pos);
+                            Mekanism.logger.error("Filter failed or can't mine: {} @ {} {}", state, level.dimension().identifier(), pos);
                         }
                     } else if (MekanismAPI.debug) {
-                        Mekanism.logger.error("State was air or was blacklisted (mismatch between search and runtime): {} @ {} {}", state, getWorldNN().dimension().location(), pos);
+                        Mekanism.logger.error("State was air or was blacklisted (mismatch between search and runtime): {} @ {} {}", state, level.dimension().identifier(), pos);
                     }
                 } else if (MekanismAPI.debug) {
-                    Mekanism.logger.debug("Block was not loaded {} {}", getWorldNN().dimension().location(), pos);
+                    Mekanism.logger.debug("Block was not loaded {} {}", level.dimension().identifier(), pos);
                 }
                 //If we failed to mine the block, because it isn't loaded, is air, or we shouldn't mine it
                 // remove the block from our list of blocks to mine, and reduce the number of blocks we have to mine
@@ -551,21 +560,16 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
         updateTargetChunk(null);
     }
 
-    /**
-     * @param filter Filter that was matched, if in inverse mode this will be null
-     *
-     * @return false if unsuccessful
-     */
-    private boolean setReplace(BlockState state, BlockPos pos, @Nullable MinerFilter<?> filter) {
-        if (level == null) {
-            return false;
-        }
+    /// @param filter Filter that was matched, if in inverse mode this will be null
+    ///
+    /// @return false if unsuccessful
+    private boolean setReplace(ServerLevel level, BlockState state, BlockPos pos, @Nullable MinerFilter<?> filter, TransactionContext transaction) {
         Item replaceTarget;
         ItemStack stack;
         if (filter == null) {
-            stack = getReplace(replaceTarget = inverseReplaceTarget, this::inverseReplaceTargetMatches);
+            stack = getReplace(level, replaceTarget = inverseReplaceTarget, this::inverseReplaceTargetMatches, transaction);
         } else {
-            stack = getReplace(replaceTarget = filter.replaceTarget, filter::replaceTargetMatches);
+            stack = getReplace(level, replaceTarget = filter.replaceTarget, filter::replaceTargetMatches, transaction);
         }
         if (stack.isEmpty()) {
             if (replaceTarget == Items.AIR || (filter == null && !inverseRequiresReplacement) || (filter != null && !filter.requiresReplacement)) {
@@ -576,7 +580,7 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
             missingStack = new ItemStack(replaceTarget);
             return false;
         }
-        BlockState newState = getStateForPlacement(stack, pos);
+        BlockState newState = getStateForPlacement(level, stack, pos);
         if (newState == null || !newState.canSurvive(level, pos)) {
             //If the spot is not a valid position for the block, then we return that we were unsuccessful
             return false;
@@ -588,57 +592,58 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
         return true;
     }
 
-    private boolean canMine(BlockState state, BlockPos pos) {
-        MekFakePlayer dummy = MekFakePlayer.setupFakePlayer((ServerLevel) level, this.worldPosition.getX(), this.worldPosition.getY(), this.worldPosition.getZ());
-        dummy.setEmulatingUUID(getOwnerUUID());//pretend to be the owner
-        boolean canMine = !NeoForge.EVENT_BUS.post(new BlockEvent.BreakEvent(level, pos, state, dummy)).isCanceled();
+    private boolean canMine(ServerLevel level, BlockState state, BlockPos pos) {
+        MekFakePlayer dummy = MekFakePlayer.setupFakePlayer(level, this.worldPosition.getX(), this.worldPosition.getY(), this.worldPosition.getZ());
+        dummy.setEmulatingData(this);//pretend to be the owner
+        //TODO - 26.1: Check about if we need to fire this on the client as well, or maybe just default mark it as notifying the client?
+        boolean canMine = !NeoForge.EVENT_BUS.post(new BreakBlockEvent(level, pos, state, dummy)).isCanceled();
         if (MekanismAPI.debug && !canMine) {
-            Mekanism.logger.debug("Denied mining block: {} @ {} {}", state, level.dimension().location(), pos);
+            Mekanism.logger.debug("Denied mining block: {} @ {} {}", state, level.dimension().identifier(), pos);
         }
-        dummy.cleanupFakePlayer((ServerLevel) level);
+        dummy.cleanupFakePlayer(level);
         return canMine;
     }
 
-    private BlockState getStateForPlacement(ItemStack stack, BlockPos pos) {
-        MekFakePlayer dummy = MekFakePlayer.setupFakePlayer((ServerLevel) level, this.worldPosition.getX(), this.worldPosition.getY(), this.worldPosition.getZ());
-        dummy.setEmulatingUUID(getOwnerUUID());//pretend to be the owner
+    @Nullable
+    private BlockState getStateForPlacement(ServerLevel level, ItemStack stack, BlockPos pos) {
+        MekFakePlayer dummy = MekFakePlayer.setupFakePlayer(level, this.worldPosition.getX(), this.worldPosition.getY(), this.worldPosition.getZ());
+        dummy.setEmulatingData(this);//pretend to be the owner
         BlockState result = StackUtils.getStateForPlacement(stack, pos, dummy);
-        dummy.cleanupFakePlayer((ServerLevel) level);
+        dummy.cleanupFakePlayer(level);
         return result;
     }
 
-    private ItemStack getReplace(Item replaceTarget, Predicate<Item> replaceStackMatches) {
+    private ItemStack getReplace(ServerLevel level, Item replaceTarget, Predicate<ItemResource> replaceStackMatches, TransactionContext transaction) {
         if (replaceTarget == Items.AIR) {
             return ItemStack.EMPTY;
         }
         //Start by sourcing from the miner's inventory
         for (IInventorySlot slot : mainSlots) {
-            ItemStack slotStack = slot.getStack();
-            if (replaceStackMatches.test(slotStack.getItem())) {
-                MekanismUtils.logMismatchedStackSize(slot.shrinkStack(1, Action.EXECUTE), 1);
-                return slotStack.copyWithCount(1);
+            ItemResource slotContents = slot.resource();
+            if (!slotContents.isEmpty() && replaceStackMatches.test(slotContents)) {
+                //Try to extract the item from the slot if the type matches what we want
+                if (slot.extract(slotContents, 1, transaction, AutomationType.INTERNAL) == 1) {
+                    return slotContents.toStack();
+                }
             }
         }
         //Then source from the upgrade if it is installed
         if (replaceTarget == Items.COBBLESTONE || replaceTarget == Items.STONE) {
-            if (upgradeComponent.isUpgradeInstalled(Upgrade.STONE_GENERATOR)) {
+            if (getUpgrades(Upgrade.STONE_GENERATOR) > 0) {
                 return new ItemStack(replaceTarget);
             }
         }
         //And finally source from the inventory on top if auto pull is enabled
         if (doPull) {
             if (pullInventory == null) {
-                pullInventory = Capabilities.ITEM.createCache((ServerLevel) level, getBlockPos().above(2), Direction.DOWN);
+                pullInventory = Capabilities.ITEM.createCache(level, getBlockPos().above(2), Direction.DOWN);
             }
-            IItemHandler pullInv = pullInventory.getCapability();
+            ResourceHandler<ItemResource> pullInv = pullInventory.getCapability();
             if (pullInv != null) {
-                TransitRequest request = TransitRequest.definedItem(pullInv, 1, Finder.item(replaceTarget));
-                if (!request.isEmpty()) {
-                    TransitResponse response = request.createSimpleResponse();
-                    if (response.useAll().isEmpty()) {
-                        //If the request isn't empty, and we were able to successfully use it all
-                        return response.getStack().copyWithCount(1);
-                    }
+                ResourceStack<ItemResource> extracted = ResourceHandlerUtil.extractFirst(pullInv, replaceStackMatches, 1, transaction);
+                if (extracted != null) {
+                    //If we were able to extract something, then return it
+                    return extracted.resource().toStack(extracted.amount());
                 }
             }
         }
@@ -653,135 +658,56 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
         selfEjectInventory = null;
     }
 
-    public boolean canInsert(List<ItemStack> toInsert) {
-        if (toInsert.isEmpty()) {
-            return true;
-        }
-        int slots = mainSlots.size();
-        Int2ObjectMap<ItemCount> cachedStacks = new Int2ObjectOpenHashMap<>(slots);
-        for (int i = 0; i < slots; i++) {
-            IInventorySlot slot = mainSlots.get(i);
-            if (!slot.isEmpty()) {
-                //Note: We skip caching the current stack of any empty slots
-                cachedStacks.put(i, new ItemCount(slot.getStack(), slot.getCount()));
-            }
-        }
-        for (ItemStack stackToInsert : toInsert) {
-            ItemStack stack = simulateInsert(cachedStacks, slots, stackToInsert);
-            if (!stack.isEmpty()) {
-                //If our stack is not empty that means we could not fit it all inside of our inventory,
-                // so we return false to being able to insert all the items.
-                return false;
+    private boolean tryInsert(List<ItemStack> toInsert, TransactionContext transaction) {
+        for (ItemStack stack : toInsert) {
+            if (!stack.isEmpty()) {//Sanitize that we don't have any empty stacks
+                int amountToInsert = stack.count();
+                int inserted = directMainHandler.insert(ItemResource.of(stack), amountToInsert, transaction, AutomationType.INTERNAL);
+                if (inserted < amountToInsert) {
+                    //We couldn't fit it all inside the inventory
+                    return false;
+                }
             }
         }
         return true;
     }
 
-    /**
-     * Prioritizes "inserting" into slots that have a matching item and then tries to insert into empty slots. This allows for more accurate simulations regarding if it
-     * is possible to fit everything in the inventory.
-     */
-    private ItemStack simulateInsert(Int2ObjectMap<ItemCount> cachedStacks, int slots, ItemStack stackToInsert) {
-        if (stackToInsert.isEmpty()) {
-            //If the stack is already empty for some reason just return it (aka no remainder)
-            return stackToInsert;
-        }
-        ItemStack stack = stackToInsert.copy();
-        //Try to simulate inserting into slots that are not currently empty
-        for (int i = 0; i < slots; i++) {
-            ItemCount cachedItem = cachedStacks.get(i);
-            if (cachedItem != null && ItemStack.isSameItemSameComponents(stack, cachedItem.stack)) {
-                //Ensure that our stack can stack with the item that is already in the slot
-                IInventorySlot slot = mainSlots.get(i);
-                int limit = slot.getLimit(stack);
-                if (cachedItem.count < limit) {
-                    //If we still have space left before this slot is full, try adding the stacks together
-                    cachedItem.count += stack.getCount();
-                    if (cachedItem.count <= limit) {
-                        //If we can fit it all, return we have no remainder
-                        return ItemStack.EMPTY;
-                    }
-                    //Otherwise, we tried to store more than can fit, update stack to represent the remainder that didn't fit
-                    stack = stack.copyWithCount(cachedItem.count - limit);
-                    // and update the actual amount stored to the limit of the slot
-                    cachedItem.count = limit;
-                }
-            }
-        }
-        //Try to simulate inserting into slots that are currently empty
-        for (int i = 0; i < slots; i++) {
-            if (!cachedStacks.containsKey(i)) {
-                //We have no cache of this slot, which means that it is currently empty
-                IInventorySlot slot = mainSlots.get(i);
-                int stackSize = stack.getCount();
-                //Attempt to insert the stack into the slot, the expected outcome given our slots' restrictions is that
-                // this will succeed and insert the entire stack
-                stack = slot.insertItem(stack, Action.SIMULATE, AutomationType.INTERNAL);
-                int remainderSize = stack.getCount();
-                if (remainderSize < stackSize) {
-                    //If the slot accepted at least some item we are inserting, then cache the item type that we put into that slot
-                    // Given the slot is empty the expected result is that we will always end up inserting into the first empty slot
-                    // and end up inserting the entire stack
-                    cachedStacks.put(i, new ItemCount(stackToInsert, stackSize - remainderSize));
-                    if (stack.isEmpty()) {
-                        //Stack was fully accepted, return that we have no remainder
-                        return ItemStack.EMPTY;
-                    }
-                }
-            }
-        }
-        return stack;
-    }
-
-    private void add(List<ItemStack> stacks) {
-        for (ItemStack stack : stacks) {
-            //Try inserting it first where it can stack and then into empty slots
-            stack = InventoryUtils.insertItem(mainSlots, stack, Action.EXECUTE, AutomationType.INTERNAL);
-            if (!stack.isEmpty()) {
-                //Because of the simulated insertion the stack should never be able to be empty here,
-                // but in case it is keep track of any excess as overflow
-                trackOverflow(stack);
-            }
-        }
-    }
-
     private boolean trackOverflow(ItemStack stack) {
         //Note: We never expect the stack to be empty but in case it is just don't handle the stack
-        if (!stack.isEmpty()) {
-            //Note: While we probably could get away by using a raw hashed item given we are removing the item entity for the stack
-            // we don't bother in case any other mods are doing weird things with it as this is just an edge case handler so shouldn't
-            // be a hotspot in regard to copying stacks
-            overflow.mergeInt(HashedItem.create(stack), stack.getCount(), Integer::sum);
-            //If we add something to the overflow map, mark that we have overflow
-            hasOverflow = true;
-            //Mark that we need to recheck if we can insert the overflow as we now have some
-            recheckOverflow = true;
-            markForSave();
-            return true;
+        if (stack.isEmpty()) {
+            return false;
         }
-        return false;
+        //Note: While we probably could get away by using a raw hashed item given we are removing the item entity for the stack
+        // we don't bother in case any other mods are doing weird things with it as this is just an edge case handler so shouldn't
+        // be a hotspot in regard to copying stacks
+        overflow.mergeInt(ItemResource.of(stack), stack.count(), Integer::sum);
+        //If we add something to the overflow map, mark that we have overflow
+        hasOverflow = true;
+        //Mark that we need to recheck if we can insert the overflow as we now have some
+        recheckOverflow = true;
+        markForSave();
+        return true;
     }
 
-    private void tryAddOverflow() {
+    private void tryAddOverflow(TransactionContext transaction) {
         if (hasOverflow) {
             //Try to add any existing overflow to our inventory
             boolean recheck = false;
-            for (ObjectIterator<Object2IntMap.Entry<HashedItem>> iter = Object2IntMaps.fastIterator(overflow); iter.hasNext(); ) {
-                Object2IntMap.Entry<HashedItem> entry = iter.next();
-                int amount = entry.getIntValue();
-                ItemStack stack = entry.getKey().createStack(amount);
+            for (ObjectIterator<Object2IntMap.Entry<ItemResource>> iter = Object2IntMaps.fastIterator(overflow); iter.hasNext(); ) {
+                Object2IntMap.Entry<ItemResource> entry = iter.next();
+                int toInsert = entry.getIntValue();
                 //Note: Inserting properly handles oversized stacks, so we don't have to handle the case that amount might be greater than
                 // the max stack size here as the different slots will only accept up to the item's max stack size
-                stack = InventoryUtils.insertItem(mainSlots, stack, Action.EXECUTE, AutomationType.INTERNAL);
+                toInsert -= directMainHandler.insert(entry.getKey(), toInsert, transaction, AutomationType.INTERNAL);
                 //Note: We do not need to mark the miner for saving if something gets moved from overflow to a slot as the slot will do so
                 // when it accepts the item, so we can skip marking that we need to save because overflow changed
-                if (stack.isEmpty()) {
+                if (toInsert == 0) {
                     //We were able to fully fit the stack, so we can remove it from our list of overflow
                     iter.remove();
                     recheck = true;
-                } else if (stack.getCount() != amount) {
+                } else if (toInsert < entry.getIntValue()) {
                     //Some was able to fit, update the amount that is actually still part of the overflow
-                    entry.setValue(stack.getCount());
+                    entry.setValue(toInsert);
                 }
             }
             if (recheck) {
@@ -794,13 +720,16 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     }
 
     public void start() {
-        if (getLevel() == null) {
-            return;
+        if (level instanceof ServerLevel serverLevel) {
+            start(serverLevel);
         }
+    }
+
+    public void start(ServerLevel level) {
         if (searcher.state == State.IDLE) {
             BlockPos startingPos = getStartingPos();
             int diameter = getDiameter();
-            searcher.setChunkCache(new MinerRegionCache((ServerLevel) getLevel(), startingPos, startingPos.offset(diameter, getMaxY() - getMinY() + 1, diameter), this.upgradeComponent.isUpgradeInstalled(Upgrade.ANCHOR)));
+            searcher.setChunkCache(new MinerRegionCache(level, startingPos, startingPos.offset(diameter, getMaxY() - getMinY() + 1, diameter), getUpgrades(Upgrade.ANCHOR) > 0));
             searcher.start();
         }
         running = true;
@@ -834,17 +763,21 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
         markForSave();
     }
 
-    public static boolean isSavedReplaceTarget(ItemStack stack, Item target) {
-        //This method is here to make it easier to maintain parity if we change the logic of isReplaceTarget
-        if (stack.getOrDefault(MekanismDataComponents.INVERSE, false)) {
-            Item inverseReplaceTarget = stack.getOrDefault(MekanismDataComponents.REPLACE_STACK, Items.AIR);
-            return inverseReplaceTarget != Items.AIR && inverseReplaceTarget == target;
+    public static boolean isSavedReplaceTarget(ItemAccess itemAccess, ItemResource target) {
+        ItemResource itemType = itemAccess.getResource();
+        if (itemType.isEmpty()) {
+            return false;
         }
-        FilterAware filterAware = stack.get(MekanismDataComponents.FILTER_AWARE);
+        //This method is here to make it easier to maintain parity if we change the logic of isReplaceTarget
+        if (itemType.getOrDefault(MekanismDataComponents.INVERSE, false)) {
+            Item inverseReplaceTarget = itemType.getOrDefault(MekanismDataComponents.REPLACE_STACK, Items.AIR);
+            return inverseReplaceTarget != Items.AIR && target.is(inverseReplaceTarget);
+        }
+        FilterAware filterAware = itemType.get(MekanismDataComponents.FILTER_AWARE);
         return filterAware != null && filterAware.anyEnabledMatch(MinerFilter.class, filter -> filter.replaceTargetMatches(target));
     }
 
-    public boolean isReplaceTarget(Item target) {
+    public boolean isReplaceTarget(ItemResource target) {
         if (inverse) {
             //If we are in inverse mode only check our replace target, and not the filter's replace targets
             // as we don't have a matching filter once we are breaking blocks so there wouldn't actually
@@ -855,20 +788,19 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
         return filterManager.anyEnabledMatch(target, MinerFilter::replaceTargetMatches);
     }
 
-    /**
-     * @apiNote Assumes that inverse is checked before this is called
-     */
-    private boolean inverseReplaceTargetMatches(Item target) {
-        return inverseReplaceTarget != Items.AIR && inverseReplaceTarget == target;
+    /// @apiNote Assumes that inverse is checked before this is called
+    private boolean inverseReplaceTargetMatches(ItemResource target) {
+        return inverseReplaceTarget != Items.AIR && target.is(inverseReplaceTarget);
     }
 
     @Override
-    public void loadAdditional(@NotNull CompoundTag nbt, @NotNull HolderLookup.Provider provider) {
-        super.loadAdditional(nbt, provider);
-        running = nbt.getBoolean(SerializationConstants.RUNNING);
-        delay = nbt.getInt(SerializationConstants.DELAY);
-        numPowering = nbt.getInt(SerializationConstants.NUM_POWERING);
-        NBTUtils.setEnumIfPresent(nbt, SerializationConstants.STATE, State.BY_ID, s -> {
+    public void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
+        running = input.getBooleanOr(SerializationConstants.RUNNING, running);
+        delay = input.getIntOr(SerializationConstants.DELAY, delay);
+        numPowering = input.getIntOr(SerializationConstants.NUM_POWERING, numPowering);
+        //TODO - 26.1: Do we want a codec that also tries to load it from int for legacy data?
+        input.read(SerializationConstants.STATE, State.CODEC).ifPresent(s -> {
             if (!initCalc && s == State.SEARCHING) {
                 //If we loaded and haven't started yet, but we were searching when we saved
                 // pretend we had finished searching so that we will start again on the first tick
@@ -885,34 +817,28 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
 
     @Override
     @Deprecated
-    public void removeComponentsFromTag(@NotNull CompoundTag tag) {
-        super.removeComponentsFromTag(tag);
-        tag.remove(SerializationConstants.NUM_POWERING);
-        tag.remove(SerializationConstants.STATE);
+    public void removeComponentsFromTag(ValueOutput output) {
+        super.removeComponentsFromTag(output);
+        output.discard(SerializationConstants.NUM_POWERING);
+        output.discard(SerializationConstants.STATE);
     }
 
     @Override
-    public void setLevel(@NotNull Level world) {
+    public void setLevel(Level world) {
         super.setLevel(world);
         //Update miner energy as the world height is likely different compared to the old pre 1.18 values
         energyContainer.updateMinerEnergyPerTick();
     }
 
     @Override
-    public void saveAdditional(@NotNull CompoundTag nbtTags, @NotNull HolderLookup.Provider provider) {
-        super.saveAdditional(nbtTags, provider);
-        nbtTags.putBoolean(SerializationConstants.RUNNING, running);
-        nbtTags.putInt(SerializationConstants.DELAY, delay);
-        nbtTags.putInt(SerializationConstants.NUM_POWERING, numPowering);
-        NBTUtils.writeEnum(nbtTags, SerializationConstants.STATE, searcher.state);
-        if (!overflow.isEmpty()) {
-            //Persist any items that are stored as overflow
-            DataResult<Tag> encoded = OverflowAware.CODEC.encodeStart(provider.createSerializationContext(NbtOps.INSTANCE), new OverflowAware(overflow));
-            if (encoded.isSuccess()) {
-                nbtTags.put(SerializationConstants.OVERFLOW, encoded.getOrThrow());
-            } else {
-                encoded.ifError(error -> Mekanism.logger.warn("Failed to encode overflowed items: {}", error.message()));
-            }
+    public void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
+        output.putBoolean(SerializationConstants.RUNNING, running);
+        output.putInt(SerializationConstants.DELAY, delay);
+        output.putInt(SerializationConstants.NUM_POWERING, numPowering);
+        output.store(SerializationConstants.STATE, State.CODEC, searcher.state);
+        if (!overflow.isEmpty()) {//Persist any items that are stored as overflow
+            output.store(SerializationConstants.OVERFLOW, OverflowAware.CODEC, new OverflowAware(overflow));
         }
     }
 
@@ -984,8 +910,8 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     }
 
     @Override
-    protected void notifyComparatorChange() {
-        super.notifyComparatorChange();
+    protected void notifyComparatorChange(Level level) {
+        super.notifyComparatorChange(level);
         Direction facing = getDirection();
         Direction left = MekanismUtils.getLeft(facing);
         BlockBounding boundingBlock = MekanismBlocks.BOUNDING_BLOCK.value();
@@ -1009,67 +935,65 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     }
 
     @Override
-    public void writeSustainedData(HolderLookup.Provider provider, CompoundTag dataMap) {
-        super.writeSustainedData(provider, dataMap);
-        dataMap.putInt(SerializationConstants.RADIUS, getRadius());
-        dataMap.putInt(SerializationConstants.MIN, getMinY());
-        dataMap.putInt(SerializationConstants.MAX, getMaxY());
-        dataMap.putBoolean(SerializationConstants.EJECT, doEject);
-        dataMap.putBoolean(SerializationConstants.PULL, doPull);
-        dataMap.putBoolean(SerializationConstants.SILK_TOUCH, getSilkTouch());
-        dataMap.putBoolean(SerializationConstants.INVERSE, inverse);
+    public void writeSustainedData(ValueOutput output) {
+        super.writeSustainedData(output);
+        output.putInt(SerializationConstants.RADIUS, getRadius());
+        output.putInt(SerializationConstants.MIN, getMinY());
+        output.putInt(SerializationConstants.MAX, getMaxY());
+        output.putBoolean(SerializationConstants.EJECT, doEject);
+        output.putBoolean(SerializationConstants.PULL, doPull);
+        output.putBoolean(SerializationConstants.SILK_TOUCH, getSilkTouch());
+        output.putBoolean(SerializationConstants.INVERSE, inverse);
         if (inverseReplaceTarget != Items.AIR) {
-            NBTUtils.writeRegistryEntry(dataMap, SerializationConstants.REPLACE_TARGET, BuiltInRegistries.ITEM, inverseReplaceTarget);
+            output.store(SerializationConstants.REPLACE_TARGET, BuiltInRegistries.ITEM.byNameCodec(), inverseReplaceTarget);
         }
-        dataMap.putBoolean(SerializationConstants.INVERSE_REQUIRES_REPLACE, inverseRequiresReplacement);
-        filterManager.writeToNBT(provider, dataMap);
+        output.putBoolean(SerializationConstants.INVERSE_REQUIRES_REPLACE, inverseRequiresReplacement);
+        filterManager.serialize(output);
     }
 
     @Override
-    public void readSustainedData(HolderLookup.Provider provider, @NotNull CompoundTag dataMap) {
-        super.readSustainedData(provider, dataMap);
-        setRadius(Math.min(dataMap.getInt(SerializationConstants.RADIUS), MekanismConfig.general.minerMaxRadius.get()));
-        NBTUtils.setIntIfPresent(dataMap, SerializationConstants.MIN, newMinY -> {
-            if (hasLevel() && !isRemote()) {
-                setMinY(Math.max(newMinY, level.getMinBuildHeight()));
+    public void readSustainedData(ValueInput input) {
+        super.readSustainedData(input);
+        setRadius(Math.min(input.getIntOr(SerializationConstants.RADIUS, DEFAULT_RADIUS), MekanismConfig.general.minerMaxRadius.get()));
+        input.getInt(SerializationConstants.MIN).ifPresent(newMinY -> {
+            if (level != null && !level.isClientSide()) {
+                setMinY(Math.max(newMinY, level.getMinY()));
             } else {
                 setMinY(newMinY);
             }
         });
-        NBTUtils.setIntIfPresent(dataMap, SerializationConstants.MAX, newMaxY -> {
-            if (hasLevel() && !isRemote()) {
-                setMaxY(Math.min(newMaxY, level.getMaxBuildHeight() - 1));
+        input.getInt(SerializationConstants.MAX).ifPresent(newMaxY -> {
+            if (level != null && !level.isClientSide()) {
+                setMaxY(Math.min(newMaxY, level.getMaxY()));
             } else {
                 setMaxY(newMaxY);
             }
         });
-        NBTUtils.setBooleanIfPresent(dataMap, SerializationConstants.EJECT, eject -> doEject = eject);
-        NBTUtils.setBooleanIfPresent(dataMap, SerializationConstants.PULL, pull -> doPull = pull);
-        NBTUtils.setBooleanIfPresent(dataMap, SerializationConstants.SILK_TOUCH, this::setSilkTouch);
-        NBTUtils.setBooleanIfPresent(dataMap, SerializationConstants.INVERSE, inverse -> this.inverse = inverse);
-        inverseReplaceTarget = NBTUtils.readRegistryEntry(dataMap, SerializationConstants.REPLACE_TARGET, BuiltInRegistries.ITEM, Items.AIR);
-        NBTUtils.setBooleanIfPresent(dataMap, SerializationConstants.INVERSE_REQUIRES_REPLACE, requiresReplace -> inverseRequiresReplacement = requiresReplace);
-        filterManager.readFromNBT(provider, dataMap);
+        doEject = input.getBooleanOr(SerializationConstants.EJECT, doEject);
+        doPull = input.getBooleanOr(SerializationConstants.PULL, doPull);
+        setSilkTouch(input.getBooleanOr(SerializationConstants.SILK_TOUCH, silkTouch));
+        inverse = input.getBooleanOr(SerializationConstants.INVERSE, inverse);
+        inverseReplaceTarget = input.read(SerializationConstants.REPLACE_TARGET, BuiltInRegistries.ITEM.byNameCodec()).orElse(Items.AIR);
+        inverseRequiresReplacement = input.getBooleanOr(SerializationConstants.INVERSE_REQUIRES_REPLACE, inverseRequiresReplacement);
+        filterManager.deserialize(input);
         //Note: We read the overflow information if it is present in sustained data in order to grab the information from the digital miner item
         // when it is placed or when the BE is loaded from NBT, but the corresponding writing of the data is done in the saveAdditional method
         // as opposed to the writeSustainedData method to ensure that configuration cards do not copy overflow data from one miner to another
-        NBTUtils.setListIfPresent(dataMap, SerializationConstants.OVERFLOW, Tag.TAG_COMPOUND, overflowTag -> {
+        Optional<OverflowAware> overflowAware = input.read(SerializationConstants.OVERFLOW, OverflowAware.CODEC);
+        if (overflowAware.isPresent()) {
             //Clear any existing overflow and read what is the actual overflow from NBT
             overflow.clear();
-            DataResult<Object2IntMap<HashedItem>> decoded = OverflowAware.CODEC.parse(provider.createSerializationContext(NbtOps.INSTANCE), overflowTag)
-                  .map(OverflowAware::overflow);
-            decoded.ifSuccess(overflow::putAll);
-            decoded.ifError(error -> Mekanism.logger.warn("Failed to decode overflowed items: {}", error.message()));
+            overflow.putAll(overflowAware.get().overflow());
             hasOverflow = !overflow.isEmpty();
             //Note: Marking rechecking if any of the overflow can fit probably isn't strictly necessary here as in theory it already tried
             // to insert anything before when it was saving, but it doesn't really hurt and then if the last tick had it get overflow or
             // had the inventory change which caused a save, but the next tick never happened the overflow may actually need to be updated
             recheckOverflow = hasOverflow;
-        });
+        }
     }
 
     @Override
-    protected void collectImplicitComponents(@NotNull DataComponentMap.Builder builder) {
+    protected void collectImplicitComponents(DataComponentMap.Builder builder) {
         super.collectImplicitComponents(builder);
         builder.set(MekanismDataComponents.RADIUS, getRadius());
         builder.set(MekanismDataComponents.MIN_Y, getMinY());
@@ -1084,14 +1008,14 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     }
 
     @Override
-    protected void applyImplicitComponents(@NotNull BlockEntity.DataComponentInput input) {
+    protected void applyImplicitComponents(DataComponentGetter input) {
         super.applyImplicitComponents(input);
         setRadius(Math.min(input.getOrDefault(MekanismDataComponents.RADIUS, radius), MekanismConfig.general.minerMaxRadius.get()));
         int newMinY = input.getOrDefault(MekanismDataComponents.MIN_Y, minY);
         int newMaxY = input.getOrDefault(MekanismDataComponents.MAX_Y, minY);
-        if (level != null && !isRemote()) {
-            setMinY(Math.max(newMinY, level.getMinBuildHeight()));
-            setMaxY(Math.min(newMaxY, level.getMaxBuildHeight() - 1));
+        if (level != null && !level.isClientSide()) {
+            setMinY(Math.max(newMinY, level.getMinY()));
+            setMaxY(Math.min(newMaxY, level.getMaxY()));
         } else {
             setMinY(newMinY);
             setMaxY(newMaxY);
@@ -1120,16 +1044,15 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
         }
     }
 
-    @NotNull
     @Override
-    public List<Component> getInfo(@NotNull Upgrade upgrade) {
+    public List<Component> getInfo(Upgrade upgrade) {
         return UpgradeUtils.getMultScaledInfo(this, upgrade);
     }
 
     @Nullable
     @Override
-    public <T> T getOffsetCapabilityIfEnabled(@NotNull BlockCapability<T, @Nullable Direction> capability, Direction side, @NotNull Vec3i offset) {
-        if (capability == Capabilities.ITEM.block()) {
+    public <T> T getOffsetCapabilityIfEnabled(BlockCapability<T, @Nullable Direction> capability, @Nullable Direction side, Vec3i offset) {
+        if (Capabilities.ITEM.is(capability)) {
             //Get item handler cap directly from here as we disable it entirely for the main block as we only have it enabled from ports
             return Objects.requireNonNull(itemHandlerManager, "Expected to have item handler").resolve(capability, side);
         }
@@ -1138,10 +1061,10 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     }
 
     @Override
-    public boolean isOffsetCapabilityDisabled(@NotNull BlockCapability<?, @Nullable Direction> capability, Direction side, @NotNull Vec3i offset) {
-        if (capability == Capabilities.ITEM.block()) {
+    public boolean isOffsetCapabilityDisabled(BlockCapability<?, @Nullable Direction> capability, @Nullable Direction side, Vec3i offset) {
+        if (Capabilities.ITEM.is(capability)) {
             return notItemPort(side, offset);
-        } else if (EnergyCompatUtils.isEnergyCapability(capability)) {
+        } else if (Capabilities.ENERGY.is(capability)) {
             return notEnergyPort(side, offset);
         }
         //If we are not an item handler or energy capability, and it is a capability that we can support,
@@ -1151,7 +1074,7 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
         return notItemPort(side, offset) && notEnergyPort(side, offset);
     }
 
-    private boolean notItemPort(Direction side, Vec3i offset) {
+    private boolean notItemPort(@Nullable Direction side, Vec3i offset) {
         if (offset.equals(new Vec3i(0, 1, 0))) {
             //If input then disable if wrong face of input
             return side != Direction.UP;
@@ -1164,7 +1087,7 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
         return true;
     }
 
-    private boolean notEnergyPort(Direction side, Vec3i offset) {
+    private boolean notEnergyPort(@Nullable Direction side, Vec3i offset) {
         if (offset.equals(Vec3i.ZERO)) {
             //Disable if it is the bottom port but wrong side of it
             return side != Direction.DOWN;
@@ -1187,9 +1110,7 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
         return chunkLoaderComponent;
     }
 
-    /**
-     * @apiNote Should only be called on the server, but probably won't cause major issues if called on the client
-     */
+    /// @apiNote Should only be called on the server, but probably won't cause major issues if called on the client
     private void updateTargetChunk(@Nullable ChunkPos target) {
         if (!Objects.equals(targetChunk, target)) {
             //Only update the target if it has changed
@@ -1200,13 +1121,13 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
 
     @Override
     public Set<ChunkPos> getChunkSet() {
-        ChunkPos minerChunk = new ChunkPos(worldPosition);
+        ChunkPos minerChunk = ChunkPos.containing(worldPosition);
         if (targetChunk != null) {
             //If we have a target check to make sure it is in the radius (most likely it is)
-            if (SectionPos.blockToSectionCoord(worldPosition.getX() - radius) <= targetChunk.x &&
-                targetChunk.x <= SectionPos.blockToSectionCoord(worldPosition.getX() + radius) &&
-                SectionPos.blockToSectionCoord(worldPosition.getZ() - radius) <= targetChunk.z &&
-                targetChunk.z <= SectionPos.blockToSectionCoord(worldPosition.getZ() + radius)) {
+            if (SectionPos.blockToSectionCoord(worldPosition.getX() - radius) <= targetChunk.x() &&
+                targetChunk.x() <= SectionPos.blockToSectionCoord(worldPosition.getX() + radius) &&
+                SectionPos.blockToSectionCoord(worldPosition.getZ() - radius) <= targetChunk.z() &&
+                targetChunk.z() <= SectionPos.blockToSectionCoord(worldPosition.getZ() + radius)) {
                 // if it is, return the chunks we should be loading, provide the chunk the miner is in
                 // and the chunk that the miner is currently mining
                 //TODO: At some point we may want to change the ticket of the chunk the miner is mining to be
@@ -1226,7 +1147,7 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
         return filterManager;
     }
 
-    public MinerEnergyContainer getEnergyContainer() {
+    public MinerEnergyContainer energyContainer() {
         return energyContainer;
     }
 
@@ -1278,29 +1199,27 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
         filterManager.addContainerTrackers(container);
     }
 
-    @NotNull
     @Override
-    public CompoundTag getReducedUpdateTag(@NotNull HolderLookup.Provider provider) {
-        CompoundTag updateTag = super.getReducedUpdateTag(provider);
-        updateTag.putInt(SerializationConstants.RADIUS, getRadius());
-        updateTag.putInt(SerializationConstants.MIN, getMinY());
-        updateTag.putInt(SerializationConstants.MAX, getMaxY());
-        return updateTag;
+    public void writeReducedUpdatedTag(ValueOutput output) {
+        super.writeReducedUpdatedTag(output);
+        output.putInt(SerializationConstants.RADIUS, getRadius());
+        output.putInt(SerializationConstants.MIN, getMinY());
+        output.putInt(SerializationConstants.MAX, getMaxY());
     }
 
     @Override
-    public void handleUpdateTag(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider provider) {
-        super.handleUpdateTag(tag, provider);
-        NBTUtils.setIntIfPresent(tag, SerializationConstants.RADIUS, this::setRadius);//the client is allowed to use whatever server sends
-        NBTUtils.setIntIfPresent(tag, SerializationConstants.MIN, this::setMinY);
-        NBTUtils.setIntIfPresent(tag, SerializationConstants.MAX, this::setMaxY);
+    public void handleUpdateTag(ValueInput input) {
+        super.handleUpdateTag(input);
+        input.getInt(SerializationConstants.RADIUS).ifPresent(this::setRadius);//the client is allowed to use whatever server sends
+        input.getInt(SerializationConstants.MIN).ifPresent(this::setMinY);
+        input.getInt(SerializationConstants.MAX).ifPresent(this::setMaxY);
     }
 
-    private List<ItemStack> getDrops(ServerLevel level, BlockState state, BlockPos pos) {
+    private List<ItemStack> getDrops(ServerLevel level, BlockState state, BlockPos pos, TransactionContext transaction) {
         if (state.isAir()) {
             return Collections.emptyList();
         }
-        ItemStack stack = ItemAtomicDisassembler.fullyChargedStack();
+        ItemStack stack = ItemAtomicDisassembler.fullyChargedStack(transaction);
         if (getSilkTouch()) {
             Optional<Reference<Enchantment>> silkTouch = level.holder(Enchantments.SILK_TOUCH);
             //noinspection OptionalIsPresent - Capturing lambda
@@ -1309,7 +1228,7 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
             }
         }
         MekFakePlayer dummy = MekFakePlayer.setupFakePlayer(level, this.worldPosition.getX(), this.worldPosition.getY(), this.worldPosition.getZ());
-        dummy.setEmulatingUUID(getOwnerUUID());//pretend to be the owner
+        dummy.setEmulatingData(this);//pretend to be the owner
         List<ItemStack> drops = WorldUtils.getDrops(state, level, pos, WorldUtils.getTileEntity(level, pos), dummy, stack);
         dummy.cleanupFakePlayer(level);
         return drops;
@@ -1326,13 +1245,13 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
         return mainSlots.size();
     }
 
-    @ComputerMethod(methodDescription = "Get the contents of the internal inventory slot. 0 based.")
-    ItemStack getItemInSlot(int slot) throws ComputerException {
+    @WrappingComputerMethod(wrapper = ComputerIInventorySlotWrapper.class, methodNames = "getItemInSlot", docPlaceholder = "internal inventory slot. 0 based")
+    IInventorySlot getCorrespondingSlot(int slot) throws ComputerException {
         int slots = getSlotCount();
         if (slot < 0 || slot >= slots) {
             throw new ComputerException("Slot: '%d' is out of bounds, as this digital miner only has '%d' slots (zero indexed).", slot, slots);
         }
-        return mainSlots.get(slot).getStack();
+        return mainSlots.get(slot);
     }
 
     @ComputerMethod(methodDescription = "Get the state of the Miner's search")
@@ -1365,7 +1284,7 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     @ComputerMethod(nameOverride = "start", requiresPublicSecurity = true, methodDescription = "Attempt to start the mining process")
     void computerStart() throws ComputerException {
         validateSecurityIsPublic();
-        start();
+        start((ServerLevel) validateLevel());
     }
 
     @ComputerMethod(nameOverride = "stop", requiresPublicSecurity = true, methodDescription = "Attempt to stop the mining process")
@@ -1407,7 +1326,7 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     void computerSetMinY(int minY) throws ComputerException {
         validateCanChangeConfiguration();
         if (level != null) {
-            int min = level.getMinBuildHeight();
+            int min = level.getMinY();
             if (minY < min || minY > getMaxY()) {
                 //Validate dimensions even though we can clamp
                 throw new ComputerException("Min Y '%d' is out of range must be between %d and %d. (Inclusive)", minY, min, getMaxY());
@@ -1420,7 +1339,7 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
     void computerSetMaxY(int maxY) throws ComputerException {
         validateCanChangeConfiguration();
         if (level != null) {
-            int max = level.getMaxBuildHeight() - 1;
+            int max = level.getMaxY();
             if (maxY < getMinY() || maxY > max) {
                 //Validate dimensions even though we can clamp
                 throw new ComputerException("Max Y '%d' is out of range must be between %d and %d. (Inclusive)", maxY, getMinY(), max);
@@ -1473,15 +1392,4 @@ public class TileEntityDigitalMiner extends TileEntityMekanism implements IChunk
         return filterManager.removeFilter(filter);
     }
     //End methods IComputerTile
-
-    private static class ItemCount {
-
-        private final ItemStack stack;
-        private int count;
-
-        public ItemCount(ItemStack stack, int count) {
-            this.stack = stack;
-            this.count = count;
-        }
-    }
 }

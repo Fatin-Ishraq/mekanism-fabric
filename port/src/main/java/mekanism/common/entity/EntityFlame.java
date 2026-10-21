@@ -19,6 +19,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -51,9 +52,8 @@ import mekanism.neoshim.neoforge.common.NeoForge;
 import mekanism.neoshim.neoforge.common.util.BlockSnapshot;
 import mekanism.neoshim.neoforge.entity.IEntityWithComplexSpawn;
 import mekanism.neoshim.neoforge.event.EventHooks;
-import mekanism.neoshim.neoforge.event.level.BlockEvent;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.event.level.block.BreakBlockEvent;
+import org.jspecify.annotations.Nullable;
 
 public class EntityFlame extends Projectile implements IEntityWithComplexSpawn {
 
@@ -66,7 +66,7 @@ public class EntityFlame extends Projectile implements IEntityWithComplexSpawn {
 
     @Nullable
     public static EntityFlame create(Level level, LivingEntity owner, InteractionHand hand, FlamethrowerMode mode) {
-        EntityFlame flame = MekanismEntityTypes.FLAME.get().create(level);
+        EntityFlame flame = MekanismEntityTypes.FLAME.get().create(level, EntitySpawnReason.EVENT);
         if (flame == null) {
             return null;
         }
@@ -110,7 +110,7 @@ public class EntityFlame extends Projectile implements IEntityWithComplexSpawn {
             EntityHitResult entityResult = ProjectileUtil.getEntityHitResult(level(), this, localVec, motionVec,
                   getBoundingBox().expandTowards(getDeltaMovement()).inflate(1.0), this::canHitEntity);
             if (entityResult != null && entityResult.getType() == Type.ENTITY) {
-                if (entityResult.getEntity() instanceof Player target && getOwner() instanceof Player owner && !owner.canHarmPlayer(target)) {
+                if (entityResult.getEntity() instanceof Player target && getOwner() instanceof Player ownerPlayer && !ownerPlayer.canHarmPlayer(target)) {
                     hitResult = null;
                 } else {
                     hitResult = entityResult;
@@ -148,13 +148,13 @@ public class EntityFlame extends Projectile implements IEntityWithComplexSpawn {
     }
 
     @Override
-    protected void onHitBlock(@NotNull BlockHitResult blockRayTrace) {
+    protected void onHitBlock(BlockHitResult blockRayTrace) {
         super.onHitBlock(blockRayTrace);
         BlockPos hitPos = blockRayTrace.getBlockPos();
         Direction hitSide = blockRayTrace.getDirection();
         BlockState hitState = level().getBlockState(hitPos);
         boolean hitFluid = !hitState.getFluidState().isEmpty();
-        if (!level().isClientSide && MekanismConfig.general.aestheticWorldDamage.get() && !hitFluid) {
+        if (!level().isClientSide() && MekanismConfig.general.aestheticWorldDamage.get() && !hitFluid) {
             FlamethrowerMode mode = getData(MekanismAttachmentTypes.FLAMETHROWER_MODE);
             if (mode == FlamethrowerMode.HEAT) {
                 Entity owner = getOwner();
@@ -217,10 +217,11 @@ public class EntityFlame extends Projectile implements IEntityWithComplexSpawn {
         ItemStack stack = item.getItem();
         if (!stack.isEmpty()) {//This probably should never be empty but validate it in case
             Level level = level();
-            Optional<RecipeHolder<SmeltingRecipe>> recipe = MekanismRecipeType.getRecipeFor(RecipeType.SMELTING, new SingleRecipeInput(stack), level);
+            SingleRecipeInput input = new SingleRecipeInput(stack);
+            Optional<RecipeHolder<SmeltingRecipe>> recipe = MekanismRecipeType.getRecipeFor(RecipeType.SMELTING, input, level);
             if (recipe.isPresent()) {
-                ItemStack result = recipe.get().value().getResultItem(level.registryAccess());
-                item.setItem(result.copyWithCount(result.getCount() * stack.getCount()));
+                ItemStack result = recipe.get().value().assemble(input);
+                item.setItem(result.copyWithCount(result.count() * stack.count()));
                 item.tickCount = 0;
                 spawnParticlesAt(item.blockPosition());
                 playSound(SoundEvents.FIRE_EXTINGUISH, 1.0F, 1.0F);
@@ -238,19 +239,21 @@ public class EntityFlame extends Projectile implements IEntityWithComplexSpawn {
         if (stack.isEmpty()) {
             return;
         }
+        SingleRecipeInput input = new SingleRecipeInput(stack);
         Optional<RecipeHolder<SmeltingRecipe>> recipe;
         try {
-            recipe = MekanismRecipeType.getRecipeFor(RecipeType.SMELTING, new SingleRecipeInput(stack), level());
+            recipe = MekanismRecipeType.getRecipeFor(RecipeType.SMELTING, input, level());
         } catch (Exception e) {
             return;
         }
         if (recipe.isPresent()) {
-            if (!level().isClientSide) {
-                if (NeoForge.EVENT_BUS.post(new BlockEvent.BreakEvent(level(), blockPos, hitState, shooter)).isCanceled()) {
-                    //We can't break the block exit
-                    return;
-                }
-                ItemStack result = recipe.get().value().getResultItem(level().registryAccess());
+            //TODO - 26.1: Do we need to be firing any of the place methods on the client side now that we also are firing this event on the client side?
+            if (NeoForge.EVENT_BUS.post(new BreakBlockEvent(level(), blockPos, hitState, shooter)).isCanceled()) {
+                //We can't break the block exit
+                return;
+            }
+            if (!level().isClientSide()) {
+                ItemStack result = recipe.get().value().assemble(input);
                 if (!(result.getItem() instanceof BlockItem) || !tryPlace(shooter, blockPos, hitSide, Block.byItem(result.getItem()).defaultBlockState())) {
                     level().removeBlock(blockPos, false);
                     ItemEntity item = new ItemEntity(level(), blockPos.getX() + 0.5, blockPos.getY() + 0.5, blockPos.getZ() + 0.5, result.copy());
@@ -264,11 +267,13 @@ public class EntityFlame extends Projectile implements IEntityWithComplexSpawn {
     }
 
     private void burn(Entity entity) {
-        if (!(entity instanceof ItemEntity) || MekanismConfig.gear.flamethrowerDestroyItems.get()) {
-            //Only actually burn the entity if it is not an item, or we allow destroying items
-            if (entity.hurt(MekanismDamageTypes.FLAMETHROWER.source(registryAccess(), this, getOwner()), DAMAGE)) {
-                //Mirror flame enchant of igniting for 5 seconds
-                entity.igniteForSeconds(5);
+        if (entity.level() instanceof ServerLevel level) {
+            if (!(entity instanceof ItemEntity) || MekanismConfig.gear.flamethrowerDestroyItems.get()) {
+                //Only actually burn the entity if it is not an item, or we allow destroying items
+                if (entity.hurtServer(level, MekanismDamageTypes.FLAMETHROWER.source(registryAccess(), this, getOwner()), DAMAGE)) {
+                    //Mirror flame enchant of igniting for 5 seconds
+                    entity.igniteForSeconds(5);
+                }
             }
         }
     }
@@ -288,7 +293,7 @@ public class EntityFlame extends Projectile implements IEntityWithComplexSpawn {
     }
 
     @Override
-    protected void defineSynchedData(@NotNull SynchedEntityData.Builder builder) {
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
     }
 
     @Override

@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -16,11 +17,11 @@ import mekanism.common.block.attribute.Attributes.AttributeComputerIntegration;
 import mekanism.common.block.attribute.Attributes.AttributeSecurity;
 import mekanism.common.capabilities.Capabilities;
 import mekanism.common.integration.computer.ComputerCapabilityHelper;
-import mekanism.common.integration.energy.EnergyCompatUtils;
 import mekanism.common.registration.MekanismDeferredRegister;
 import mekanism.common.registration.impl.TileEntityTypeRegistryObject.CapabilityData;
 import mekanism.common.tile.base.CapabilityTileEntity;
 import mekanism.common.tile.base.TileEntityMekanism;
+import net.minecraft.SharedConstants;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.Block;
@@ -29,13 +30,11 @@ import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.BlockEntityType.BlockEntitySupplier;
 import mekanism.neoshim.bus.api.IEventBus;
-import mekanism.neoshim.fml.loading.FMLEnvironment;
 import mekanism.neoshim.neoforge.capabilities.BlockCapability;
 import mekanism.neoshim.neoforge.capabilities.ICapabilityProvider;
 import mekanism.neoshim.neoforge.capabilities.RegisterCapabilitiesEvent;
 import mekanism.neoshim.neoforge.registries.DeferredHolder;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class TileEntityTypeDeferredRegister extends MekanismDeferredRegister<BlockEntityType<?>> {
 
@@ -53,8 +52,8 @@ public class TileEntityTypeDeferredRegister extends MekanismDeferredRegister<Blo
               .with(Capabilities.CHEMICAL.block(), CapabilityTileEntity.CHEMICAL_HANDLER_PROVIDER)
               .with(Capabilities.HEAT, CapabilityTileEntity.HEAT_HANDLER_PROVIDER)
               .with(Capabilities.ITEM.block(), CapabilityTileEntity.ITEM_HANDLER_PROVIDER)
-              .with(Capabilities.FLUID.block(), CapabilityTileEntity.FLUID_HANDLER_PROVIDER);
-        EnergyCompatUtils.addBlockCapabilities(builder);
+              .with(Capabilities.FLUID.block(), CapabilityTileEntity.FLUID_HANDLER_PROVIDER)
+              .with(Capabilities.ENERGY.block(), CapabilityTileEntity.ENERGY_HANDLER_PROVIDER);
         if (Mekanism.hooks.computerCompatEnabled()) {
             ComputerCapabilityHelper.addComputerCapabilities(builder, () -> Attribute.has(block, AttributeComputerIntegration.class));
         }
@@ -71,7 +70,7 @@ public class TileEntityTypeDeferredRegister extends MekanismDeferredRegister<Blo
     }
 
     @Override
-    public void register(@NotNull IEventBus bus) {
+    public void register(IEventBus bus) {
         super.register(bus);
         bus.addListener(this::registerCapabilities);
     }
@@ -81,7 +80,7 @@ public class TileEntityTypeDeferredRegister extends MekanismDeferredRegister<Blo
             //Note: All entries should be of this type
             if (entry instanceof TileEntityTypeRegistryObject<?> tileRO) {
                 tileRO.registerCapabilityProviders(event);
-            } else if (!FMLEnvironment.production) {
+            } else if (SharedConstants.IS_RUNNING_IN_IDE) {
                 throw new IllegalStateException("Expected entry to be a TileEntityTypeRegistryObject");
             }
         }
@@ -102,29 +101,27 @@ public class TileEntityTypeDeferredRegister extends MekanismDeferredRegister<Blo
             this.factory = factory;
         }
 
-        public <CAP, CONTEXT> BlockEntityTypeBuilder<BE> withSimple(BlockCapability<CAP, CONTEXT> capability) {
+        public <CAP, CONTEXT extends @Nullable Object> BlockEntityTypeBuilder<BE> withSimple(BlockCapability<CAP, CONTEXT> capability) {
             return withSimple(capability, ConstantPredicates.ALWAYS_TRUE);
         }
 
         @SuppressWarnings("unchecked")
-        public <CAP, CONTEXT> BlockEntityTypeBuilder<BE> withSimple(BlockCapability<CAP, CONTEXT> capability, BooleanSupplier shouldApply) {
+        public <CAP, CONTEXT extends @Nullable Object> BlockEntityTypeBuilder<BE> withSimple(BlockCapability<CAP, CONTEXT> capability, BooleanSupplier shouldApply) {
             return with(capability, (ICapabilityProvider<? super BE, CONTEXT, CAP>) Capabilities.SIMPLE_PROVIDER, shouldApply);
         }
 
-        public <CAP, CONTEXT> BlockEntityTypeBuilder<BE> with(BlockCapability<CAP, CONTEXT> capability,
+        public <CAP, CONTEXT extends @Nullable Object> BlockEntityTypeBuilder<BE> with(BlockCapability<CAP, CONTEXT> capability,
               Function<BlockCapability<CAP, CONTEXT>, ICapabilityProvider<? super BE, CONTEXT, CAP>> provider) {
             return with(capability, provider.apply(capability));
         }
 
-        public <CAP, CONTEXT> BlockEntityTypeBuilder<BE> with(BlockCapability<CAP, CONTEXT> capability, ICapabilityProvider<? super BE, CONTEXT, CAP> provider) {
+        public <CAP, CONTEXT extends @Nullable Object> BlockEntityTypeBuilder<BE> with(BlockCapability<CAP, CONTEXT> capability, ICapabilityProvider<? super BE, CONTEXT, CAP> provider) {
             return with(capability, provider, ConstantPredicates.ALWAYS_TRUE);
         }
 
-        /**
-         * @param shouldApply Determines whether the provider actually be attached to this block entity type. Useful for cases when we want to conditionally apply it
-         *                    based on loaded mods or a block's attributes.
-         */
-        public <CAP, CONTEXT> BlockEntityTypeBuilder<BE> with(BlockCapability<CAP, CONTEXT> capability, ICapabilityProvider<? super BE, CONTEXT, CAP> provider,
+        /// @param shouldApply Determines whether the provider actually be attached to this block entity type. Useful for cases when we want to conditionally apply it
+        /// based on loaded mods or a block's attributes.
+        public <CAP, CONTEXT extends @Nullable Object> BlockEntityTypeBuilder<BE> with(BlockCapability<CAP, CONTEXT> capability, ICapabilityProvider<? super BE, CONTEXT, CAP> provider,
               BooleanSupplier shouldApply) {
             capabilityProviders.add(new CapabilityData<>(capability, provider, shouldApply));
             return this;
@@ -172,7 +169,7 @@ public class TileEntityTypeDeferredRegister extends MekanismDeferredRegister<Blo
         @SuppressWarnings("ConstantConditions")
         public TileEntityTypeRegistryObject<BE> build() {
             //Note: There is no data fixer type as forge does not currently have a way exposing data fixers to mods yet
-            TileEntityTypeRegistryObject<BE> holder = registerMek(block.getId().getPath(), () -> BlockEntityType.Builder.<BE>of(factory, block.value()).build(null));
+            TileEntityTypeRegistryObject<BE> holder = registerMek(block.getId().getPath(), () -> new BlockEntityType<>(factory, Set.of(block.value())));
             holder.tickers(clientTicker, serverTicker);
             holder.capabilities(capabilityProviders.isEmpty() ? null : capabilityProviders);
             return holder;

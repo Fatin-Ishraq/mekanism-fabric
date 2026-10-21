@@ -1,13 +1,13 @@
 package mekanism.common.lib.inventory;
 
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.common.content.transporter.TransporterPathfinder.Destination;
 import mekanism.common.lib.SidedBlockPos;
 import mekanism.common.lib.inventory.TransitRequest.TransitResponse;
-import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.level.Level;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public interface IAdvancedTransportEjector {
 
     @Nullable
@@ -23,7 +23,7 @@ public interface IAdvancedTransportEjector {
 
     void toggleRoundRobin();
 
-    boolean canSendHome(ItemStack stack);
+    boolean canSendHome(Level level, ItemResource itemType, int amount, @Nullable TransactionContext transaction);
 
-    TransitResponse sendHome(TransitRequest request);
+    TransitResponse sendHome(Level level, TransitRequest request, TransactionContext transaction);
 }

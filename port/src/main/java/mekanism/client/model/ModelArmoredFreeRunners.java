@@ -1,7 +1,6 @@
 package mekanism.client.model;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import java.util.List;
 import mekanism.common.Mekanism;
 import net.minecraft.client.model.geom.EntityModelSet;
@@ -10,8 +9,8 @@ import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
 import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
-import net.minecraft.client.renderer.LightTexture;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.util.LightCoordsUtil;
 
 public class ModelArmoredFreeRunners extends ModelFreeRunners {
 
@@ -84,17 +83,29 @@ public class ModelArmoredFreeRunners extends ModelFreeRunners {
         super(root);
         leftParts.addAll(getRenderableParts(root, PLATE_L, TOP_PLATE_L, CONNECTION_L, ARMORED_BRACE_L));
         rightParts.addAll(getRenderableParts(root, PLATE_R, TOP_PLATE_R, CONNECTION_R, ARMORED_BRACE_R));
+        //TODO - 26.1: Figure out how to have the lit parts of the model be rendered as full bright
         litLeftParts = getRenderableParts(root, BATTERY_L);
         litRightParts = getRenderableParts(root, BATTERY_R);
     }
 
     @Override
-    protected void renderLeg(@NotNull PoseStack poseStack, @NotNull VertexConsumer vertexConsumer, int light, int overlayLight, int color, boolean left) {
-        super.renderLeg(poseStack, vertexConsumer, light, overlayLight, color, left);
-        if (left) {
-            renderPartsToBuffer(litLeftParts, poseStack, vertexConsumer, LightTexture.FULL_BRIGHT, overlayLight, color);
+    public void collect(FreeRunnerRenderState state, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int light, int overlayLight, boolean hasEffect) {
+        super.collect(state, poseStack, submitNodeCollector, light, overlayLight, hasEffect);
+        if (state.leftVisible()) {
+            collectParts(litLeftParts, poseStack, getRenderType(), submitNodeCollector, LightCoordsUtil.FULL_BRIGHT, overlayLight, -1, null, hasEffect);
         } else {
-            renderPartsToBuffer(litRightParts, poseStack, vertexConsumer, LightTexture.FULL_BRIGHT, overlayLight, color);
+            collectParts(litRightParts, poseStack, getRenderType(), submitNodeCollector, LightCoordsUtil.FULL_BRIGHT, overlayLight, -1, null, hasEffect);
+        }
+    }
+
+    @Override
+    public void setupAnim(FreeRunnerRenderState state) {
+        super.setupAnim(state);
+        for (ModelPart leftPart : litLeftParts) {
+            leftPart.visible = state.leftVisible();
+        }
+        for (ModelPart rightPart : litRightParts) {
+            rightPart.visible = state.rightVisible();
         }
     }
 }

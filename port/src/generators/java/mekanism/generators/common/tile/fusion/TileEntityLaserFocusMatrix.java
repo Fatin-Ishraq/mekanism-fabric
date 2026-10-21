@@ -1,12 +1,16 @@
 package mekanism.generators.common.tile.fusion;
 
 import mekanism.api.lasers.ILaserReceptor;
+import mekanism.common.lib.transaction.TransactionHelper;
 import mekanism.generators.common.content.fusion.FusionReactorMultiblockData;
 import mekanism.generators.common.registries.GeneratorsBlocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
 
 public class TileEntityLaserFocusMatrix extends TileEntityFusionReactorBlock implements ILaserReceptor {
 
@@ -15,23 +19,29 @@ public class TileEntityLaserFocusMatrix extends TileEntityFusionReactorBlock imp
     }
 
     @Override
-    public void receiveLaserEnergy(long energy) {
+    public int receiveLaserEnergy(int energy, TransactionContext transaction) {
         FusionReactorMultiblockData multiblock = getMultiblock();
         if (multiblock.isFormed()) {
-            multiblock.addTemperatureFromEnergyInput(energy);
+            multiblock.addTemperatureFromEnergyInput(energy, transaction);
+            return energy;
         }
+        return 0;
     }
 
     @Override
-    public InteractionResult onRightClick(Player player) {
-        if (!isRemote() && player.isCreative()) {
+    public InteractionResult onRightClick(Level level, Player player) {
+        if (!level.isClientSide() && player.isCreative()) {
             FusionReactorMultiblockData multiblock = getMultiblock();
             if (multiblock.isFormed()) {
-                multiblock.setPlasmaTemp(1_000_000_000);
-                return InteractionResult.sidedSuccess(isRemote());
+                try (Transaction transaction = TransactionHelper.openTransactionSafe()) {
+                    multiblock.setPlasmaTemp(10 * FusionReactorMultiblockData.BURN_TEMPERATURE, transaction);
+                    transaction.commit();
+                }
+                return InteractionResult.SUCCESS_SERVER;
             }
         }
-        return super.onRightClick(player);
+        //TODO - 26.1: Don't call super on the client side if it was successful?
+        return super.onRightClick(level, player);
     }
 
     @Override

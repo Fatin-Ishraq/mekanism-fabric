@@ -1,6 +1,8 @@
 package mekanism.common.lib;
 
 import mekanism.common.util.StatUtils;
+import net.minecraft.util.ARGB;
+import org.jspecify.annotations.Nullable;
 
 public class Color {
 
@@ -17,6 +19,7 @@ public class Color {
     }
 
     public int r() {
+        //TODO - 26.1: Should this use ARGB.as8BitChannel() to be consistent with it flooring instead of what we are doing which is rounding?
         return (int) Math.round(r * 255D);
     }
 
@@ -69,11 +72,11 @@ public class Color {
     }
 
     public int rgba() {
-        return (r() & 0xFF) << 24 | (g() & 0xFF) << 16 | (b() & 0xFF) << 8 | (a() & 0xFF);
+        return ARGB.color(r(), g(), b(), a());
     }
 
     public int argb() {
-        return (a() & 0xFF) << 24 | rgb();
+        return ARGB.color(a(), r(), g(), b());
     }
 
     public int rgb() {
@@ -92,14 +95,12 @@ public class Color {
         return new int[]{r(), g(), b()};
     }
 
-    /**
-     * Blends this color into another, by a given scale.
-     *
-     * @param to    color to blend with
-     * @param scale a scale (0 -> 1) defining the effect of the second color
-     *
-     * @return blended color
-     */
+    /// Blends this color into another, by a given scale.
+    ///
+    /// @param to    color to blend with
+    /// @param scale a scale (0 -> 1) defining the effect of the second color
+    ///
+    /// @return blended color
     public Color blend(Color to, double scale) {
         return rgbad(r + (to.r - r) * scale,
               g + (to.g - g) * scale,
@@ -203,13 +204,6 @@ public class Color {
         };
     }
 
-    //Works both directions
-    public static int argbToFromABGR(int argb) {
-        int red = argb >> 16 & 0xFF;
-        int blue = argb & 0xFF;
-        return argb & 0xFF00FF00 | blue << 16 | red;
-    }
-
     public double[] hsvArray() {
         double min = StatUtils.min(r, g, b), max = StatUtils.max(r, g, b);
         double delta = max - min;
@@ -232,12 +226,8 @@ public class Color {
         return ret;
     }
 
-    public static int packOpaque(int rgb) {
-        return rgb | 0xFF000000;
-    }
-
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(@Nullable Object obj) {
         if (obj == this) {
             return true;
         }

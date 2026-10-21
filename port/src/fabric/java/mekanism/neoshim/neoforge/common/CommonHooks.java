@@ -1,6 +1,6 @@
 package mekanism.neoshim.neoforge.common;
 
-import mekanism.neoshim.neoforge.event.level.BlockEvent;
+import mekanism.neoshim.neoforge.event.level.block.BreakBlockEvent;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
@@ -24,9 +24,9 @@ public class CommonHooks {
         return CRAFTING_PLAYER.get();
     }
 
-    /** Fires Fabric's PlayerBlockBreakEvents.BEFORE (and the shim BreakEvent); the returned event is cancelled if any listener vetoed. */
-    public static BlockEvent.BreakEvent fireBlockBreak(Level level, GameType gameType, ServerPlayer player, BlockPos pos, BlockState state) {
-        BlockEvent.BreakEvent event = new BlockEvent.BreakEvent(level, pos, state, player);
+    /** Fires Fabric's PlayerBlockBreakEvents.BEFORE (and the shim BreakBlockEvent); the returned event is cancelled if any listener vetoed. */
+    public static BreakBlockEvent fireBlockBreak(Level level, GameType gameType, ServerPlayer player, BlockPos pos, BlockState state) {
+        BreakBlockEvent event = new BreakBlockEvent(level, pos, state, player);
         if (gameType.isBlockPlacingRestricted() && !player.mayBuild()) {
             event.setCanceled(true);
         }
@@ -41,8 +41,9 @@ public class CommonHooks {
     }
 
     public static mekanism.neoshim.neoforge.event.entity.living.LivingShieldBlockEvent onDamageBlock(net.minecraft.world.entity.LivingEntity blocker,
-          mekanism.neoshim.neoforge.common.damagesource.DamageContainer container, boolean originalBlocked) {
-        return NeoForge.EVENT_BUS.post(new mekanism.neoshim.neoforge.event.entity.living.LivingShieldBlockEvent(blocker, container, originalBlocked));
+          mekanism.neoshim.neoforge.common.damagesource.DamageContainer container, float originalBlockedDamage, boolean originalBlocked) {
+        return NeoForge.EVENT_BUS.post(
+              new mekanism.neoshim.neoforge.event.entity.living.LivingShieldBlockEvent(blocker, container, originalBlockedDamage, originalBlocked));
     }
 
     public static boolean tryDispenseShearsHarvestBlock(net.minecraft.core.dispenser.BlockSource source, net.minecraft.world.item.ItemStack stack,

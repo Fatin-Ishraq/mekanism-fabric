@@ -6,7 +6,7 @@ import mekanism.neoshim.bus.api.Event;
 import mekanism.neoshim.fml.event.IModBusEvent;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 public class RegisterEvent extends Event implements IModBusEvent {
@@ -20,7 +20,7 @@ public class RegisterEvent extends Event implements IModBusEvent {
     }
 
     @SuppressWarnings("unchecked")
-    public <T> void register(ResourceKey<? extends Registry<T>> registryKey, ResourceLocation name, Supplier<T> valueSupplier) {
+    public <T> void register(ResourceKey<? extends Registry<T>> registryKey, Identifier name, Supplier<T> valueSupplier) {
         if (this.registryKey.equals(registryKey)) {
             Registry.register((Registry<T>) this.registry, name, valueSupplier.get());
         }
@@ -49,6 +49,6 @@ public class RegisterEvent extends Event implements IModBusEvent {
     @FunctionalInterface
     public interface RegisterHelper<T> {
 
-        void register(ResourceLocation name, T value);
+        void register(Identifier name, T value);
     }
 }

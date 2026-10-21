@@ -14,7 +14,6 @@ import net.minecraft.core.dispenser.DefaultDispenseItemBehavior;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
@@ -26,14 +25,13 @@ import net.minecraft.world.level.block.DispenserBlock;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.NotNull;
 
 public class ItemBalloon extends Item {
 
     private final EnumColor color;
 
-    public ItemBalloon(EnumColor color) {
-        super(new Item.Properties());
+    public ItemBalloon(Item.Properties properties, EnumColor color) {
+        super(properties);
         this.color = color;
         DispenserBlock.registerBehavior(this, new DispenserBehavior(this.color));
     }
@@ -42,29 +40,25 @@ public class ItemBalloon extends Item {
         return color;
     }
 
-    @NotNull
     @Override
-    public InteractionResultHolder<ItemStack> use(Level world, @NotNull Player player, @NotNull InteractionHand hand) {
+    public InteractionResult use(Level world, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        if (!world.isClientSide) {
+        if (!world.isClientSide()) {
             boolean rightHand = MekanismUtils.isRightArm(player, hand);
             Vec3 pos = new Pos3D(rightHand ? -0.4 : 0.4, 0, 0.3).yRot(player.yBodyRot).translate(new Pos3D(player));
             EntityBalloon balloon = EntityBalloon.create(world, pos.x - 0.5, pos.y - 1.25, pos.z - 0.5, color);
             if (balloon == null) {
-                return InteractionResultHolder.fail(stack);
+                return InteractionResult.FAIL;
             }
             world.addFreshEntity(balloon);
             world.gameEvent(player, GameEvent.ENTITY_PLACE, pos);
         }
-        if (!player.isCreative()) {
-            stack.shrink(1);
-        }
-        return InteractionResultHolder.success(stack);
+        stack.consume(1, player);
+        return InteractionResult.SUCCESS_SERVER;
     }
 
-    @NotNull
     @Override
-    public Component getName(@NotNull ItemStack stack) {
+    public Component getName(ItemStack stack) {
         Item item = stack.getItem();
         if (item instanceof ItemBalloon balloon) {
             return TextComponentUtil.build(balloon.getColor(), super.getName(stack));
@@ -72,7 +66,6 @@ public class ItemBalloon extends Item {
         return super.getName(stack);
     }
 
-    @NotNull
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Player player = context.getPlayer();
@@ -97,7 +90,7 @@ public class ItemBalloon extends Item {
             if (WorldUtils.isValidReplaceableBlock(world, null, pos.above()) && WorldUtils.isValidReplaceableBlock(world, null, pos.above(2))) {
                 world.removeBlock(pos.above(), false);
                 world.removeBlock(pos.above(2), false);
-                if (!world.isClientSide) {
+                if (!world.isClientSide()) {
                     EntityBalloon balloon = EntityBalloon.create(world, pos, color);
                     if (balloon == null) {
                         return InteractionResult.FAIL;
@@ -113,17 +106,16 @@ public class ItemBalloon extends Item {
         return InteractionResult.PASS;
     }
 
-    @NotNull
     @Override
-    public InteractionResult interactLivingEntity(@NotNull ItemStack stack, Player player, @NotNull LivingEntity entity, @NotNull InteractionHand hand) {
+    public InteractionResult interactLivingEntity(ItemStack stack, Player player, LivingEntity entity, InteractionHand hand) {
         if (player.isShiftKeyDown()) {
             Level level = player.level();
-            if (!level.isClientSide) {
+            if (!level.isClientSide()) {
                 AABB bound = new AABB(entity.getX() - 0.2, entity.getY() - 0.5, entity.getZ() - 0.2,
                       entity.getX() + 0.2, entity.getY() + entity.getBbHeight() + 4, entity.getZ() + 0.2);
                 List<EntityBalloon> balloonsNear = level.getEntitiesOfClass(EntityBalloon.class, bound);
                 for (EntityBalloon balloon : balloonsNear) {
-                    if (balloon.latchedEntity == entity) {
+                    if (balloon.isLatchedTo(entity)) {
                         return InteractionResult.SUCCESS;
                     }
                 }
@@ -148,9 +140,8 @@ public class ItemBalloon extends Item {
             this.color = color;
         }
 
-        @NotNull
         @Override
-        public ItemStack execute(BlockSource source, @NotNull ItemStack stack) {
+        public ItemStack execute(BlockSource source, ItemStack stack) {
             Direction side = source.state().getValue(DispenserBlock.FACING);
             BlockPos sourcePos = source.pos();
             BlockPos offsetPos = sourcePos.relative(side);
@@ -163,7 +154,7 @@ public class ItemBalloon extends Item {
                 List<EntityBalloon> balloonsNear = source.level().getEntitiesOfClass(EntityBalloon.class, bound);
                 boolean hasBalloon = false;
                 for (EntityBalloon balloon : balloonsNear) {
-                    if (balloon.latchedEntity == entity) {
+                    if (balloon.isLatchedTo(entity)) {
                         hasBalloon = true;
                         break;
                     }
@@ -185,7 +176,7 @@ public class ItemBalloon extends Item {
                     case WEST -> pos = pos.add(-0.5, -1, 0);
                     case EAST -> pos = pos.add(0.5, -1, 0);
                 }
-                if (!source.level().isClientSide) {
+                if (!source.level().isClientSide()) {
                     EntityBalloon balloon = EntityBalloon.create(source.level(), pos.x, pos.y, pos.z, color);
                     if (balloon != null) {
                         source.level().addFreshEntity(balloon);

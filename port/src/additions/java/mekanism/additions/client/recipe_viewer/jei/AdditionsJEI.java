@@ -6,22 +6,20 @@ import mekanism.client.recipe_viewer.jei.JEIAliasHelper;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.registration.IIngredientAliasRegistration;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.resources.Identifier;
 
 @JeiPlugin
 public class AdditionsJEI implements IModPlugin {
 
-    @NotNull
     @Override
-    public ResourceLocation getPluginUid() {
+    public Identifier getPluginUid() {
         //Note: Can't use MekanismTools.rl, as JEI needs this in the constructor and the class may not be loaded yet.
         // we can still reference the modid though because of constant inlining
-        return ResourceLocation.fromNamespaceAndPath(MekanismAdditions.MODID, "jei_plugin");
+        return Identifier.fromNamespaceAndPath(MekanismAdditions.MODID, "jei_plugin");
     }
 
     @Override
-    public void registerIngredientAliases(@NotNull IIngredientAliasRegistration registration) {
+    public void registerIngredientAliases(IIngredientAliasRegistration registration) {
         new AdditionsAliasMapping().addAliases(new JEIAliasHelper(registration));
     }
 }

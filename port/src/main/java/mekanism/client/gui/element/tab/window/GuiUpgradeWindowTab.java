@@ -12,7 +12,7 @@ import mekanism.common.inventory.container.SelectedWindowData.WindowType;
 import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 public class GuiUpgradeWindowTab extends GuiWindowCreatorTab<TileEntityMekanism, GuiUpgradeWindowTab> {
 
@@ -24,8 +24,8 @@ public class GuiUpgradeWindowTab extends GuiWindowCreatorTab<TileEntityMekanism,
     }
 
     @Override
-    protected void colorTab(GuiGraphics guiGraphics) {
-        MekanismRenderer.color(guiGraphics, SpecialColors.TAB_UPGRADE);
+    protected int getTabColor(GuiGraphicsExtractor guiGraphics) {
+        return MekanismRenderer.color(SpecialColors.TAB_UPGRADE);
     }
 
     @Override

@@ -1,24 +1,24 @@
 package mekanism.neoshim.neoforge.client.settings;
 
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.Minecraft;
 
 public enum KeyModifier {
     CONTROL {
         @Override
         public boolean isActive(IKeyConflictContext conflictContext) {
-            return Screen.hasControlDown();
+            return Minecraft.getInstance().hasControlDown();
         }
     },
     SHIFT {
         @Override
         public boolean isActive(IKeyConflictContext conflictContext) {
-            return Screen.hasShiftDown();
+            return Minecraft.getInstance().hasShiftDown();
         }
     },
     ALT {
         @Override
         public boolean isActive(IKeyConflictContext conflictContext) {
-            return Screen.hasAltDown();
+            return Minecraft.getInstance().hasAltDown();
         }
     },
     NONE {

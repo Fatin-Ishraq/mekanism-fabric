@@ -1,7 +1,5 @@
 package mekanism.client.gui.item;
 
-import mekanism.api.energy.IEnergyContainer;
-import mekanism.api.math.MathUtils;
 import mekanism.client.ClientTickHandler;
 import mekanism.client.gui.GuiMekanism;
 import mekanism.client.gui.element.bar.GuiBar.IBarInfoHandler;
@@ -13,28 +11,32 @@ import mekanism.client.gui.element.custom.GuiFrequencySelector.IGuiColorFrequenc
 import mekanism.client.gui.element.custom.GuiFrequencySelector.IItemGuiFrequencySelector;
 import mekanism.client.gui.element.custom.GuiTeleporterStatus;
 import mekanism.common.MekanismLang;
+import mekanism.common.component.containers.type.ContainerType;
 import mekanism.common.content.teleporter.TeleporterFrequency;
 import mekanism.common.inventory.container.item.PortableTeleporterContainer;
 import mekanism.common.inventory.warning.WarningTracker.WarningType;
 import mekanism.common.lib.frequency.FrequencyType;
+import mekanism.common.lib.frequency.FrequencyTypes;
 import mekanism.common.tile.TileEntityTeleporter.TeleporterStatus;
 import mekanism.common.util.text.EnergyDisplay;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import org.jetbrains.annotations.NotNull;
+import mekanism.neoshim.neoforge.transfer.energy.EnergyHandler;
+import org.jspecify.annotations.Nullable;
 
 public class GuiPortableTeleporter extends GuiMekanism<PortableTeleporterContainer> implements IItemGuiFrequencySelector<TeleporterFrequency, PortableTeleporterContainer>,
       IGuiColorFrequencySelector<TeleporterFrequency> {
 
+    @Nullable
     private GuiTeleporterStatus status;
+    @Nullable
     private MekanismButton teleportButton;
 
     public GuiPortableTeleporter(PortableTeleporterContainer container, Inventory inv, Component title) {
-        super(container, inv, title);
-        imageHeight = 172;
+        super(container, inv, title, DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT + 6);
         titleLabelY = 4;
     }
 
@@ -45,18 +47,18 @@ public class GuiPortableTeleporter extends GuiMekanism<PortableTeleporterContain
         addRenderableWidget(new GuiVerticalPowerBar(this, new IBarInfoHandler() {
                   @Override
                   public Component getTooltip() {
-                      IEnergyContainer container = menu.getEnergyContainer();
-                      return container == null ? EnergyDisplay.ZERO.getTextComponent() : EnergyDisplay.of(container).getTextComponent();
+                      EnergyHandler energyHandler = menu.getEnergyHandler();
+                      return energyHandler == null ? EnergyDisplay.ZERO.getTextComponent() : EnergyDisplay.of(energyHandler).getTextComponent();
                   }
 
                   @Override
                   public double getLevel() {
-                      IEnergyContainer container = menu.getEnergyContainer();
-                      return container == null ? 0 : MathUtils.divideToLevel(container.getEnergy(), container.getMaxEnergy());
+                      EnergyHandler energyHandler = menu.getEnergyHandler();
+                      return energyHandler == null ? 0 : ContainerType.ENERGY.divideToLevel(energyHandler);
                   }
               }, 158, 26)
         ).warning(WarningType.NOT_ENOUGH_ENERGY, () -> menu.getStatus() == TeleporterStatus.NOT_ENOUGH_ENERGY);
-        teleportButton = addRenderableWidget(new TranslationButton(this, 42, 147, 92, 20, MekanismLang.BUTTON_TELEPORT, (element, mouseX, mouseY) -> {
+        teleportButton = addRenderableWidget(new TranslationButton(this, 42, 147, 92, 20, MekanismLang.BUTTON_TELEPORT, (element, _, _) -> {
             GuiPortableTeleporter gui = (GuiPortableTeleporter) element.gui();
             TeleporterFrequency frequency = gui.getFrequency();
             if (frequency != null && gui.menu.getStatus().isReady()) {
@@ -80,18 +82,24 @@ public class GuiPortableTeleporter extends GuiMekanism<PortableTeleporterContain
 
     @Override
     public void buttonsUpdated() {
-        teleportButton.active = menu.getStatus().isReady() && getFrequency() != null;
+        if (teleportButton != null) {
+            teleportButton.active = menu.getStatus().isReady() && getFrequency() != null;
+        }
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        renderTitleTextWithOffset(guiGraphics, status.getRelativeRight());
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
+        if (status == null) {
+            renderTitleText(guiGraphics);
+        } else {
+            renderTitleTextWithOffset(guiGraphics, status.getRelativeRight());
+        }
         super.drawForegroundText(guiGraphics, mouseX, mouseY);
     }
 
     @Override
     public FrequencyType<TeleporterFrequency> getFrequencyType() {
-        return FrequencyType.TELEPORTER;
+        return FrequencyTypes.TELEPORTER;
     }
 
     @Override

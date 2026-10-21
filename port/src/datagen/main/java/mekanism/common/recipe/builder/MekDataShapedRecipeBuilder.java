@@ -1,14 +1,14 @@
 package mekanism.common.recipe.builder;
 
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.common.recipe.upgrade.MekanismShapedRecipe;
 import mekanism.common.registration.impl.BlockRegistryObject;
 import net.minecraft.core.Holder;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStackTemplate;
+import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.ShapedRecipe;
+import net.minecraft.world.item.crafting.ShapedRecipePattern;
 
-@NothingNullByDefault
 public class MekDataShapedRecipeBuilder extends ExtendedShapedRecipeBuilder {
 
     private MekDataShapedRecipeBuilder(Holder<Item> result, int count) {
@@ -32,7 +32,7 @@ public class MekDataShapedRecipeBuilder extends ExtendedShapedRecipeBuilder {
     }
 
     @Override
-    protected Recipe<?> wrapRecipe(ShapedRecipe recipe) {
-        return new MekanismShapedRecipe(recipe);
+    protected Recipe<?> wrapRecipe(Recipe.CommonInfo commonInfo, CraftingRecipe.CraftingBookInfo bookInfo, ShapedRecipePattern pattern, ItemStackTemplate result) {
+        return new MekanismShapedRecipe(commonInfo, bookInfo, pattern, result);
     }
 }

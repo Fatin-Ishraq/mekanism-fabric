@@ -9,7 +9,7 @@ import mekanism.neoshim.neoforge.fluids.FluidType;
 import net.minecraft.core.Registry;
 import net.minecraft.network.syncher.EntityDataSerializer;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
  * Registry keys for the NeoForge-only registries Mekanism references. They live in the {@code mekanism_fabric} namespace so they cannot clash
@@ -36,7 +36,7 @@ public class NeoForgeRegistries {
         public static final ResourceKey<Registry<StructureModifier>> STRUCTURE_MODIFIERS = key("structure_modifier");
 
         private static <T> ResourceKey<Registry<T>> key(String name) {
-            return ResourceKey.createRegistryKey(ResourceLocation.fromNamespaceAndPath("mekanism_fabric", "neoforge/" + name));
+            return ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath("mekanism_fabric", "neoforge/" + name));
         }
     }
 }

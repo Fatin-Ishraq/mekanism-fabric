@@ -24,8 +24,10 @@ import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.WorldUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.Containers;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -35,6 +37,7 @@ import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
@@ -46,10 +49,8 @@ import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.level.redstone.Redstone;
-import net.minecraft.world.phys.HitResult;
 import mekanism.neoshim.neoforge.network.PacketDistributor;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public abstract class BlockMekanism extends Block {
 
@@ -60,7 +61,7 @@ public abstract class BlockMekanism extends Block {
 
     @Nullable
     @Override
-    public PushReaction getPistonPushReaction(@NotNull BlockState state) {
+    public PushReaction getPistonPushReaction(BlockState state) {
         if (state.hasBlockEntity()) {
             //Protect against mods like Quark that allow blocks with TEs to be moved
             //TODO: Eventually it would be nice to go through this and maybe even allow some TEs to be moved if they don't strongly
@@ -71,14 +72,14 @@ public abstract class BlockMekanism extends Block {
     }
 
     @Override
-    protected boolean canBeReplaced(@NotNull BlockState state, @NotNull Fluid fluid) {
+    protected boolean canBeReplaced(BlockState state, Fluid fluid) {
         return false;
     }
 
-    @NotNull
     @Override
-    public ItemStack getCloneItemStack(@NotNull BlockState state, @NotNull HitResult target, @NotNull LevelReader world, @NotNull BlockPos pos, @NotNull Player player) {
-        ItemStack stack = super.getCloneItemStack(state, target, world, pos, player);
+    public ItemStack getCloneItemStack(LevelReader world, BlockPos pos, BlockState state, boolean includeData, Player player) {
+        ItemStack stack = super.getCloneItemStack(world, pos, state, includeData, player);
+        //TODO - 26.1: Do we also want to check the includeData field in this if statement?
         if (MekanismConfig.common.copyBlockData.get()) {
             TileEntityUpdateable tile = WorldUtils.getTileEntity(TileEntityUpdateable.class, world, pos);
             if (tile != null) {
@@ -89,7 +90,7 @@ public abstract class BlockMekanism extends Block {
     }
 
     @Override
-    protected boolean triggerEvent(@NotNull BlockState state, @NotNull Level level, @NotNull BlockPos pos, int id, int param) {
+    protected boolean triggerEvent(BlockState state, Level level, BlockPos pos, int id, int param) {
         boolean triggered = super.triggerEvent(state, level, pos, id, param);
         if (this instanceof IHasTileEntity<?> hasTileEntity) {
             return hasTileEntity.triggerBlockEntityEvent(state, level, pos, id, param);
@@ -98,18 +99,17 @@ public abstract class BlockMekanism extends Block {
     }
 
     @Override
-    protected void createBlockStateDefinition(@NotNull StateDefinition.Builder<Block, BlockState> builder) {
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         super.createBlockStateDefinition(builder);
         BlockStateHelper.fillBlockStateContainer(this, builder);
     }
 
     @Nullable
     @Override
-    public BlockState getStateForPlacement(@NotNull BlockPlaceContext context) {
+    public BlockState getStateForPlacement(BlockPlaceContext context) {
         return BlockStateHelper.getStateForPlacement(super.getStateForPlacement(context), context);
     }
 
-    @NotNull
     @Override
     protected FluidState getFluidState(BlockState state) {
         if (state.getBlock() instanceof IStateFluidLoggable fluidLoggable) {
@@ -118,35 +118,29 @@ public abstract class BlockMekanism extends Block {
         return super.getFluidState(state);
     }
 
-    @NotNull
     @Override
-    protected BlockState updateShape(BlockState state, @NotNull Direction facing, @NotNull BlockState facingState, @NotNull LevelAccessor world, @NotNull BlockPos currentPos,
-          @NotNull BlockPos facingPos) {
+    protected BlockState updateShape(BlockState state, LevelReader level, ScheduledTickAccess scheduledTickAccess, BlockPos currentPos,
+          Direction facing, BlockPos facingPos, BlockState facingState, RandomSource random) {
         if (state.getBlock() instanceof IStateFluidLoggable fluidLoggable) {
-            fluidLoggable.updateFluids(state, world, currentPos);
+            fluidLoggable.updateFluids(level, currentPos, state, scheduledTickAccess);
         }
-        return super.updateShape(state, facing, facingState, world, currentPos, facingPos);
+        return super.updateShape(state, level, scheduledTickAccess, currentPos, facing, facingPos, facingState, random);
     }
 
     @Override
-    protected void onRemove(@NotNull BlockState state, @NotNull Level world, @NotNull BlockPos pos, @NotNull BlockState newState, boolean isMoving) {
-        if (!state.is(newState.getBlock())) {
-            AttributeHasBounding hasBounding = Attribute.get(state, AttributeHasBounding.class);
-            if (hasBounding != null) {
-                hasBounding.removeBoundingBlocks(world, pos, state);
-            }
+    protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos, boolean movedByPiston) {
+        super.affectNeighborsAfterRemoval(state, level, pos, movedByPiston);
+        AttributeHasBounding hasBounding = Attribute.get(state, AttributeHasBounding.class);
+        if (hasBounding != null) {
+            hasBounding.removeBoundingBlocks(level, pos, state);
         }
-        if (state.hasBlockEntity() && !state.is(newState.getBlock())) {
-            TileEntityUpdateable tile = WorldUtils.getTileEntity(TileEntityUpdateable.class, world, pos);
-            if (tile != null) {
-                tile.blockRemoved();
-            }
-        }
-        super.onRemove(state, world, pos, newState, isMoving);
+        //TODO - 26.1: I believe this theoretically only needs to happen if it supports comparators?
+        Containers.updateNeighboursAfterDestroy(state, level, pos);
+
     }
 
     @Override
-    public void setPlacedBy(@NotNull Level world, @NotNull BlockPos pos, @NotNull BlockState state, @Nullable LivingEntity placer, @NotNull ItemStack stack) {
+    public void setPlacedBy(Level world, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
         super.setPlacedBy(world, pos, state, placer, stack);
         AttributeHasBounding hasBounding = Attribute.get(state, AttributeHasBounding.class);
         if (hasBounding != null) {
@@ -156,11 +150,11 @@ public abstract class BlockMekanism extends Block {
         if (tile != null) {
             //Note: We call onAdded here rather than in onPlace so that we make sure we can run any client side code and that the
             // tile is present
-            tile.onAdded();
+            tile.onAdded(world);
             if (tile instanceof ISecurityTile securityTile && securityTile.getOwnerUUID() == null && placer != null) {
                 //There was no stored owner that got set, use the placer's id
-                securityTile.setOwnerUUID(placer.getUUID());
-                if (!world.isClientSide) {
+                securityTile.setOwnerUUID(placer.getUUID(), null);
+                if (!world.isClientSide()) {
                     //If the machine doesn't already have an owner, make sure we portray this
                     PacketDistributor.sendToAllPlayers(new PacketSyncSecurity(placer.getUUID()));
                 }
@@ -169,44 +163,40 @@ public abstract class BlockMekanism extends Block {
     }
 
     @Override
-    public void onBlockExploded(@NotNull BlockState state, @NotNull Level world, @NotNull BlockPos pos, @NotNull Explosion explosion) {
-        if (!world.isClientSide) {
-            AttributeMultiblock multiblockAttribute = Attribute.get(state, AttributeMultiblock.class);
-            if (multiblockAttribute != null && explosion instanceof MeltdownExplosion meltdown) {
-                MultiblockData multiblock = multiblockAttribute.getMultiblock(world, pos, meltdown.getMultiblockID());
-                if (multiblock != null) {
-                    multiblock.meltdownHappened(world);
-                }
+    public void onBlockExploded(BlockState state, ServerLevel world, BlockPos pos, Explosion explosion) {
+        AttributeMultiblock multiblockAttribute = Attribute.get(state, AttributeMultiblock.class);
+        if (multiblockAttribute != null && explosion instanceof MeltdownExplosion meltdown) {
+            MultiblockData multiblock = multiblockAttribute.getMultiblock(world, pos, meltdown.getMultiblockID());
+            if (multiblock != null) {
+                multiblock.meltdownHappened(world);
             }
         }
         super.onBlockExploded(state, world, pos, explosion);
     }
 
-    @NotNull
     @Override
-    public BlockState rotate(@NotNull BlockState state, @NotNull LevelAccessor world, @NotNull BlockPos pos, @NotNull Rotation rotation) {
+    public BlockState rotate(BlockState state, LevelAccessor world, BlockPos pos, Rotation rotation) {
         return AttributeStateFacing.rotate(state, world, pos, rotation);
     }
 
-    @NotNull
     @Override
-    protected BlockState rotate(@NotNull BlockState state, @NotNull Rotation rotation) {
+    protected BlockState rotate(BlockState state, Rotation rotation) {
         return AttributeStateFacing.rotate(state, rotation);
     }
 
-    @NotNull
     @Override
-    protected BlockState mirror(@NotNull BlockState state, @NotNull Mirror mirror) {
+    protected BlockState mirror(BlockState state, Mirror mirror) {
         return AttributeStateFacing.mirror(state, mirror);
     }
 
     @Override
-    protected boolean hasAnalogOutputSignal(@NotNull BlockState blockState) {
-        return Attribute.has(blockState.getBlockHolder(), AttributeComparator.class);
+    protected boolean hasAnalogOutputSignal(BlockState blockState) {
+        return Attribute.has(blockState.typeHolder(), AttributeComparator.class);
     }
 
     @Override
-    protected int getAnalogOutputSignal(@NotNull BlockState blockState, @NotNull Level world, @NotNull BlockPos pos) {
+    protected int getAnalogOutputSignal(BlockState blockState, Level world, BlockPos pos, Direction direction) {
+        //TODO - 26.1: Should we add support for direction? Maybe for multiblocks to not output one inside the multiblock or something
         if (hasAnalogOutputSignal(blockState)) {
             BlockEntity tile = WorldUtils.getTileEntity(world, pos);
             //Double-check the tile actually has comparator support
@@ -218,14 +208,12 @@ public abstract class BlockMekanism extends Block {
     }
 
     @Override
-    protected float getDestroyProgress(@NotNull BlockState state, @NotNull Player player, @NotNull BlockGetter blockGetter, @NotNull BlockPos pos) {
+    protected float getDestroyProgress(BlockState state, Player player, BlockGetter blockGetter, BlockPos pos) {
         return getDestroyProgress(state, player, blockGetter, pos, state.hasBlockEntity() ? WorldUtils.getTileEntity(blockGetter, pos) : null);
     }
 
-    /**
-     * Like {@link BlockBehaviour#getDestroyProgress(BlockState, Player, BlockGetter, BlockPos)} except also passes the tile to only have to get it once.
-     */
-    protected float getDestroyProgress(@NotNull BlockState state, @NotNull Player player, @NotNull BlockGetter blockGetter, @NotNull BlockPos pos,
+    /// Like [BlockBehaviour#getDestroyProgress(BlockState, Player, BlockGetter, BlockPos)] except also passes the tile to only have to get it once.
+    protected float getDestroyProgress(BlockState state, Player player, BlockGetter blockGetter, BlockPos pos,
           @Nullable BlockEntity tile) {
         Level level = tile == null ? null : tile.getLevel();
         //Do our best effort to see if we can figure out a corresponding level to look up the security from
@@ -248,7 +236,7 @@ public abstract class BlockMekanism extends Block {
     }
 
     @Override
-    public void animateTick(@NotNull BlockState state, @NotNull Level world, @NotNull BlockPos pos, @NotNull RandomSource random) {
+    public void animateTick(BlockState state, Level world, BlockPos pos, RandomSource random) {
         super.animateTick(state, world, pos, random);
         if (RadiationManager.isGlobalRadiationEnabled()) {//Skip getting the tile if radiation is disabled in the config
             BlockEntity tile = WorldUtils.getTileEntity(world, pos);
@@ -268,13 +256,13 @@ public abstract class BlockMekanism extends Block {
         }
     }
 
-    protected ItemInteractionResult genericClientActivated(ItemStack stack, BlockEntity blockEntity) {
+    protected InteractionResult genericClientActivated(ItemStack stack, BlockEntity blockEntity) {
         if (!Attribute.has(this, AttributeGui.class) && MekanismUtils.canUseAsWrench(stack)) {
             if (blockEntity instanceof ITileRadioactive tileRadioactive && tileRadioactive.getRadiationScale() > 0) {
-                return ItemInteractionResult.FAIL;
+                return InteractionResult.FAIL;
             }
-            return ItemInteractionResult.SUCCESS;
+            return InteractionResult.SUCCESS;
         }
-        return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        return InteractionResult.TRY_WITH_EMPTY_HAND;
     }
 }

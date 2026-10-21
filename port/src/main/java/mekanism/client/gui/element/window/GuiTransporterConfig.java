@@ -24,8 +24,7 @@ import mekanism.common.network.to_server.configuration_update.PacketInputColor;
 import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.tile.interfaces.ISideConfiguration;
 import mekanism.common.util.text.BooleanStateDisplay.OnOff;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 public class GuiTransporterConfig<TILE extends TileEntityMekanism & ISideConfiguration> extends GuiWindow {
 
@@ -33,7 +32,7 @@ public class GuiTransporterConfig<TILE extends TileEntityMekanism & ISideConfigu
 
     public GuiTransporterConfig(IGuiWrapper gui, int x, int y, TILE tile, SelectedWindowData windowData) {
         super(gui, x, y, 156, 119, windowData);
-        if (windowData.type != WindowType.TRANSPORTER_CONFIG) {
+        if (windowData.type() != WindowType.TRANSPORTER_CONFIG) {
             throw new IllegalArgumentException("Transporter configs must have a transporter config window type");
         }
         this.tile = tile;
@@ -42,11 +41,11 @@ public class GuiTransporterConfig<TILE extends TileEntityMekanism & ISideConfigu
               () -> Collections.singletonList(MekanismLang.STRICT_INPUT_ENABLED.translate(OnOff.of(tile.getEjector().hasStrictInput())))));
         addChild(new GuiSlot(SlotType.NORMAL, gui, relativeX + 111, relativeY + 48));
         addChild(new MekanismImageButton(gui, relativeX + 136, relativeY + 6, 14, 16, getButtonLocation("exclamation"),
-              (element, mouseX, mouseY) -> PacketUtils.sendToServer(new PacketGuiInteract(GuiInteraction.STRICT_INPUT, this.tile))))
+              (_, _, _) -> PacketUtils.sendToServer(new PacketGuiInteract(GuiInteraction.STRICT_INPUT, this.tile))))
               .setTooltip(MekanismLang.STRICT_INPUT);
         addChild(new ColorButton(gui, relativeX + 112, relativeY + 49, 16, 16, () -> this.tile.getEjector().getOutputColor(),
-              (element, mouseX, mouseY) -> PacketUtils.sendToServer(new PacketEjectColor(this.tile.getBlockPos(), MekClickType.left(Screen.hasShiftDown()))),
-              (element, mouseX, mouseY) -> PacketUtils.sendToServer(new PacketEjectColor(this.tile.getBlockPos(), MekClickType.RIGHT))));
+              (_, event, _) -> PacketUtils.sendToServer(new PacketEjectColor(this.tile.getBlockPos(), MekClickType.left(event.hasShiftDown()))),
+              (_, _, _) -> PacketUtils.sendToServer(new PacketEjectColor(this.tile.getBlockPos(), MekClickType.RIGHT))));
         addSideDataButton(RelativeSide.BOTTOM, 41, 64 + 16);
         addSideDataButton(RelativeSide.TOP, 41, 34);
         addSideDataButton(RelativeSide.FRONT, 41, 57);
@@ -73,7 +72,7 @@ public class GuiTransporterConfig<TILE extends TileEntityMekanism & ISideConfigu
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         drawTitleText(guiGraphics, MekanismLang.TRANSPORTER_CONFIG.translate(), 5);
         drawScrollingString(guiGraphics, MekanismLang.INPUT.translate(), 18, 105, TextAlignment.CENTER, subheadingTextColor(), 68, 0, false);

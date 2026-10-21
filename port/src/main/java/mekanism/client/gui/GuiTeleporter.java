@@ -9,21 +9,22 @@ import mekanism.common.content.teleporter.TeleporterFrequency;
 import mekanism.common.inventory.container.tile.MekanismTileContainer;
 import mekanism.common.inventory.warning.WarningTracker.WarningType;
 import mekanism.common.lib.frequency.FrequencyType;
+import mekanism.common.lib.frequency.FrequencyTypes;
 import mekanism.common.tile.TileEntityTeleporter;
 import mekanism.common.tile.TileEntityTeleporter.TeleporterStatus;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
 public class GuiTeleporter extends GuiMekanismTile<TileEntityTeleporter, MekanismTileContainer<TileEntityTeleporter>>
       implements ITileGuiFrequencySelector<TeleporterFrequency, TileEntityTeleporter>, IGuiColorFrequencySelector<TeleporterFrequency> {
 
+    @Nullable
     private GuiTeleporterStatus status;
 
     public GuiTeleporter(MekanismTileContainer<TileEntityTeleporter> container, Inventory inv, Component title) {
-        super(container, inv, title);
-        imageHeight += 74;
+        super(container, inv, title, DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT + 74);
         titleLabelY = 4;
         inventoryLabelY = imageHeight - 93;
         dynamicSlots = true;
@@ -33,20 +34,20 @@ public class GuiTeleporter extends GuiMekanismTile<TileEntityTeleporter, Mekanis
     protected void addGuiElements() {
         super.addGuiElements();
         status = addRenderableWidget(new GuiTeleporterStatus(this, () -> getFrequency() != null, () -> tile.status));
-        addRenderableWidget(new GuiVerticalPowerBar(this, tile.getEnergyContainer(), 158, 26))
+        addRenderableWidget(new GuiVerticalPowerBar(this, tile.energyContainer(), 158, 26))
               .warning(WarningType.NOT_ENOUGH_ENERGY, () -> tile.status == TeleporterStatus.NOT_ENOUGH_ENERGY);
         addRenderableWidget(new GuiFrequencySelector<>(this, 14));
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        renderTitleTextWithOffset(guiGraphics, status.getRelativeRight(), tile.getEnergySlotX());
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
+        renderTitleTextWithOffset(guiGraphics, status == null ? 0 : status.getRelativeRight(), tile.getEnergySlotX());
         renderInventoryText(guiGraphics);
         super.drawForegroundText(guiGraphics, mouseX, mouseY);
     }
 
     @Override
     public FrequencyType<TeleporterFrequency> getFrequencyType() {
-        return FrequencyType.TELEPORTER;
+        return FrequencyTypes.TELEPORTER;
     }
 }

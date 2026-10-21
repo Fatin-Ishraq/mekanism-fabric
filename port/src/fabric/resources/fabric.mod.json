@@ -60,174 +60,189 @@
       }
     },
     "loom:injected_interfaces": {
-      "net/minecraft/class_1792": [
+      "net/minecraft/world/item/Item": [
         "mekanism/neoshim/neoforge/common/extensions/IItemExtension"
       ],
-      "net/minecraft/class_1799": [
+      "net/minecraft/world/item/ItemStack": [
         "mekanism/neoshim/neoforge/common/extensions/IItemStackExtension",
         "mekanism/neoshim/neoforge/common/extensions/IMutableDataComponentHolderExtension"
       ],
-      "net/minecraft/class_9322": [
+      "net/minecraft/world/item/ItemInstance": [
+        "mekanism/neoshim/neoforge/common/extensions/ItemInstanceExtension"
+      ],
+      "net/minecraft/core/component/DataComponentGetter": [
+        "mekanism/neoshim/neoforge/common/extensions/IDataComponentGetterExtension"
+      ],
+      "net/minecraft/core/component/DataComponentHolder": [
         "mekanism/neoshim/neoforge/common/extensions/IDataComponentHolderExtension"
       ],
-      "net/minecraft/class_9323$class_9324": [
+      "net/minecraft/resources/ResourceKey": [
+        "mekanism/neoshim/neoforge/common/extensions/IResourceKeyExtension"
+      ],
+      "net/minecraft/resources/Identifier": [
+        "mekanism/neoshim/neoforge/common/extensions/IResourceLocationExtension"
+      ],
+      "net/minecraft/core/component/DataComponentMap$Builder": [
         "mekanism/neoshim/neoforge/common/extensions/IDataComponentMapBuilderExtension"
       ],
-      "net/minecraft/class_9326$class_9327": [
+      "net/minecraft/core/component/DataComponentPatch$Builder": [
         "mekanism/neoshim/neoforge/common/extensions/IDataComponentPatchBuilderExtension"
       ],
-      "net/minecraft/class_2586$class_9473": [
-        "mekanism/neoshim/neoforge/common/extensions/IBlockEntityDataComponentInputExtension"
-      ],
-      "net/minecraft/class_1792$class_1793": [
+      "net/minecraft/world/item/Item$Properties": [
         "mekanism/neoshim/neoforge/common/extensions/IItemPropertiesExtension"
       ],
-      "net/minecraft/class_2248": [
+      "net/minecraft/world/level/block/Block": [
         "mekanism/neoshim/neoforge/common/extensions/IBlockExtension"
       ],
-      "net/minecraft/class_4970$class_4971": [
+      "net/minecraft/world/level/block/state/BlockBehaviour$BlockStateBase": [
         "mekanism/neoshim/neoforge/common/extensions/IBlockStateExtension"
       ],
-      "net/minecraft/class_3611": [
+      "net/minecraft/world/level/material/Fluid": [
         "mekanism/neoshim/neoforge/common/extensions/IFluidExtension"
       ],
-      "net/minecraft/class_3610": [
+      "net/minecraft/world/level/material/FluidState": [
         "mekanism/neoshim/neoforge/common/extensions/IFluidStateExtension"
       ],
-      "net/minecraft/class_1937": [
+      "net/minecraft/world/level/Level": [
         "mekanism/neoshim/neoforge/common/extensions/ILevelExtension",
         "mekanism/neoshim/neoforge/attachment/IAttachmentHolder"
       ],
-      "net/minecraft/class_7225$class_7874": [
+      "net/minecraft/core/HolderLookup$Provider": [
         "mekanism/neoshim/neoforge/common/extensions/IHolderLookupProviderExtension"
       ],
-      "net/minecraft/class_4538": [
+      "net/minecraft/world/level/LevelReader": [
         "mekanism/neoshim/neoforge/common/extensions/ILevelReaderExtension"
       ],
-      "net/minecraft/class_1297": [
+      "net/minecraft/world/level/BlockGetter": [
+        "mekanism/neoshim/neoforge/common/extensions/IBlockGetterExtension"
+      ],
+      "net/minecraft/world/entity/Entity": [
         "mekanism/neoshim/neoforge/common/extensions/IEntityExtension",
         "mekanism/neoshim/neoforge/attachment/IAttachmentHolder"
       ],
-      "net/minecraft/class_1309": [
+      "net/minecraft/world/entity/LivingEntity": [
         "mekanism/neoshim/neoforge/common/extensions/ILivingEntityExtension"
       ],
-      "net/minecraft/class_1657": [
+      "net/minecraft/world/entity/player/Player": [
         "mekanism/neoshim/neoforge/common/extensions/IPlayerExtension"
       ],
-      "net/minecraft/class_2586": [
+      "net/minecraft/world/level/block/entity/BlockEntity": [
         "mekanism/neoshim/neoforge/common/extensions/IBlockEntityExtension",
         "mekanism/neoshim/neoforge/attachment/IAttachmentHolder"
       ],
-      "net/minecraft/class_2791": [
+      "net/minecraft/world/level/chunk/ChunkAccess": [
         "mekanism/neoshim/neoforge/attachment/IAttachmentHolder"
       ],
-      "net/minecraft/class_6880": [
+      "net/minecraft/core/Holder": [
         "mekanism/neoshim/neoforge/common/extensions/IHolderExtension<TT;>"
       ],
-      "net/minecraft/class_2378": [
+      "net/minecraft/core/Registry": [
         "mekanism/neoshim/neoforge/common/extensions/IRegistryExtension<TT;>"
       ],
-      "net/minecraft/class_1856": [
+      "net/minecraft/world/item/crafting/Ingredient": [
         "mekanism/neoshim/neoforge/common/extensions/IIngredientExtension"
       ],
-      "net/minecraft/class_1293": [
+      "net/minecraft/util/random/WeightedList$Builder": [
+        "mekanism/neoshim/neoforge/common/extensions/IWeightedListBuilderExtension<TE;>"
+      ],
+      "net/minecraft/world/effect/MobEffectInstance": [
         "mekanism/neoshim/neoforge/common/extensions/IMobEffectInstanceExtension"
       ],
-      "net/minecraft/class_1299": [
+      "net/minecraft/world/entity/EntityType": [
         "mekanism/neoshim/neoforge/common/extensions/IEntityTypeExtension"
       ],
-      "net/minecraft/class_1959": [
+      "net/minecraft/world/level/biome/Biome": [
         "mekanism/neoshim/neoforge/common/extensions/IBiomeExtension"
       ],
-      "net/minecraft/class_4590": [
+      "com/mojang/math/Transformation": [
         "mekanism/neoshim/neoforge/common/extensions/ITransformationExtension"
       ],
-      "net/minecraft/class_3908": [
+      "net/minecraft/world/MenuProvider": [
         "mekanism/neoshim/neoforge/common/extensions/IMenuProviderExtension"
       ],
-      "net/minecraft/class_1735": [
+      "net/minecraft/world/inventory/Slot": [
         "mekanism/neoshim/neoforge/common/extensions/ISlotExtension"
       ],
-      "net/minecraft/class_2263": [
+      "net/minecraft/world/level/block/BucketPickup": [
         "mekanism/neoshim/neoforge/common/extensions/IBucketPickupExtension"
       ],
-      "net/minecraft/class_1538": [
+      "net/minecraft/world/entity/LightningBolt": [
         "mekanism/neoshim/neoforge/common/extensions/ILightningBoltExtension"
       ],
-      "net/minecraft/class_8735": [
+      "net/minecraft/network/protocol/configuration/ServerConfigurationPacketListener": [
         "mekanism/neoshim/neoforge/common/extensions/IServerConfigurationPacketListenerExtension"
       ],
-      "net/minecraft/class_1761": [
+      "net/minecraft/world/item/CreativeModeTab": [
         "mekanism/neoshim/neoforge/common/extensions/ICreativeModeTabExtension"
       ],
-      "net/minecraft/class_1299$class_1300": [
+      "net/minecraft/world/entity/EntityType$Builder": [
         "mekanism/neoshim/neoforge/common/extensions/IEntityTypeBuilderExtension<TT;>"
       ],
-      "net/minecraft/class_1761$class_7913": [
+      "net/minecraft/world/item/CreativeModeTab$Builder": [
         "mekanism/neoshim/neoforge/common/extensions/ICreativeModeTabBuilderExtension"
       ],
-      "net/minecraft/class_5633": [
+      "net/minecraft/world/item/DispensibleContainerItem": [
         "mekanism/neoshim/neoforge/common/extensions/IDispensibleContainerItemExtension"
       ],
-      "net/minecraft/class_2960": [
-        "mekanism/neoshim/neoforge/common/extensions/IResourceLocationExtension"
-      ],
-      "net/minecraft/class_1087": [
-        "mekanism/neoshim/neoforge/client/extensions/IBakedModelExtension"
-      ],
-      "net/minecraft/class_304": [
+      "net/minecraft/client/KeyMapping": [
         "mekanism/neoshim/neoforge/client/extensions/IKeyMappingExtension"
       ],
-      "net/minecraft/class_339": [
+      "net/minecraft/client/gui/components/AbstractWidget": [
         "mekanism/neoshim/neoforge/client/extensions/IAbstractWidgetExtension"
       ],
-      "net/minecraft/class_437": [
+      "net/minecraft/client/gui/screens/Screen": [
         "mekanism/neoshim/neoforge/client/extensions/IScreenExtension"
       ],
-      "net/minecraft/class_465": [
+      "net/minecraft/client/gui/screens/inventory/AbstractContainerScreen": [
         "mekanism/neoshim/neoforge/client/extensions/IAbstractContainerScreenExtension"
       ],
-      "net/minecraft/class_4588": [
+      "com/mojang/blaze3d/vertex/VertexConsumer": [
         "mekanism/neoshim/neoforge/client/extensions/IVertexConsumerExtension"
       ],
-      "net/minecraft/class_777": [
-        "mekanism/neoshim/neoforge/client/extensions/IBakedQuadExtension"
-      ],
-      "net/minecraft/class_806": [
-        "mekanism/neoshim/neoforge/client/extensions/IItemOverridesExtension"
-      ],
-      "net/minecraft/class_1092": [
+      "net/minecraft/client/resources/model/ModelManager": [
         "mekanism/neoshim/neoforge/client/extensions/IModelManagerExtension"
       ],
-      "net/minecraft/class_7775": [
-        "mekanism/neoshim/neoforge/client/extensions/IModelBakerExtension"
-      ],
-      "net/minecraft/class_918": [
-        "mekanism/neoshim/neoforge/client/extensions/IItemRendererExtension"
-      ],
-      "net/minecraft/class_898": [
+      "net/minecraft/client/renderer/entity/EntityRenderDispatcher": [
         "mekanism/neoshim/neoforge/client/extensions/IEntityRenderDispatcherExtension"
       ],
-      "net/minecraft/class_761": [
+      "net/minecraft/client/renderer/LevelRenderer": [
         "mekanism/neoshim/neoforge/client/extensions/ILevelRendererExtension"
       ],
-      "net/minecraft/class_827": [
+      "net/minecraft/client/renderer/blockentity/BlockEntityRenderer": [
         "mekanism/neoshim/neoforge/client/extensions/IBlockEntityRendererExtension<TT;>"
       ],
-      "net/minecraft/class_703": [
+      "net/minecraft/client/particle/Particle": [
         "mekanism/neoshim/neoforge/client/extensions/IParticleExtension"
       ],
-      "net/minecraft/class_727": [
+      "net/minecraft/client/particle/TerrainParticle": [
         "mekanism/neoshim/neoforge/client/extensions/ITerrainParticleExtension"
       ],
-      "net/minecraft/class_702": [
-        "mekanism/neoshim/neoforge/client/extensions/IParticleEngineExtension"
+      "net/minecraft/client/renderer/block/dispatch/BlockStateModel": [
+        "mekanism/neoshim/neoforge/client/extensions/BlockStateModelExtension"
       ],
-      "net/minecraft/class_332": [
-        "mekanism/neoshim/neoforge/client/extensions/IGuiGraphicsExtension"
+      "net/minecraft/client/renderer/block/dispatch/BlockStateModelPart": [
+        "mekanism/neoshim/neoforge/client/extensions/BlockStateModelPartExtension"
       ],
-      "net/minecraft/class_979": [
-        "mekanism/neoshim/neoforge/client/extensions/IElytraLayerExtension<TT;>"
+      "net/minecraft/client/resources/model/geometry/UnbakedGeometry": [
+        "mekanism/neoshim/neoforge/client/extensions/UnbakedGeometryExtension"
+      ],
+      "net/minecraft/client/resources/model/UnbakedModel": [
+        "mekanism/neoshim/neoforge/client/extensions/UnbakedModelExtension"
+      ],
+      "net/minecraft/client/resources/model/ResolvedModel": [
+        "mekanism/neoshim/neoforge/client/extensions/ResolvedModelExtension"
+      ],
+      "net/minecraft/client/resources/model/ModelBaker": [
+        "mekanism/neoshim/neoforge/client/extensions/ModelBakerExtension"
+      ],
+      "net/minecraft/client/resources/model/ModelBakery$BakingResult": [
+        "mekanism/neoshim/neoforge/client/extensions/BakingResultExtension"
+      ],
+      "net/minecraft/world/level/storage/ValueInput": [
+        "mekanism/neoshim/neoforge/common/extensions/IValueInputExtension"
+      ],
+      "net/minecraft/world/level/storage/ValueOutput": [
+        "mekanism/neoshim/neoforge/common/extensions/IValueOutputExtension"
       ]
     }
   }

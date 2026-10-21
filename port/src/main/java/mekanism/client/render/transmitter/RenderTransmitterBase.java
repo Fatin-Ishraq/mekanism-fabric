@@ -7,46 +7,32 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import mekanism.api.annotations.NothingNullByDefault;
-import mekanism.client.model.MekanismModelCache;
-import mekanism.client.render.MekanismRenderer;
-import mekanism.client.render.lib.Quad;
-import mekanism.client.render.lib.QuadUtils;
-import mekanism.client.render.obj.VisibleModelConfiguration;
 import mekanism.client.render.tileentity.MekanismTileEntityRenderer;
-import mekanism.common.Mekanism;
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.tile.transmitter.TileEntityTransmitter;
 import mekanism.common.util.EnumUtils;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.renderer.block.model.ItemOverrides;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.client.resources.model.BlockModelRotation;
-import net.minecraft.client.resources.model.ModelBaker;
-import net.minecraft.client.resources.model.ModelResourceLocation;
+import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.core.Direction;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
-import mekanism.neoshim.neoforge.client.model.data.ModelData;
-import mekanism.neoshim.neoforge.client.model.geometry.IGeometryBakingContext;
-import mekanism.neoshim.neoforge.client.model.geometry.StandaloneGeometryBakingContext;
 import org.joml.Vector3f;
 
-@NothingNullByDefault
-public abstract class RenderTransmitterBase<TRANSMITTER extends TileEntityTransmitter> extends MekanismTileEntityRenderer<TRANSMITTER> {
+//TODO - 26.1 models
+public abstract class RenderTransmitterBase<TRANSMITTER extends TileEntityTransmitter, STATE extends TransmitterRenderState> extends MekanismTileEntityRenderer<TRANSMITTER, STATE> {
 
-    public static final ResourceLocation MODEL_LOCATION = MekanismUtils.getResource(ResourceType.MODEL, "transmitter_contents.obj");
-    private static final ModelResourceLocation MODEL_VARIANT = mekanism.fabric.client.model.StandaloneModels.location(MODEL_LOCATION);
+    public static final Identifier MODEL_LOCATION = MekanismUtils.getResource(ResourceType.MODEL, "transmitter_contents.obj");
+    /*private static final ModelResourceLocation MODEL_VARIANT = ModelResourceLocation.standalone(MODEL_LOCATION);
     private static final IGeometryBakingContext contentsConfiguration = StandaloneGeometryBakingContext.builder()
           .withGui3d(false)
           .withUseBlockLight(false)
           .withUseAmbientOcclusion(false)
-          .build(Mekanism.rl("transmitter_contents"));
+          .build(Mekanism.rl("transmitter_contents"));*/
     private static final Map<ContentsModelData, List<BakedQuad>> contentModelCache = new Object2ObjectOpenHashMap<>();
     private static final Vector3f NORMAL = new Vector3f(1, 1, 1).normalize();
 
@@ -57,7 +43,7 @@ public abstract class RenderTransmitterBase<TRANSMITTER extends TileEntityTransm
     private static List<BakedQuad> getBakedQuads(List<String> visible, TextureAtlasSprite icon, Level world) {
         ContentsModelData modelData = new ContentsModelData(visible, icon);
         List<BakedQuad> modelQuads = contentModelCache.get(modelData);
-        if (modelQuads == null) {
+        /*if (modelQuads == null) {
             ModelBaker baker = Minecraft.getInstance().getModelManager().getModelBakery().new ModelBakerImpl(
                   (modelLoc, material) -> material.sprite(),
                   MODEL_VARIANT
@@ -74,7 +60,7 @@ public abstract class RenderTransmitterBase<TRANSMITTER extends TileEntityTransm
             }
             modelQuads = QuadUtils.bake(unpackedQuads);
             contentModelCache.put(modelData, modelQuads);
-        }
+        }*/
         return modelQuads;
     }
 
@@ -88,7 +74,7 @@ public abstract class RenderTransmitterBase<TRANSMITTER extends TileEntityTransm
         for (Direction side : EnumUtils.DIRECTIONS) {
             list.add(side.getSerializedName() + transmitter.getTransmitter().getConnectionType(side).name());
         }
-        renderModel(transmitter, matrix, builder, MekanismRenderer.getRed(rgb), MekanismRenderer.getGreen(rgb), MekanismRenderer.getBlue(rgb), alpha, light,
+        renderModel(transmitter, matrix, builder, ARGB.redFloat(rgb), ARGB.greenFloat(rgb), ARGB.blueFloat(rgb), alpha, light,
               overlayLight, icon, list);
     }
 
@@ -97,9 +83,9 @@ public abstract class RenderTransmitterBase<TRANSMITTER extends TileEntityTransm
         if (!visible.isEmpty()) {
             Pose entry = matrix.last();
             //Get all the sides
-            for (BakedQuad quad : getBakedQuads(visible, icon, transmitter.getLevel())) {
-                builder.putBulkData(entry, quad, red, green, blue, alpha, light, overlayLight, false);
-            }
+            /*for (BakedQuad quad : getBakedQuads(visible, icon, transmitter.getLevel())) {
+                builder.putBulkData(entry, quad, red, green, blue, alpha, light, overlayLight);
+            }*/
         }
     }
 

@@ -5,26 +5,22 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.functions.ConstantPredicates;
 import mekanism.api.text.IHasTranslationKey;
-import mekanism.common.MekanismLang;
 import net.minecraft.client.KeyMapping;
 import mekanism.neoshim.neoforge.client.settings.IKeyConflictContext;
 import mekanism.neoshim.neoforge.client.settings.KeyConflictContext;
 import mekanism.neoshim.neoforge.client.settings.KeyModifier;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
-@NothingNullByDefault
 public class MekKeyBindingBuilder {
 
     @Nullable
     private String description;
     private IKeyConflictContext keyConflictContext = KeyConflictContext.UNIVERSAL;
     private KeyModifier keyModifier = KeyModifier.NONE;
-    @Nullable
-    private InputConstants.Key key;
-    private String category = MekanismLang.MEKANISM.getTranslationKey();
+    private InputConstants.@Nullable Key key;
+    private KeyMapping.Category category = MekanismKeyHandler.CATEGORY;
     @Nullable
     private BiConsumer<KeyMapping, Boolean> onKeyDown;
     @Nullable
@@ -74,11 +70,7 @@ public class MekKeyBindingBuilder {
         return this;
     }
 
-    public MekKeyBindingBuilder category(IHasTranslationKey category) {
-        return category(Objects.requireNonNull(category, "Category cannot be null.").getTranslationKey());
-    }
-
-    public MekKeyBindingBuilder category(String category) {
+    public MekKeyBindingBuilder category(KeyMapping.Category category) {
         this.category = Objects.requireNonNull(category, "Category cannot be null.");
         return this;
     }
@@ -113,7 +105,7 @@ public class MekKeyBindingBuilder {
               keyConflictContext,
               keyModifier,
               Objects.requireNonNull(key, "Key has not been set"),
-              category,
+              Objects.requireNonNull(category, "Category has not been set"),
               onKeyDown,
               onKeyUp,
               toggleable,

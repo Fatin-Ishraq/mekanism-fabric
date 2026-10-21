@@ -1,19 +1,14 @@
 package mekanism.common.lib.distribution.target;
 
-import mekanism.api.math.MathUtils;
-import mekanism.common.lib.distribution.SplitInfo;
 import mekanism.common.lib.distribution.Target;
 import mekanism.common.lib.distribution.handler.LongHandler;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-public final class LongTarget extends Target<LongHandler, Void> {
-
-    @Override
-    protected void acceptAmount(LongHandler integerHandler, SplitInfo splitInfo, Void resource, long amount) {
-        splitInfo.send(integerHandler.perform(MathUtils.clampToInt(amount), false));
-    }
+public final class LongTarget extends Target<LongHandler, @Nullable Void> {
 
     @Override
-    protected long simulate(LongHandler integerHandler, Void resource, long amount) {
-        return integerHandler.perform(MathUtils.clampToInt(amount), true);
+    protected long accept(LongHandler longHandler, @Nullable Void resource, long amount, TransactionContext transaction) {
+        return longHandler.perform(amount, transaction);
     }
 }

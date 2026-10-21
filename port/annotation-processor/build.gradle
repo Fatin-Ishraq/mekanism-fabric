@@ -17,12 +17,22 @@ repositories {
             includeGroup('org.openzen.zencode')
         }
     }
+    maven {
+        name = 'MojangMeta'
+        url = 'https://maven.neoforged.net/mojang-meta'
+        content {
+            includeModule('net.neoforged', 'minecraft-dependencies')
+        }
+    }
     mavenCentral()
 }
 
 dependencies {
+    //Query the version of GSON and JSpecify used by the version of MC that we are developing for to ensure no extra files have to be downloaded
+    //FABRIC: pinned versions instead of NeoForge's minecraft-dependencies platform (not resolvable from the Fabric build)
+    implementation('org.jspecify:jspecify:1.0.0')
+    implementation('com.google.code.gson:gson:2.13.2')
+
     implementation('org.openzen.zencode:JavaAnnotations:0.3.8')
-    //Version of GSON used by vanilla (and thus packed and already downloaded)
-    implementation('com.google.code.gson:gson:2.10.1')
-    implementation('com.palantir.javapoet:javapoet:0.7.0')
+    implementation('com.palantir.javapoet:javapoet:0.14.0')
 }

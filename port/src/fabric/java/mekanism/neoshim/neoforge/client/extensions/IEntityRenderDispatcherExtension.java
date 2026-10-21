@@ -1,15 +1,8 @@
 package mekanism.neoshim.neoforge.client.extensions;
 
-import java.util.Map;
-import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
-import net.minecraft.client.renderer.entity.EntityRenderer;
-import net.minecraft.client.resources.PlayerSkin;
-import net.minecraft.world.entity.player.Player;
-
-/** Injected into {@link EntityRenderDispatcher}. */
+/**
+ * Injected into {@code EntityRenderDispatcher}. 26.1 moved player skin renderers to {@code PlayerModelType}-keyed maps that vanilla already
+ * exposes internally, so NeoForge's {@code getSkinMap()} accessor has no remaining callers.
+ */
 public interface IEntityRenderDispatcherExtension {
-
-    default Map<PlayerSkin.Model, EntityRenderer<? extends Player>> getSkinMap() {
-        return ((EntityRenderDispatcher) this).playerRenderers;
-    }
 }

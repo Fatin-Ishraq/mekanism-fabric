@@ -1,6 +1,5 @@
 package mekanism.client.particle;
 
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -8,24 +7,27 @@ import net.minecraft.client.particle.FlameParticle;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.SpriteSet;
+import net.minecraft.client.renderer.state.level.QuadParticleRenderState;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.particles.SimpleParticleType;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.util.LightCoordsUtil;
+import net.minecraft.util.RandomSource;
 
 public class JetpackFlameParticle extends FlameParticle {
 
-    private JetpackFlameParticle(ClientLevel world, double posX, double posY, double posZ, double velX, double velY, double velZ) {
-        super(world, posX, posY, posZ, velX, velY, velZ);
+    private JetpackFlameParticle(ClientLevel world, double posX, double posY, double posZ, double velX, double velY, double velZ, TextureAtlasSprite sprite) {
+        super(world, posX, posY, posZ, velX, velY, velZ, sprite);
     }
 
     @Override
-    public int getLightColor(float partialTick) {
-        return 190 + (int) (20F * (1.0F - Minecraft.getInstance().options.gamma().get().floatValue()));
+    public int getLightCoords(float partialTick) {
+        return LightCoordsUtil.withBlock(super.getLightCoords(partialTick), 190 + (int) (20F * (1.0F - Minecraft.getInstance().options.gamma().get().floatValue())));
     }
 
     @Override
-    public void render(@NotNull VertexConsumer vertexBuilder, @NotNull Camera renderInfo, float partialTicks) {
+    public void extract(QuadParticleRenderState particleTypeRenderState, Camera camera, float partialTickTime) {
         if (age > 0) {
-            super.render(vertexBuilder, renderInfo, partialTicks);
+            super.extract(particleTypeRenderState, camera, partialTickTime);
         }
     }
 
@@ -38,10 +40,9 @@ public class JetpackFlameParticle extends FlameParticle {
         }
 
         @Override
-        public Particle createParticle(@NotNull SimpleParticleType type, @NotNull ClientLevel world, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed) {
-            JetpackFlameParticle particle = new JetpackFlameParticle(world, x, y, z, xSpeed, ySpeed, zSpeed);
-            particle.pickSprite(this.spriteSet);
-            return particle;
+        public Particle createParticle(SimpleParticleType type, ClientLevel world, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed, RandomSource random) {
+            //TODO - 26.1: Do we need to scale the particle like flame particle's provider does?
+            return new JetpackFlameParticle(world, x, y, z, xSpeed, ySpeed, zSpeed, spriteSet.get(random));
         }
     }
 }

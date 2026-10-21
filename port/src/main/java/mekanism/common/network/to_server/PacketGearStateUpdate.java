@@ -13,7 +13,6 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.util.ByIdMap;
 import mekanism.neoshim.neoforge.network.PacketDistributor;
 import mekanism.neoshim.neoforge.network.handling.IPayloadContext;
-import org.jetbrains.annotations.NotNull;
 
 public record PacketGearStateUpdate(GearType gearType, UUID uuid, boolean state) implements IMekanismPacket {
 
@@ -25,7 +24,6 @@ public record PacketGearStateUpdate(GearType gearType, UUID uuid, boolean state)
           PacketGearStateUpdate::new
     );
 
-    @NotNull
     @Override
     public CustomPacketPayload.Type<PacketGearStateUpdate> type() {
         return TYPE;

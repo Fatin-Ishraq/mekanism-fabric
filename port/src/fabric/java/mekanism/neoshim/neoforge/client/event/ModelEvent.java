@@ -1,47 +1,32 @@
 package mekanism.neoshim.neoforge.client.event;
 
 import java.util.Map;
-import java.util.Set;
 import mekanism.neoshim.bus.api.Event;
 import mekanism.neoshim.fml.event.IModBusEvent;
-import mekanism.neoshim.neoforge.client.model.geometry.IGeometryLoader;
-import mekanism.neoshim.neoforge.client.model.geometry.GeometryLoaderManager;
-import net.minecraft.client.resources.model.BakedModel;
+import mekanism.neoshim.neoforge.client.model.UnbakedModelLoader;
+import mekanism.neoshim.neoforge.client.model.standalone.StandaloneModelKey;
+import mekanism.neoshim.neoforge.client.model.standalone.UnbakedStandaloneModel;
 import net.minecraft.client.resources.model.ModelBakery;
 import net.minecraft.client.resources.model.ModelManager;
-import net.minecraft.client.resources.model.ModelResourceLocation;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
 public abstract class ModelEvent extends Event {
 
-    public static class ModifyBakingResult extends ModelEvent implements IModBusEvent {
-
-        private final Map<ModelResourceLocation, BakedModel> models;
-        private final ModelBakery modelBakery;
-
-        public ModifyBakingResult(Map<ModelResourceLocation, BakedModel> models, ModelBakery modelBakery) {
-            this.models = models;
-            this.modelBakery = modelBakery;
-        }
-
-        public Map<ModelResourceLocation, BakedModel> getModels() {
-            return models;
-        }
-
-        public ModelBakery getModelBakery() {
-            return modelBakery;
-        }
+    protected ModelEvent() {
     }
 
+    /** Fired after the model manager applied a reload. The 26.1 model manager keeps no bakery, so {@link #getModelBakery()} is null. */
     public static class BakingCompleted extends ModelEvent implements IModBusEvent {
 
         private final ModelManager modelManager;
-        private final Map<ModelResourceLocation, BakedModel> models;
+        private final ModelBakery.BakingResult bakingResult;
+        @Nullable
         private final ModelBakery modelBakery;
 
-        public BakingCompleted(ModelManager modelManager, Map<ModelResourceLocation, BakedModel> models, ModelBakery modelBakery) {
+        public BakingCompleted(ModelManager modelManager, ModelBakery.BakingResult bakingResult, @Nullable ModelBakery modelBakery) {
             this.modelManager = modelManager;
-            this.models = models;
+            this.bakingResult = bakingResult;
             this.modelBakery = modelBakery;
         }
 
@@ -49,32 +34,45 @@ public abstract class ModelEvent extends Event {
             return modelManager;
         }
 
-        public Map<ModelResourceLocation, BakedModel> getModels() {
-            return models;
+        public ModelBakery.BakingResult getBakingResult() {
+            return bakingResult;
         }
 
+        @Nullable
         public ModelBakery getModelBakery() {
             return modelBakery;
         }
     }
 
-    public static class RegisterAdditional extends ModelEvent implements IModBusEvent {
+    /** Custom model loaders, selected by the {@code loader} field of a model JSON. */
+    public static class RegisterLoaders extends ModelEvent implements IModBusEvent {
 
-        private final Set<ModelResourceLocation> models;
+        private final Map<Identifier, UnbakedModelLoader<?>> loaders;
 
-        public RegisterAdditional(Set<ModelResourceLocation> models) {
-            this.models = models;
+        public RegisterLoaders(Map<Identifier, UnbakedModelLoader<?>> loaders) {
+            this.loaders = loaders;
         }
 
-        public void register(ModelResourceLocation model) {
-            models.add(model);
+        public void register(Identifier key, UnbakedModelLoader<?> loader) {
+            if (loaders.putIfAbsent(key, loader) != null) {
+                throw new IllegalStateException("Model loader already registered: " + key);
+            }
         }
     }
 
-    public static class RegisterGeometryLoaders extends ModelEvent implements IModBusEvent {
+    /** Models baked on their own (outside block states and items), read back via the baking result's standalone models. */
+    public static class RegisterStandalone extends ModelEvent implements IModBusEvent {
 
-        public void register(ResourceLocation key, IGeometryLoader<?> loader) {
-            GeometryLoaderManager.register(key, loader);
+        private final Map<StandaloneModelKey<?>, UnbakedStandaloneModel<?>> models;
+
+        public RegisterStandalone(Map<StandaloneModelKey<?>, UnbakedStandaloneModel<?>> models) {
+            this.models = models;
+        }
+
+        public <T> void register(StandaloneModelKey<T> key, UnbakedStandaloneModel<T> model) {
+            if (models.putIfAbsent(key, model) != null) {
+                throw new IllegalStateException("Duplicate standalone model registration: " + key);
+            }
         }
     }
 }

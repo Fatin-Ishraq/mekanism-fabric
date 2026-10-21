@@ -1,20 +1,30 @@
 package mekanism.neoshim.neoforge.event.entity;
 
 import mekanism.neoshim.bus.api.ICancellableEvent;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.Nullable;
 
 public class EntityTeleportEvent extends EntityEvent implements ICancellableEvent {
 
     protected double targetX;
     protected double targetY;
     protected double targetZ;
+    @Nullable
+    protected final ServerLevel targetLevel;
 
-    public EntityTeleportEvent(Entity entity, double targetX, double targetY, double targetZ) {
+    public EntityTeleportEvent(Entity entity, @Nullable ServerLevel targetLevel, double targetX, double targetY, double targetZ) {
         super(entity);
+        this.targetLevel = targetLevel;
         this.targetX = targetX;
         this.targetY = targetY;
         this.targetZ = targetZ;
+    }
+
+    @Nullable
+    public ServerLevel getTargetLevel() {
+        return targetLevel;
     }
 
     public double getTargetX() {

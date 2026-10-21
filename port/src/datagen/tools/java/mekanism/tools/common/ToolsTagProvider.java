@@ -16,13 +16,11 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.Item;
 import mekanism.neoshim.neoforge.common.Tags;
-import mekanism.neoshim.neoforge.common.data.ExistingFileHelper;
-import org.jetbrains.annotations.Nullable;
 
 public class ToolsTagProvider extends BaseTagProvider {
 
-    public ToolsTagProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider, @Nullable ExistingFileHelper existingFileHelper) {
-        super(output, lookupProvider, MekanismTools.MODID, existingFileHelper);
+    public ToolsTagProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider) {
+        super(output, lookupProvider, MekanismTools.MODID);
     }
 
     @Override

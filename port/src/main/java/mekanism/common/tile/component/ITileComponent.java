@@ -2,34 +2,32 @@ package mekanism.common.tile.component;
 
 import java.util.List;
 import mekanism.common.inventory.container.MekanismContainer;
-import mekanism.common.util.NBTUtils;
-import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponentType;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import mekanism.neoshim.neoforge.common.util.ValueIOSerializable;
 
-public interface ITileComponent {
+public interface ITileComponent extends ValueIOSerializable {
 
     String getComponentKey();
 
-    default void read(CompoundTag nbtTags, HolderLookup.Provider provider) {
-        NBTUtils.setCompoundIfPresent(nbtTags, getComponentKey(), tag -> deserialize(tag, provider));
+    default void read(ValueInput input) {
+        input.readChild(getComponentKey(), this);
     }
 
-    default void write(CompoundTag nbtTags, HolderLookup.Provider provider) {
-        CompoundTag componentTag = serialize(provider);
-        if (!componentTag.isEmpty()) {
-            nbtTags.put(getComponentKey(), componentTag);
+    default void write(ValueOutput output) {
+        String key = getComponentKey();
+        ValueOutput child = output.child(key);
+        serialize(child);
+        //TODO - 26.1: Do we want to just store it regardless and use output.putChild(getComponentKey(), this)?
+        if (child.isEmpty()) {
+            output.discard(key);
         }
     }
 
-    void deserialize(CompoundTag componentTag, HolderLookup.Provider provider);
-
-    CompoundTag serialize(HolderLookup.Provider provider);
-
-    default void applyImplicitComponents(@NotNull BlockEntity.DataComponentInput input) {
+    default void applyImplicitComponents(DataComponentGetter input) {
     }
 
     default void collectImplicitComponents(DataComponentMap.Builder builder) {
@@ -38,24 +36,20 @@ public interface ITileComponent {
     default void addRemapEntries(List<DataComponentType<?>> remapEntries) {
     }
 
-    /**
-     * Called when the tile is removed, both permanently and during unloads.
-     */
+    /// Called when the tile is removed, both permanently and during unloads.
     default void invalidate() {
     }
 
-    /**
-     * Called when the tile is permanently removed
-     */
+    /// Called when the tile is permanently removed
     default void removed() {
     }
 
     default void trackForMainContainer(MekanismContainer container) {
     }
 
-    default void addToUpdateTag(CompoundTag updateTag) {
+    default void addToUpdateTag(ValueOutput output) {
     }
 
-    default void readFromUpdateTag(CompoundTag updateTag) {
+    default void readFromUpdateTag(ValueInput input) {
     }
 }

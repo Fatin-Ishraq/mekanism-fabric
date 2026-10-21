@@ -5,14 +5,17 @@ import mekanism.client.gui.GuiUtils;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.MekanismUtils.ResourceType;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.input.InputWithModifiers;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
-import org.lwjgl.glfw.GLFW;
 
 public class GuiSlider extends GuiElement {
 
-    private static final ResourceLocation SLIDER = MekanismUtils.getResource(ResourceType.GUI, "smooth_slider.png");
+    private static final Identifier SLIDER = MekanismUtils.getResource(ResourceType.GUI, "smooth_slider.png");
 
     private final DoubleConsumer callback;
 
@@ -32,59 +35,59 @@ public class GuiSlider extends GuiElement {
     }
 
     @Override
-    public void renderBackgroundOverlay(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderBackgroundOverlay(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderBackgroundOverlay(guiGraphics, mouseX, mouseY);
         GuiUtils.fill(guiGraphics, relativeX + 2, relativeY + 3, width - 4, 6, 0xFF555555);
         int posX = (int) (value * (width - 6));
-        guiGraphics.blit(SLIDER, relativeX + posX, relativeY, 0, 0, 7, 12, 12, 12);
+        guiGraphics.blit(RenderPipelines.GUI_TEXTURED, SLIDER, relativeX + posX, relativeY, 0, 0, 7, 12, 12, 12);
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY, int button) {
-        super.onClick(mouseX, mouseY, button);
-        set(mouseX, mouseY);
+    public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
+        super.onClick(event, isDoubleClick);
+        set(event.x());
         setDragging(true);
     }
 
     @Override
-    public void onDrag(double mouseX, double mouseY, double deltaX, double deltaY) {
-        super.onDrag(mouseX, mouseY, deltaX, deltaY);
+    protected void onDrag(MouseButtonEvent event, double deltaX, double deltaY) {
+        super.onDrag(event, deltaX, deltaY);
         if (isDragging()) {
-            set(mouseX, mouseY);
+            set(event.x());
         }
     }
 
     @Override
-    public boolean keyPressed(int key, int i, int j) {
-        if (super.keyPressed(key, i, j)) {
+    public boolean keyPressed(KeyEvent event) {
+        if (super.keyPressed(event)) {
             return true;
         }
         double shift;
-        if (isPreviousButton(key) && value > 0) {
+        if (isPreviousButton(event) && value > 0) {
             shift = -0.01;
-        } else if (isNextButton(key) && value < 1) {
+        } else if (isNextButton(event) && value < 1) {
             shift = 0.01;
         } else {
             return false;
         }
-        value = Mth.clamp(value + shift, 0, 1);
+        value = Math.clamp(value + shift, 0, 1);
         callback.accept(value);
         return true;
     }
 
-    private void set(double mouseX, double mouseY) {
+    private void set(double mouseX) {
         double oldValue = value;
-        value = Mth.clamp(((mouseX - getX() - 2) / (width - 6)), 0, 1);
+        value = Math.clamp((mouseX - getX() - 2) / (width - 6), 0, 1);
         if (!Mth.equal(value, oldValue)) {
             callback.accept(value);
         }
     }
 
-    private boolean isPreviousButton(int key) {
-        return key == GLFW.GLFW_KEY_UP || key == GLFW.GLFW_KEY_LEFT;
+    private boolean isPreviousButton(InputWithModifiers key) {
+        return key.isUp() || key.isLeft();
     }
 
-    private boolean isNextButton(int key) {
-        return key == GLFW.GLFW_KEY_DOWN || key == GLFW.GLFW_KEY_RIGHT;
+    private boolean isNextButton(InputWithModifiers key) {
+        return key.isDown() || key.isRight();
     }
 }

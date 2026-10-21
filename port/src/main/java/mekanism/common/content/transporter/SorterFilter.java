@@ -21,10 +21,12 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.ExtraCodecs;
 import net.minecraft.world.item.Item;
-import mekanism.neoshim.neoforge.items.IItemHandler;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
+import org.jspecify.annotations.Nullable;
 
-public abstract class SorterFilter<FILTER extends SorterFilter<FILTER>> extends BaseFilter<FILTER> {
+public abstract class SorterFilter<FILTER extends SorterFilter<FILTER>> extends BaseFilter<FILTER> implements Finder {
 
     public static final int MAX_LENGTH = 48;
 
@@ -90,13 +92,11 @@ public abstract class SorterFilter<FILTER extends SorterFilter<FILTER>> extends 
         max = filter.max;
     }
 
-    public abstract Finder getFinder();
-
-    public TransitRequest mapInventory(IItemHandler itemHandler, boolean singleItem) {
+    public TransitRequest mapInventory(ResourceHandler<ItemResource> itemHandler, boolean singleItem, @Nullable TransactionContext transaction) {
         if (sizeMode && !singleItem) {
-            return TransitRequest.definedItem(itemHandler, min, max, getFinder());
+            return TransitRequest.definedItem(itemHandler, min, max, this, transaction);
         }
-        return TransitRequest.definedItem(itemHandler, singleItem ? 1 : Item.ABSOLUTE_MAX_STACK_SIZE, getFinder());
+        return TransitRequest.definedItem(itemHandler, singleItem ? 1 : Item.ABSOLUTE_MAX_STACK_SIZE, this, transaction);
     }
 
     @Override
@@ -111,7 +111,7 @@ public abstract class SorterFilter<FILTER extends SorterFilter<FILTER>> extends 
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) {
             return true;
         } else if (o == null || getClass() != o.getClass() || !super.equals(o)) {

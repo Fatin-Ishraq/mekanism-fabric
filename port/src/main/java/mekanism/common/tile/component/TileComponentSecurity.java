@@ -9,27 +9,28 @@ import mekanism.common.integration.computer.annotation.ComputerMethod;
 import mekanism.common.inventory.container.MekanismContainer;
 import mekanism.common.inventory.container.sync.SyncableEnum;
 import mekanism.common.lib.frequency.Frequency.FrequencyIdentity;
-import mekanism.common.lib.frequency.FrequencyType;
+import mekanism.common.lib.frequency.FrequencyTypes;
 import mekanism.common.lib.security.SecurityFrequency;
 import mekanism.common.registries.MekanismDataComponents;
 import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.util.MekanismUtils;
 import mekanism.common.util.NBTUtils;
-import net.minecraft.core.HolderLookup;
+import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponentType;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import org.jspecify.annotations.Nullable;
 
 public class TileComponentSecurity implements ITileComponent {
 
-    /**
-     * TileEntity implementing this component.
-     */
+    /// TileEntity implementing this component.
     public final TileEntityMekanism tile;
 
+    @Nullable
     private UUID ownerUUID;
+    @Nullable
     private String ownerName;
 
     private SecurityMode securityMode = SecurityMode.PUBLIC;
@@ -37,27 +38,30 @@ public class TileComponentSecurity implements ITileComponent {
     public TileComponentSecurity(TileEntityMekanism tile) {
         this.tile = tile;
         tile.addComponent(this);
-        tile.getFrequencyComponent().track(FrequencyType.SECURITY, true, false, true);
+        tile.getFrequencyComponent().track(FrequencyTypes.SECURITY, true, false, true);
     }
 
+    @Nullable
     public SecurityFrequency getFrequency() {
-        return tile.getFrequency(FrequencyType.SECURITY);
+        return tile.getFrequency(FrequencyTypes.SECURITY);
     }
 
+    @Nullable
     @ComputerMethod
     public UUID getOwnerUUID() {
         return ownerUUID;
     }
 
-    public void setOwnerUUID(UUID uuid) {
+    public void setOwnerUUID(@Nullable UUID uuid) {
         ownerUUID = uuid;
         if (ownerUUID == null) {
-            tile.getFrequencyComponent().unsetFrequency(FrequencyType.SECURITY);
+            tile.getFrequencyComponent().unsetFrequency(FrequencyTypes.SECURITY);
         } else {
-            tile.setFrequency(FrequencyType.SECURITY, new FrequencyIdentity(ownerUUID, SecurityMode.PUBLIC, ownerUUID), ownerUUID);
+            tile.setFrequency(FrequencyTypes.SECURITY, new FrequencyIdentity(ownerUUID, SecurityMode.PUBLIC, ownerUUID), ownerUUID);
         }
     }
 
+    @Nullable
     @ComputerMethod
     public String getOwnerName() {
         return ownerName;
@@ -84,9 +88,12 @@ public class TileComponentSecurity implements ITileComponent {
     }
 
     @Override
-    public void applyImplicitComponents(@NotNull BlockEntity.DataComponentInput input) {
+    public void applyImplicitComponents(DataComponentGetter input) {
         securityMode = input.getOrDefault(MekanismDataComponents.SECURITY, securityMode);
-        setOwnerUUID(input.getOrDefault(MekanismDataComponents.OWNER, ownerUUID));
+        UUID owner = input.get(MekanismDataComponents.OWNER);
+        if (owner != null) {
+            setOwnerUUID(owner);
+        }
     }
 
     @Override
@@ -105,24 +112,20 @@ public class TileComponentSecurity implements ITileComponent {
     }
 
     @Override
-    public void deserialize(CompoundTag securityNBT, HolderLookup.Provider provider) {
-        NBTUtils.setEnumIfPresent(securityNBT, SerializationConstants.SECURITY_MODE, SecurityMode.BY_ID, mode -> securityMode = mode);
+    public void deserialize(ValueInput securityInput) {
+        NBTUtils.setEnumIfPresent(securityInput, SerializationConstants.SECURITY_MODE, SecurityMode.BY_ID, mode -> securityMode = mode);
         //Note: We can just set the owner uuid directly as the frequency data should be set already from the frequency component
         // Or if it was cleared due to changing owner data as an item, the block place should update it properly
         //TODO: If this ends up causing issues anywhere we may want to consider ensuring the frequency gets set if it is missing
-        NBTUtils.setUUIDIfPresent(securityNBT, SerializationConstants.OWNER_UUID, uuid -> ownerUUID = uuid);
+        securityInput.read(SerializationConstants.OWNER_UUID, UUIDUtil.CODEC).ifPresent(uuid -> ownerUUID = uuid);
     }
 
     @Override
-    public CompoundTag serialize(HolderLookup.Provider provider) {
-        CompoundTag securityNBT = new CompoundTag();
+    public void serialize(ValueOutput securityOutput) {
         if (securityMode != SecurityMode.PUBLIC) {
-            NBTUtils.writeEnum(securityNBT, SerializationConstants.SECURITY_MODE, securityMode);
+            NBTUtils.writeEnum(securityOutput, SerializationConstants.SECURITY_MODE, securityMode);
         }
-        if (ownerUUID != null) {
-            securityNBT.putUUID(SerializationConstants.OWNER_UUID, ownerUUID);
-        }
-        return securityNBT;
+        securityOutput.storeNullable(SerializationConstants.OWNER_UUID, UUIDUtil.CODEC, ownerUUID);
     }
 
     @Override
@@ -131,17 +134,17 @@ public class TileComponentSecurity implements ITileComponent {
     }
 
     @Override
-    public void addToUpdateTag(CompoundTag updateTag) {
+    public void addToUpdateTag(ValueOutput output) {
         if (ownerUUID != null) {
-            updateTag.putUUID(SerializationConstants.OWNER_UUID, ownerUUID);
-            updateTag.putString(SerializationConstants.OWNER_NAME, MekanismUtils.getLastKnownUsername(ownerUUID));
+            output.store(SerializationConstants.OWNER_UUID, UUIDUtil.CODEC, ownerUUID);
+            output.putString(SerializationConstants.OWNER_NAME, MekanismUtils.getLastKnownUsername(ownerUUID));
         }
     }
 
     @Override
-    public void readFromUpdateTag(CompoundTag updateTag) {
-        NBTUtils.setUUIDIfPresent(updateTag, SerializationConstants.OWNER_UUID, uuid -> ownerUUID = uuid);
-        NBTUtils.setStringIfPresent(updateTag, SerializationConstants.OWNER_NAME, name -> ownerName = name);
+    public void readFromUpdateTag(ValueInput input) {
+        input.read(SerializationConstants.OWNER_UUID, UUIDUtil.CODEC).ifPresent(uuid -> ownerUUID = uuid);
+        ownerName = input.getString(SerializationConstants.OWNER_NAME).orElse(ownerName);
     }
 
     //Computer related methods

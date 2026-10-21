@@ -2,23 +2,32 @@ package mekanism.tools.common.material;
 
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.common.config.IMekanismConfig;
 import mekanism.common.config.value.CachedFloatValue;
 import mekanism.common.config.value.CachedIntValue;
+import mekanism.tools.common.MekanismTools;
 import mekanism.tools.common.config.ToolsConfigTranslations.MaterialTranslations;
 import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.tags.TagKey;
-import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.item.equipment.ArmorMaterial;
+import net.minecraft.world.item.equipment.ArmorType;
+import net.minecraft.world.item.equipment.EquipmentAsset;
+import net.minecraft.world.item.equipment.EquipmentAssets;
 import net.minecraft.world.level.block.Block;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
-@NothingNullByDefault
 public class MaterialCreator implements BaseMekanismMaterial {
 
     private final BaseMekanismMaterial fallBack;
+    private final ResourceKey<EquipmentAsset> equipmentAsset;
 
     private final CachedIntValue shieldDurability;
     private final CachedFloatValue swordDamage;
@@ -54,11 +63,12 @@ public class MaterialCreator implements BaseMekanismMaterial {
     public MaterialCreator(IMekanismConfig config, ModConfigSpec.Builder builder, BaseMekanismMaterial materialDefaults) {
         fallBack = materialDefaults;
         String toolKey = getRegistryPrefix();
+        equipmentAsset = ResourceKey.create(EquipmentAssets.ROOT_ID, MekanismTools.rl(toolKey));
         MaterialTranslations translations = MaterialTranslations.create(toolKey);
         translations.topLevel().applyToBuilder(builder).push(toolKey);
         toolDurability = CachedIntValue.wrap(config, translations.toolDurability().applyToBuilder(builder)
               .gameRestart()
-              .defineInRange(toolKey + "ToolDurability", materialDefaults.getUses(), 1, Integer.MAX_VALUE));
+              .defineInRange(toolKey + "ToolDurability", materialDefaults.getDurability(), 1, Integer.MAX_VALUE));
         efficiency = CachedFloatValue.wrap(config, translations.efficiency().applyToBuilder(builder)
               .gameRestart()
               .define(toolKey + "Efficiency", (double) materialDefaults.getSpeed()));
@@ -127,28 +137,28 @@ public class MaterialCreator implements BaseMekanismMaterial {
               .defineInRange(toolKey + "KnockbackResistance", materialDefaults.knockbackResistance(), 0, Float.MAX_VALUE));
         bootDurability = CachedIntValue.wrap(config, translations.bootDurability().applyToBuilder(builder)
               .gameRestart()
-              .defineInRange(toolKey + "BootDurability", materialDefaults.getDurabilityForType(ArmorItem.Type.BOOTS), 1, Integer.MAX_VALUE));
+              .defineInRange(toolKey + "BootDurability", materialDefaults.getDurabilityForType(ArmorType.BOOTS), 1, Integer.MAX_VALUE));
         bootArmor = CachedIntValue.wrap(config, translations.bootArmor().applyToBuilder(builder)
               .gameRestart()
-              .defineInRange(toolKey + "BootArmor", materialDefaults.getDefense(ArmorItem.Type.BOOTS), 0, Integer.MAX_VALUE));
+              .defineInRange(toolKey + "BootArmor", materialDefaults.getDefense(ArmorType.BOOTS), 0, Integer.MAX_VALUE));
         leggingDurability = CachedIntValue.wrap(config, translations.leggingDurability().applyToBuilder(builder)
               .gameRestart()
-              .defineInRange(toolKey + "LeggingDurability", materialDefaults.getDurabilityForType(ArmorItem.Type.LEGGINGS), 1, Integer.MAX_VALUE));
+              .defineInRange(toolKey + "LeggingDurability", materialDefaults.getDurabilityForType(ArmorType.LEGGINGS), 1, Integer.MAX_VALUE));
         leggingArmor = CachedIntValue.wrap(config, translations.leggingArmor().applyToBuilder(builder)
               .gameRestart()
-              .defineInRange(toolKey + "LeggingArmor", materialDefaults.getDefense(ArmorItem.Type.LEGGINGS), 0, Integer.MAX_VALUE));
+              .defineInRange(toolKey + "LeggingArmor", materialDefaults.getDefense(ArmorType.LEGGINGS), 0, Integer.MAX_VALUE));
         chestplateDurability = CachedIntValue.wrap(config, translations.chestplateDurability().applyToBuilder(builder)
               .gameRestart()
-              .defineInRange(toolKey + "ChestplateDurability", materialDefaults.getDurabilityForType(ArmorItem.Type.CHESTPLATE), 1, Integer.MAX_VALUE));
+              .defineInRange(toolKey + "ChestplateDurability", materialDefaults.getDurabilityForType(ArmorType.CHESTPLATE), 1, Integer.MAX_VALUE));
         chestplateArmor = CachedIntValue.wrap(config, translations.chestplateArmor().applyToBuilder(builder)
               .gameRestart()
-              .defineInRange(toolKey + "ChestplateArmor", materialDefaults.getDefense(ArmorItem.Type.CHESTPLATE), 0, Integer.MAX_VALUE));
+              .defineInRange(toolKey + "ChestplateArmor", materialDefaults.getDefense(ArmorType.CHESTPLATE), 0, Integer.MAX_VALUE));
         helmetDurability = CachedIntValue.wrap(config, translations.helmetDurability().applyToBuilder(builder)
               .gameRestart()
-              .defineInRange(toolKey + "HelmetDurability", materialDefaults.getDurabilityForType(ArmorItem.Type.HELMET), 1, Integer.MAX_VALUE));
+              .defineInRange(toolKey + "HelmetDurability", materialDefaults.getDurabilityForType(ArmorType.HELMET), 1, Integer.MAX_VALUE));
         helmetArmor = CachedIntValue.wrap(config, translations.helmetArmor().applyToBuilder(builder)
               .gameRestart()
-              .defineInRange(toolKey + "HelmetArmor", materialDefaults.getDefense(ArmorItem.Type.HELMET), 0, Integer.MAX_VALUE));
+              .defineInRange(toolKey + "HelmetArmor", materialDefaults.getDefense(ArmorType.HELMET), 0, Integer.MAX_VALUE));
         builder.pop();
     }
 
@@ -256,7 +266,7 @@ public class MaterialCreator implements BaseMekanismMaterial {
     }
 
     @Override
-    public int getUses() {
+    public int getDurability() {
         return toolDurability.get();
     }
 
@@ -271,12 +281,12 @@ public class MaterialCreator implements BaseMekanismMaterial {
     }
 
     @Override
-    public TagKey<Block> getIncorrectBlocksForDrops() {
-        return fallBack.getIncorrectBlocksForDrops();
+    public TagKey<Block> incorrectBlocksForDrops() {
+        return fallBack.incorrectBlocksForDrops();
     }
 
     @Override
-    public int getDurabilityForType(ArmorItem.Type armorType) {
+    public int getDurabilityForType(ArmorType armorType) {
         return switch (armorType) {
             case BOOTS -> bootDurability.get();
             case LEGGINGS -> leggingDurability.get();
@@ -286,7 +296,7 @@ public class MaterialCreator implements BaseMekanismMaterial {
     }
 
     @Override
-    public int getDefense(ArmorItem.Type armorType) {
+    public int getDefense(ArmorType armorType) {
         return switch (armorType) {
             case BOOTS -> bootArmor.get();
             case LEGGINGS -> leggingArmor.get();
@@ -317,8 +327,8 @@ public class MaterialCreator implements BaseMekanismMaterial {
     }
 
     @Override
-    public Ingredient getRepairIngredient() {
-        return fallBack.getRepairIngredient();
+    public TagKey<Item> getRepairItems() {
+        return fallBack.getRepairItems();
     }
 
     @Override
@@ -334,5 +344,26 @@ public class MaterialCreator implements BaseMekanismMaterial {
     @Override
     public float knockbackResistance() {
         return knockbackResistance.get();
+    }
+
+    public ResourceKey<EquipmentAsset> equipmentAsset() {
+        return equipmentAsset;
+    }
+
+    /// copied and adapted from [ArmorMaterial#createAttributes(ArmorType)]
+    public ItemAttributeModifiers createAttributes(ArmorType type) {
+        int defense = getDefense(type);
+        ItemAttributeModifiers.Builder modifiers = ItemAttributeModifiers.builder();
+        EquipmentSlotGroup slotGroup = EquipmentSlotGroup.bySlot(type.getSlot());
+        Identifier modifierId = Identifier.withDefaultNamespace("armor." + type.getName());
+        modifiers.add(Attributes.ARMOR, new AttributeModifier(modifierId, defense, AttributeModifier.Operation.ADD_VALUE), slotGroup);
+        modifiers.add(Attributes.ARMOR_TOUGHNESS, new AttributeModifier(modifierId, this.toughness(), AttributeModifier.Operation.ADD_VALUE), slotGroup);
+        if (knockbackResistance() > 0.0F) {
+            modifiers.add(
+                  Attributes.KNOCKBACK_RESISTANCE, new AttributeModifier(modifierId, this.knockbackResistance(), AttributeModifier.Operation.ADD_VALUE), slotGroup
+            );
+        }
+
+        return modifiers.build();
     }
 }

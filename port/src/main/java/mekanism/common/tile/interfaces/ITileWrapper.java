@@ -1,21 +1,24 @@
 package mekanism.common.tile.interfaces;
 
-import mekanism.api.Chunk3D;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
+import org.jspecify.annotations.Nullable;
 
 public interface ITileWrapper {
 
     BlockPos getBlockPos();
 
+    @Nullable
     Level getLevel();
 
     default GlobalPos getTileGlobalPos() {
-        return GlobalPos.of(getLevel().dimension(), getBlockPos());
+        return GlobalPos.of(getDimension(), getBlockPos());
     }
 
-    default Chunk3D getTileChunk() {
-        return new Chunk3D(getTileGlobalPos());
+    default ResourceKey<Level> getDimension() {
+        return getLevel().dimension();
     }
+
 }

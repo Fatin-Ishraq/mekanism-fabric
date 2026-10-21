@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import mekanism.api.chemical.Chemical;
 import mekanism.api.chemical.ChemicalStack;
+import mekanism.api.chemical.ChemicalStackTemplate;
 import mekanism.api.recipes.ElectrolysisRecipe.ElectrolysisRecipeOutput;
 import mekanism.api.recipes.MekanismRecipe;
 import mekanism.api.recipes.PressurizedReactionRecipe.PressurizedReactionRecipeOutput;
@@ -34,10 +35,13 @@ import mekanism.common.integration.crafttweaker.CrTUtils;
 import mekanism.common.integration.crafttweaker.chemical.CrTChemicalStack;
 import mekanism.common.integration.crafttweaker.chemical.ICrTChemicalStack;
 import net.minecraft.core.Holder;
+import net.minecraft.core.TypedInstance;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
+import mekanism.neoshim.neoforge.fluids.FluidStackTemplate;
 
 public abstract class MekanismRecipeHandler<RECIPE extends MekanismRecipe<?>> implements IRecipeHandler<RECIPE> {
 
@@ -46,7 +50,7 @@ public abstract class MekanismRecipeHandler<RECIPE extends MekanismRecipe<?>> im
     @Override
     public abstract <U extends Recipe<?>> boolean doesConflict(final IRecipeManager<? super RECIPE> manager, final RECIPE recipe, final U other);
 
-    protected <TYPE, INGREDIENT extends InputIngredient<TYPE>> boolean ingredientConflicts(INGREDIENT a, INGREDIENT b) {
+    protected <TYPE, STACK extends TypedInstance<TYPE>, INGREDIENT extends InputIngredient<TYPE, STACK>> boolean ingredientConflicts(INGREDIENT a, INGREDIENT b) {
         return a.getRepresentations().stream().anyMatch(b::testType);
     }
 
@@ -66,7 +70,7 @@ public abstract class MekanismRecipeHandler<RECIPE extends MekanismRecipe<?>> im
               .append(method)
               .append("(\"")
               //Note: Uses path rather than entire location as we only allow adding recipes to the CrT namespace
-              .append(recipe.id().getPath())
+              .append(recipe.id().identifier().getPath())
               .append('"');
         for (Object param : params) {
             if (param != SKIP_OPTIONAL_PARAM) {
@@ -77,18 +81,22 @@ public abstract class MekanismRecipeHandler<RECIPE extends MekanismRecipe<?>> im
         return commandString.append(");").toString();
     }
 
-    /**
-     * Super simplified/watered down version of BaseCrTExampleProvider#getConversionRepresentations
-     */
+    /// Super simplified/watered down version of BaseCrTExampleProvider#getConversionRepresentations
     private String convertParam(Object param) {
         if (param instanceof CommandStringDisplayable displayable) {
             return displayable.getCommandString();
         } else if (param instanceof ItemStack stack) {
             return ItemStackUtil.getCommandString(stack);
+        } else if (param instanceof ItemStackTemplate template) {
+            return ItemStackUtil.getCommandString(template.create());
         } else if (param instanceof FluidStack stack) {
             return IFluidStack.of(stack).getCommandString();
+        } else if (param instanceof FluidStackTemplate template) {
+            return IFluidStack.of(template.create()).getCommandString();
         } else if (param instanceof ChemicalStack stack) {
             return new CrTChemicalStack(stack).getCommandString();
+        } else if (param instanceof ChemicalStackTemplate template) {
+            return new CrTChemicalStack(template.create()).getCommandString();
         } else if (param instanceof Number || param instanceof Boolean) {//Handle integers and the like
             return param.toString();
         } else if (param instanceof ItemStackIngredient ingredient) {
@@ -113,23 +121,20 @@ public abstract class MekanismRecipeHandler<RECIPE extends MekanismRecipe<?>> im
             //Outputs sometimes are as arrays, try wrapping them into a single element
             // eventually we may want to try listing them all somehow?
             return convertParam(longs[0]);
-        } else if (param instanceof ElectrolysisRecipeOutput(ChemicalStack left, ChemicalStack right)) {
+        } else if (param instanceof ElectrolysisRecipeOutput(ChemicalStackTemplate left, ChemicalStackTemplate right)) {
             return convertParam(left) + ", " + convertParam(right);
         }
         //Shouldn't happen
         return "Unimplemented: " + param;
     }
 
-    private static String convertChemicalIngredient(ChemicalIngredient ingredient, long amount) {
+    private static String convertChemicalIngredient(ChemicalIngredient ingredient, int amount) {
         if (ingredient instanceof TagChemicalIngredient tagIngredient) {
             KnownTag<Chemical> tag = CrTUtils.chemicalTags().tag(tagIngredient.tag());
             if (amount == 1) {
                 return tag.getCommandString();
-            } else if (amount > 0 && amount <= Integer.MAX_VALUE) {
-                return tag.withAmount((int) amount).getCommandString();
             }
-            //Tag with amount can only handle up to max int, so we have to do it explicitly if we have more
-            return CrTConstants.CLASS_CHEMICAL_STACK_INGREDIENT + ".from(" + tag.getCommandString() + ", " + amount + ")";
+            return tag.withAmount(amount).getCommandString();
         }
         List<ICrTChemicalStack> list = new ArrayList<>();
         for (Holder<Chemical> chemical : ingredient.getChemicalHolders()) {
@@ -144,14 +149,12 @@ public abstract class MekanismRecipeHandler<RECIPE extends MekanismRecipe<?>> im
         return CrTConstants.CLASS_CHEMICAL_STACK_INGREDIENT + ".from(" + amount + ", " + representation + ")";
     }
 
-    /**
-     * Helper to generically decompose data into the proper recipe components.
-     */
+    /// Helper to generically decompose data into the proper recipe components.
     protected Optional<IDecomposedRecipe> decompose(Object... importantData) {
         TypeData<IIngredientWithAmount, CTFluidIngredient, ChemicalStackIngredient> inputs = new TypeData<>();
-        TypeData<IItemStack, IFluidStack, ChemicalStack> outputs = new TypeData<>();
+        TypeData<IItemStack, IFluidStack, ChemicalStackTemplate> outputs = new TypeData<>();
         int duration = -1;
-        long energy = -1;
+        int energy = -1;
         Boolean perTickUsage = null;
         for (Object data : importantData) {
             if (data instanceof List<?> dataList) {
@@ -179,16 +182,16 @@ public abstract class MekanismRecipeHandler<RECIPE extends MekanismRecipe<?>> im
                 outputs.addItem(IItemStack.of(stack));
             } else if (data instanceof FluidStack stack) {
                 outputs.addFluid(IFluidStack.of(stack));
-            } else if (data instanceof ChemicalStack stack) {
+            } else if (data instanceof ChemicalStackTemplate stack) {
                 outputs.addChemical(stack);
-            } else if (data instanceof PressurizedReactionRecipeOutput(ItemStack item, ChemicalStack chemical)) {
-                if (!item.isEmpty()) {
+            } else if (data instanceof PressurizedReactionRecipeOutput(ItemStackTemplate item, ChemicalStackTemplate chemical)) {
+                if (item != null) {
                     outputs.addItem(IItemStack.of(item));
                 }
-                if (!chemical.isEmpty()) {
+                if (chemical != null) {
                     outputs.addChemical(chemical);
                 }
-            } else if (data instanceof ElectrolysisRecipeOutput(ChemicalStack left, ChemicalStack right)) {
+            } else if (data instanceof ElectrolysisRecipeOutput(ChemicalStackTemplate left, ChemicalStackTemplate right)) {
                 outputs.addChemical(left);
                 outputs.addChemical(right);
             } else if (data instanceof Boolean b) {

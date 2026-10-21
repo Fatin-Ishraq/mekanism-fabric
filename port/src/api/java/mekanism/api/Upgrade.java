@@ -3,28 +3,22 @@ package mekanism.api;
 import com.mojang.serialization.Codec;
 import io.netty.buffer.ByteBuf;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.function.Function;
 import java.util.function.IntFunction;
-import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.text.APILang;
 import mekanism.api.text.EnumColor;
 import mekanism.api.text.IHasTranslationKey.IHasEnumNameTranslationKey;
 import mekanism.api.text.ILangEntry;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.ByIdMap;
+import net.minecraft.util.ExtraCodecs;
 import net.minecraft.util.StringRepresentable;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
-@NothingNullByDefault
 public enum Upgrade implements IHasEnumNameTranslationKey, StringRepresentable {
     SPEED("speed", APILang.UPGRADE_SPEED, APILang.UPGRADE_SPEED_DESCRIPTION, 8, EnumColor.RED),
     ENERGY("energy", APILang.UPGRADE_ENERGY, APILang.UPGRADE_ENERGY_DESCRIPTION, 8, EnumColor.BRIGHT_GREEN),
@@ -34,32 +28,21 @@ public enum Upgrade implements IHasEnumNameTranslationKey, StringRepresentable {
     ANCHOR("anchor", APILang.UPGRADE_ANCHOR, APILang.UPGRADE_ANCHOR_DESCRIPTION, 1, EnumColor.DARK_GREEN),
     STONE_GENERATOR("stone_generator", APILang.UPGRADE_STONE_GENERATOR, APILang.UPGRADE_STONE_GENERATOR_DESCRIPTION, 1, EnumColor.ORANGE);
 
-    /**
-     * Codec for serializing upgrades based on their name.
-     *
-     * @since 10.6.0
-     */
-    public static final Codec<Upgrade> CODEC;
+    /// Codec for serializing upgrades based on their name.
+    ///
+    /// @since 10.6.0
+    public static final Codec<Upgrade> CODEC = StringRepresentable.fromEnum(Upgrade::values);
+    //TODO - 26.1: Validate there are no cases where a zero value is stored in an upgrade map as our positive int will error for that
+    //TODO - 26.1: Make sure this is lenient so if there are invalid amounts or unknown upgrades then it skips them. Maybe just LenientUnboundedMapCodec ?
+    private static final Codec<Map<Upgrade, Integer>> UPGRADE_MAP_CODEC = Codec.unboundedMap(CODEC, ExtraCodecs.POSITIVE_INT);
 
-    //TODO - 1.22 remove backcompat and inline back to StringRepresentable.fromEnum
-    static {
-        Upgrade[] values = values();
-        Function<String, Upgrade> nameLookup = StringRepresentable.createNameLookup(values, Function.identity());
-        Function<String, Upgrade> remapper = it -> "gas".equals(it) ? CHEMICAL : nameLookup.apply(it);
-        CODEC = new EnumCodec<>(values, remapper);
-    }
-
-    /**
-     * Gets an upgrade by index, wrapping for out of bounds indices.
-     *
-     * @since 10.6.0
-     */
+    /// Gets an upgrade by index, wrapping for out of bounds indices.
+    ///
+    /// @since 10.6.0
     public static final IntFunction<Upgrade> BY_ID = ByIdMap.continuous(Upgrade::ordinal, values(), ByIdMap.OutOfBoundsStrategy.WRAP);
-    /**
-     * Stream codec for syncing upgrades by index.
-     *
-     * @since 10.6.0
-     */
+    /// Stream codec for syncing upgrades by index.
+    ///
+    /// @since 10.6.0
     public static final StreamCodec<ByteBuf, Upgrade> STREAM_CODEC = ByteBufCodecs.idMapper(BY_ID, Upgrade::ordinal);
 
     private final String name;
@@ -76,66 +59,26 @@ public enum Upgrade implements IHasEnumNameTranslationKey, StringRepresentable {
         this.color = color;
     }
 
-    /**
-     * Reads and builds a map of upgrades to their amounts from NBT.
-     *
-     * @param nbtTags Stored upgrades.
-     *
-     * @return Installed upgrade map.
-     *
-     * @implNote Unmodifiable if empty.
-     */
-    public static Map<Upgrade, Integer> buildMap(@Nullable CompoundTag nbtTags) {
-        Map<Upgrade, Integer> upgrades = null;
-        if (nbtTags != null && nbtTags.contains(SerializationConstants.UPGRADES, Tag.TAG_LIST)) {
-            ListTag list = nbtTags.getList(SerializationConstants.UPGRADES, Tag.TAG_COMPOUND);
-            for (int tagCount = 0; tagCount < list.size(); tagCount++) {
-                CompoundTag compound = list.getCompound(tagCount);
-                Upgrade upgrade = BY_ID.apply(compound.getInt(SerializationConstants.TYPE));
-                //Validate the nbt isn't malformed with a negative or zero amount
-                int installed = Math.max(compound.getInt(SerializationConstants.AMOUNT), 0);
-                if (installed > 0) {
-                    if (upgrades == null) {
-                        upgrades = new EnumMap<>(Upgrade.class);
-                    }
-                    upgrades.put(upgrade, installed);
-                }
-            }
+    /// Reads and builds a map of upgrades to their amounts from the given input.
+    ///
+    /// @param upgradeInput Stored upgrades.
+    ///
+    /// @return Unmodifiable map representing the installed upgrades.
+    public static Map<Upgrade, Integer> buildMap(ValueInput upgradeInput) {
+        return upgradeInput.read(SerializationConstants.UPGRADES, UPGRADE_MAP_CODEC).orElse(Collections.emptyMap());
+    }
+
+    /// Writes a map of upgrades to their amounts to NBT.
+    ///
+    /// @param upgrades      Upgrades to store.
+    /// @param upgradeOutput Output to write upgrades to.
+    public static void saveMap(Map<Upgrade, Integer> upgrades, ValueOutput upgradeOutput) {
+        if (!upgrades.isEmpty()) {
+            upgradeOutput.store(SerializationConstants.UPGRADES, UPGRADE_MAP_CODEC, upgrades);
         }
-        return upgrades == null ? Collections.emptyMap() : upgrades;
     }
 
-    /**
-     * Writes a map of upgrades to their amounts to NBT.
-     *
-     * @param upgrades Upgrades to store.
-     * @param nbtTags  Tag to write to.
-     */
-    public static void saveMap(Map<Upgrade, Integer> upgrades, CompoundTag nbtTags) {
-        ListTag list = new ListTag()/*FABRIC: no capacity ctor*/;
-        for (Entry<Upgrade, Integer> entry : upgrades.entrySet()) {
-            list.add(entry.getKey().getTag(entry.getValue()));
-        }
-        nbtTags.put(SerializationConstants.UPGRADES, list);
-    }
-
-    /**
-     * Writes this upgrade with given amount to NBT.
-     *
-     * @param amount Amount.
-     *
-     * @return NBT.
-     */
-    public CompoundTag getTag(int amount) {
-        CompoundTag compound = new CompoundTag();
-        compound.putInt(SerializationConstants.TYPE, ordinal());
-        compound.putInt(SerializationConstants.AMOUNT, amount);
-        return compound;
-    }
-
-    /**
-     * Gets the "raw" name of this upgrade for use in registry names.
-     */
+    /// Gets the "raw" name of this upgrade for use in registry names.
     @Override
     public String getSerializedName() {
         return name;
@@ -146,23 +89,17 @@ public enum Upgrade implements IHasEnumNameTranslationKey, StringRepresentable {
         return langKey.getTranslationKey();
     }
 
-    /**
-     * Gets the description for this upgrade.
-     */
+    /// Gets the description for this upgrade.
     public Component getDescription() {
         return descLangKey.translate();
     }
 
-    /**
-     * Gets the max number of upgrades of this type that can be installed.
-     */
+    /// Gets the max number of upgrades of this type that can be installed.
     public int getMax() {
         return maxStack;
     }
 
-    /**
-     * Gets the color to use when rendering various information related to this upgrade.
-     */
+    /// Gets the color to use when rendering various information related to this upgrade.
     public EnumColor getColor() {
         return color;
     }

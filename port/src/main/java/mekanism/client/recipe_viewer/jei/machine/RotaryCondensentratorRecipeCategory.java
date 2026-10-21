@@ -8,17 +8,17 @@ import mekanism.client.gui.element.gauge.GuiFluidGauge;
 import mekanism.client.gui.element.gauge.GuiGauge;
 import mekanism.client.gui.element.progress.ProgressType;
 import mekanism.client.gui.element.slot.SlotType;
-import mekanism.client.recipe_viewer.RecipeViewerUtils;
 import mekanism.client.recipe_viewer.jei.HolderRecipeCategory;
 import mekanism.client.recipe_viewer.type.RecipeViewerRecipeType;
 import mekanism.common.inventory.container.slot.SlotOverlay;
+import mekanism.common.util.RegistryUtils;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.helpers.IGuiHelper;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.RecipeIngredientRole;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.context.ContextMap;
 import net.minecraft.world.item.crafting.RecipeHolder;
-import org.jetbrains.annotations.NotNull;
 
 public class RotaryCondensentratorRecipeCategory extends HolderRecipeCategory<RotaryRecipe> {
 
@@ -40,26 +40,26 @@ public class RotaryCondensentratorRecipeCategory extends HolderRecipeCategory<Ro
     }
 
     @Override
-    public void setRecipe(@NotNull IRecipeLayoutBuilder builder, RecipeHolder<RotaryRecipe> recipeHolder, @NotNull IFocusGroup focusGroup) {
+    public void setRecipe(IRecipeLayoutBuilder builder, RecipeHolder<RotaryRecipe> recipeHolder, IFocusGroup focusGroup) {
         RotaryRecipe recipe = recipeHolder.value();
+        ContextMap slotDisplayContext = getSlotDisplayContext();
         if (condensentrating) {
             if (recipe.hasChemicalToFluid()) {
-                initChemical(builder, RecipeIngredientRole.INPUT, chemicalGauge, recipe.getChemicalInput().getRepresentations());
-                initFluid(builder, RecipeIngredientRole.OUTPUT, fluidGauge, recipe.getFluidOutputDefinition());
+                initChemical(builder, RecipeIngredientRole.INPUT, chemicalGauge, recipe.getChemicalInput().getRepresentations(slotDisplayContext));
+                initFluid(builder, fluidGauge, recipe.getFluidOutputDefinition());
             }
         } else if (recipe.hasFluidToChemical()) {
-            initFluid(builder, RecipeIngredientRole.INPUT, fluidGauge, recipe.getFluidInput().getRepresentations());
-            initChemical(builder, RecipeIngredientRole.OUTPUT, chemicalGauge, recipe.getChemicalOutputDefinition());
+            initFluid(builder, RecipeIngredientRole.INPUT, fluidGauge, recipe.getFluidInput().getRepresentations(slotDisplayContext));
+            initChemical(builder, chemicalGauge, recipe.getChemicalOutputDefinition());
         }
     }
 
-    @NotNull
     @Override
-    public ResourceLocation getRegistryName(@NotNull RecipeHolder<RotaryRecipe> recipe) {
-        ResourceLocation baseId = super.getRegistryName(recipe);
+    public Identifier getIdentifier(RecipeHolder<RotaryRecipe> recipe) {
+        Identifier baseId = super.getIdentifier(recipe);
         if (condensentrating) {
-            return RecipeViewerUtils.synthetic(baseId, "condensentrating");
+            return RegistryUtils.synthetic(baseId, "condensentrating");
         }
-        return RecipeViewerUtils.synthetic(baseId, "decondensentrating");
+        return RegistryUtils.synthetic(baseId, "decondensentrating");
     }
 }

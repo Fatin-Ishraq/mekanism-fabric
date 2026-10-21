@@ -38,7 +38,7 @@ import org.jetbrains.annotations.Nullable;
  * Fluid + amount (in mB) + data components. Serialized format ({@code id}, {@code amount}, {@code components}) matches NeoForge so that
  * saved data is interchangeable.
  */
-public final class FluidStack implements DataComponentHolder {
+public final class FluidStack implements DataComponentHolder, FluidInstance {
 
     public static final Codec<Holder<Fluid>> FLUID_NON_EMPTY_CODEC = BuiltInRegistries.FLUID.holderByNameCodec().validate(
           holder -> holder.is(Fluids.EMPTY.builtInRegistryHolder()) ? DataResult.error(() -> "Fluid must not be minecraft:empty") : DataResult.success(holder));
@@ -185,8 +185,56 @@ public final class FluidStack implements DataComponentHolder {
     }
 
     @SuppressWarnings("deprecation")
-    public Holder<Fluid> getFluidHolder() {
+    @Override
+    public Holder<Fluid> typeHolder() {
         return this.getFluid().builtInRegistryHolder();
+    }
+
+    /** Pre-26.1 name of {@link #typeHolder()}. */
+    public Holder<Fluid> getFluidHolder() {
+        return typeHolder();
+    }
+
+    @Override
+    public int amount() {
+        return getAmount();
+    }
+
+    public DataComponentMap getPrototype() {
+        return DataComponentMap.EMPTY;
+    }
+
+    public DataComponentMap immutableComponents() {
+        return this.components.toImmutableMap();
+    }
+
+    public boolean hasNonDefault(DataComponentType<?> type) {
+        return this.components.hasNonDefault(type);
+    }
+
+    public FluidStack transmuteCopy(Fluid fluid) {
+        return transmuteCopy(fluid, getAmount());
+    }
+
+    public FluidStack transmuteCopy(Fluid fluid, int amount) {
+        return isEmpty() ? EMPTY : new FluidStack(fluid.builtInRegistryHolder(), amount, getComponentsPatch());
+    }
+
+    public java.util.List<Component> getTooltipLines(net.minecraft.world.item.Item.TooltipContext context, @Nullable net.minecraft.world.entity.player.Player player,
+          net.minecraft.world.item.TooltipFlag flag) {
+        return java.util.List.of(getHoverName());
+    }
+
+    public static boolean matches(FluidStack first, FluidStackTemplate second) {
+        return first.getAmount() == second.amount() && isSameFluidSameComponents(first, second);
+    }
+
+    public static boolean isSameFluid(FluidStack first, FluidStackTemplate second) {
+        return first.is(second.fluid());
+    }
+
+    public static boolean isSameFluidSameComponents(FluidStack first, FluidStackTemplate second) {
+        return first.is(second.fluid()) && first.getComponentsPatch().equals(second.components());
     }
 
     public boolean is(TagKey<Fluid> tag) {
@@ -209,6 +257,7 @@ public final class FluidStack implements DataComponentHolder {
         return holders.contains(this.getFluidHolder());
     }
 
+    @Override
     public boolean is(FluidType fluidType) {
         return getFluidType() == fluidType;
     }
@@ -269,7 +318,7 @@ public final class FluidStack implements DataComponentHolder {
     }
 
     @Nullable
-    public <T> T set(DataComponentType<? super T> type, @Nullable T component) {
+    public <T> T set(DataComponentType<T> type, @Nullable T component) {
         return this.components.set(type, component);
     }
 
@@ -305,6 +354,7 @@ public final class FluidStack implements DataComponentHolder {
         return getFluidType().getDescriptionId(this);
     }
 
+    @Override
     public FluidType getFluidType() {
         return FluidType.of(getFluid());
     }

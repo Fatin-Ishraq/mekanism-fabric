@@ -1,10 +1,9 @@
 package mekanism.neoshim.neoforge.common.world.chunk;
 
-import java.util.Comparator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
@@ -14,16 +13,18 @@ import org.jetbrains.annotations.Nullable;
  * Forced-chunk controller. Tickets are added through a vanilla {@link TicketType} and persisted per level by {@link ForcedChunkStore}, which reinstates them on
  * server start and runs the controller's {@link LoadingValidationCallback} like NeoForge does.
  */
-public record TicketController(ResourceLocation id, @Nullable LoadingValidationCallback callback) {
+public record TicketController(Identifier id, @Nullable LoadingValidationCallback callback) {
 
-    static final Map<ResourceLocation, TicketController> CONTROLLERS = new ConcurrentHashMap<>();
-    private static final TicketType<BlockPos> BLOCK_TICKET = TicketType.create("mekanism_fabric:forced_block", Comparator.comparingLong(BlockPos::asLong));
+    static final Map<Identifier, TicketController> CONTROLLERS = new ConcurrentHashMap<>();
+    //Custom ticket types are not persisted by vanilla (no FLAG_PERSIST): ForcedChunkStore owns persistence and reinstates on server start
+    private static final TicketType LOADING_TICKET = new TicketType(TicketType.NO_TIMEOUT, TicketType.FLAG_LOADING);
+    private static final TicketType TICKING_TICKET = new TicketType(TicketType.NO_TIMEOUT, TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION);
 
     public TicketController {
         CONTROLLERS.put(id, this);
     }
 
-    public TicketController(ResourceLocation id) {
+    public TicketController(Identifier id) {
         this(id, null);
     }
 
@@ -31,12 +32,13 @@ public record TicketController(ResourceLocation id, @Nullable LoadingValidationC
         ChunkPos chunkPos = new ChunkPos(chunkX, chunkZ);
         //Level 2 = entity ticking for ticking tickets, 3 = block ticking (approximation of NeoForge's behavior)
         int distance = ticking ? 2 : 3;
+        TicketType type = ticking ? TICKING_TICKET : LOADING_TICKET;
         if (add) {
-            level.getChunkSource().addRegionTicket(BLOCK_TICKET, chunkPos, distance, owner.immutable());
+            level.getChunkSource().addTicketWithRadius(type, chunkPos, distance);
         } else {
-            level.getChunkSource().removeRegionTicket(BLOCK_TICKET, chunkPos, distance, owner.immutable());
+            level.getChunkSource().removeTicketWithRadius(type, chunkPos, distance);
         }
-        ForcedChunkStore.get(level).update(id, owner, chunkPos.toLong(), add, ticking);
+        ForcedChunkStore.get(level).update(id, owner, chunkPos.pack(), add, ticking);
         return true;
     }
 

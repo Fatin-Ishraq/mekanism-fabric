@@ -4,7 +4,7 @@ import com.mojang.serialization.Codec;
 import java.util.Objects;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -14,13 +14,13 @@ import org.jetbrains.annotations.Nullable;
 public class DataMapType<R, T> {
 
     private final ResourceKey<Registry<R>> registryKey;
-    private final ResourceLocation id;
+    private final Identifier id;
     private final Codec<T> codec;
     @Nullable
     private final Codec<T> networkCodec;
     private final boolean mandatorySync;
 
-    protected DataMapType(ResourceKey<Registry<R>> registryKey, ResourceLocation id, Codec<T> codec, @Nullable Codec<T> networkCodec, boolean mandatorySync) {
+    protected DataMapType(ResourceKey<Registry<R>> registryKey, Identifier id, Codec<T> codec, @Nullable Codec<T> networkCodec, boolean mandatorySync) {
         this.registryKey = Objects.requireNonNull(registryKey);
         this.id = Objects.requireNonNull(id);
         this.codec = Objects.requireNonNull(codec);
@@ -28,7 +28,7 @@ public class DataMapType<R, T> {
         this.mandatorySync = mandatorySync;
     }
 
-    public static <T, R> Builder<T, R> builder(ResourceLocation id, ResourceKey<Registry<R>> registry, Codec<T> codec) {
+    public static <T, R> Builder<T, R> builder(Identifier id, ResourceKey<Registry<R>> registry, Codec<T> codec) {
         return new Builder<>(registry, id, codec);
     }
 
@@ -36,7 +36,7 @@ public class DataMapType<R, T> {
         return registryKey;
     }
 
-    public ResourceLocation id() {
+    public Identifier id() {
         return id;
     }
 
@@ -56,13 +56,13 @@ public class DataMapType<R, T> {
     public static class Builder<T, R> {
 
         protected final ResourceKey<Registry<R>> registryKey;
-        protected final ResourceLocation id;
+        protected final Identifier id;
         protected final Codec<T> codec;
         @Nullable
         protected Codec<T> networkCodec;
         protected boolean mandatorySync;
 
-        Builder(ResourceKey<Registry<R>> registryKey, ResourceLocation id, Codec<T> codec) {
+        Builder(ResourceKey<Registry<R>> registryKey, Identifier id, Codec<T> codec) {
             this.registryKey = registryKey;
             this.id = id;
             this.codec = codec;

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Generates the NeoForge-extension interface injection plumbing (NOTES.md D1):
 
- * the "loom:injected_interfaces" block of src/fabric/resources/fabric.mod.json (keys must be intermediary class names), and
+ * the "loom:injected_interfaces" block of src/fabric/resources/fabric.mod.json (keys are runtime class names: intermediary on obfuscated versions, Mojang names on 26.1+), and
  * one boilerplate mixin per target class under src/fabric/java/mekanism/fabric/mixin/inject/ that makes the vanilla class implement the
    extension interfaces at runtime, plus their entries in mekanism_fabric.mixins.json.
 
 Targets marked manual=True get the injected interface but no generated mixin (a hand-written mixin in mekanism.fabric.mixin implements it).
 
-Usage: gen_injections.py <mappings.tiny with official/intermediary/named>
+Usage: gen_injections.py [<mappings.tiny with official/intermediary/named>]  (omit the mappings on unobfuscated versions)
 """
 import json
 import re
@@ -23,10 +23,15 @@ ATT = "mekanism/neoshim/neoforge/attachment/IAttachmentHolder"
 SPEC = [
     ("net/minecraft/world/item/Item", False, "", [EXT + "IItemExtension"], False, False),
     ("net/minecraft/world/item/ItemStack", False, "", [EXT + "IItemStackExtension", EXT + "IMutableDataComponentHolderExtension"], False, False),
+    ("net/minecraft/world/item/ItemInstance", True, "", [EXT + "ItemInstanceExtension"], False, False),
+    ("net/minecraft/core/component/DataComponentGetter", True, "", [EXT + "IDataComponentGetterExtension"], False, False),
     ("net/minecraft/core/component/DataComponentHolder", True, "", [EXT + "IDataComponentHolderExtension"], False, False),
+    ("net/minecraft/resources/ResourceKey", False, "T", [EXT + "IResourceKeyExtension"], False, False),
+    ("net/minecraft/resources/Identifier", False, "", [EXT + "IResourceLocationExtension"], False, False),
+    ("net/minecraft/world/level/storage/ValueInput", True, "", [EXT + "IValueInputExtension"], False, False),
+    ("net/minecraft/world/level/storage/ValueOutput", True, "", [EXT + "IValueOutputExtension"], False, False),
     ("net/minecraft/core/component/DataComponentMap$Builder", False, "", [EXT + "IDataComponentMapBuilderExtension"], False, False),
     ("net/minecraft/core/component/DataComponentPatch$Builder", False, "", [EXT + "IDataComponentPatchBuilderExtension"], False, False),
-    ("net/minecraft/world/level/block/entity/BlockEntity$DataComponentInput", True, "", [EXT + "IBlockEntityDataComponentInputExtension"], False, False),
     ("net/minecraft/world/item/Item$Properties", False, "", [EXT + "IItemPropertiesExtension"], False, True),
     ("net/minecraft/world/level/block/Block", False, "", [EXT + "IBlockExtension"], False, False),
     ("net/minecraft/world/level/block/state/BlockBehaviour$BlockStateBase", False, "", [EXT + "IBlockStateExtension"], False, False),
@@ -35,6 +40,7 @@ SPEC = [
     ("net/minecraft/world/level/Level", False, "", [EXT + "ILevelExtension", ATT], False, False),
     ("net/minecraft/core/HolderLookup$Provider", True, "", [EXT + "IHolderLookupProviderExtension"], False, False),
     ("net/minecraft/world/level/LevelReader", True, "", [EXT + "ILevelReaderExtension"], False, False),
+    ("net/minecraft/world/level/BlockGetter", True, "", [EXT + "IBlockGetterExtension"], False, False),
     ("net/minecraft/world/entity/Entity", False, "", [EXT + "IEntityExtension", ATT], False, False),
     ("net/minecraft/world/entity/LivingEntity", False, "", [EXT + "ILivingEntityExtension"], False, False),
     ("net/minecraft/world/entity/player/Player", False, "", [EXT + "IPlayerExtension"], False, False),
@@ -43,6 +49,7 @@ SPEC = [
     ("net/minecraft/core/Holder", True, "T", [EXT + "IHolderExtension<T>"], False, False),
     ("net/minecraft/core/Registry", True, "T", [EXT + "IRegistryExtension<T>"], False, False),
     ("net/minecraft/world/item/crafting/Ingredient", False, "", [EXT + "IIngredientExtension"], False, False),
+    ("net/minecraft/util/random/WeightedList$Builder", False, "E", [EXT + "IWeightedListBuilderExtension<E>"], False, True),
     ("net/minecraft/world/effect/MobEffectInstance", False, "", [EXT + "IMobEffectInstanceExtension"], False, False),
     ("net/minecraft/world/entity/EntityType", False, "T", [EXT + "IEntityTypeExtension"], False, False),
     ("net/minecraft/world/level/biome/Biome", False, "", [EXT + "IBiomeExtension"], False, False),
@@ -56,27 +63,25 @@ SPEC = [
     ("net/minecraft/world/entity/EntityType$Builder", False, "T", [EXT + "IEntityTypeBuilderExtension<T>"], False, False),
     ("net/minecraft/world/item/CreativeModeTab$Builder", False, "", [EXT + "ICreativeModeTabBuilderExtension"], False, False),
     ("net/minecraft/world/item/DispensibleContainerItem", True, "", [EXT + "IDispensibleContainerItemExtension"], False, False),
-    ("net/minecraft/resources/ResourceLocation", False, "", [EXT + "IResourceLocationExtension"], False, False),
     # client
-    ("net/minecraft/client/resources/model/BakedModel", True, "", [CEXT + "IBakedModelExtension"], True, False),
     ("net/minecraft/client/KeyMapping", False, "", [CEXT + "IKeyMappingExtension"], True, True),
     ("net/minecraft/client/gui/components/AbstractWidget", False, "", [CEXT + "IAbstractWidgetExtension"], True, True),
     ("net/minecraft/client/gui/screens/Screen", False, "", [CEXT + "IScreenExtension"], True, False),
     ("net/minecraft/client/gui/screens/inventory/AbstractContainerScreen", False, "T", [CEXT + "IAbstractContainerScreenExtension"], True, False),
     ("com/mojang/blaze3d/vertex/VertexConsumer", True, "", [CEXT + "IVertexConsumerExtension"], True, False),
-    ("net/minecraft/client/renderer/block/model/BakedQuad", False, "", [CEXT + "IBakedQuadExtension"], True, False),
-    ("net/minecraft/client/renderer/block/model/ItemOverrides", False, "", [CEXT + "IItemOverridesExtension"], True, False),
     ("net/minecraft/client/resources/model/ModelManager", False, "", [CEXT + "IModelManagerExtension"], True, True),
-    ("net/minecraft/client/resources/model/ModelBaker", True, "", [CEXT + "IModelBakerExtension"], True, False),
-    ("net/minecraft/client/renderer/entity/ItemRenderer", False, "", [CEXT + "IItemRendererExtension"], True, False),
     ("net/minecraft/client/renderer/entity/EntityRenderDispatcher", False, "", [CEXT + "IEntityRenderDispatcherExtension"], True, False),
     ("net/minecraft/client/renderer/LevelRenderer", False, "", [CEXT + "ILevelRendererExtension"], True, False),
     ("net/minecraft/client/renderer/blockentity/BlockEntityRenderer", True, "T", [CEXT + "IBlockEntityRendererExtension<T>"], True, False),
     ("net/minecraft/client/particle/Particle", False, "", [CEXT + "IParticleExtension"], True, False),
     ("net/minecraft/client/particle/TerrainParticle", False, "", [CEXT + "ITerrainParticleExtension"], True, False),
-    ("net/minecraft/client/particle/ParticleEngine", False, "", [CEXT + "IParticleEngineExtension"], True, False),
-    ("net/minecraft/client/gui/GuiGraphics", False, "", [CEXT + "IGuiGraphicsExtension"], True, False),
-    ("net/minecraft/client/renderer/entity/layers/ElytraLayer", False, "T,M", [CEXT + "IElytraLayerExtension<T>"], True, False),
+    ("net/minecraft/client/renderer/block/dispatch/BlockStateModel", True, "", [CEXT + "BlockStateModelExtension"], True, False),
+    ("net/minecraft/client/renderer/block/dispatch/BlockStateModelPart", True, "", [CEXT + "BlockStateModelPartExtension"], True, False),
+    ("net/minecraft/client/resources/model/geometry/UnbakedGeometry", True, "", [CEXT + "UnbakedGeometryExtension"], True, False),
+    ("net/minecraft/client/resources/model/UnbakedModel", True, "", [CEXT + "UnbakedModelExtension"], True, False),
+    ("net/minecraft/client/resources/model/ResolvedModel", True, "", [CEXT + "ResolvedModelExtension"], True, False),
+    ("net/minecraft/client/resources/model/ModelBaker", True, "", [CEXT + "ModelBakerExtension"], True, False),
+    ("net/minecraft/client/resources/model/ModelBakery$BakingResult", False, "", [CEXT + "BakingResultExtension"], True, False),
 ]
 
 # Bounds for type parameters of generic targets (for the generated mixin declarations)
@@ -113,7 +118,8 @@ def java_name(path):
 
 
 def main():
-    mapping = load_named_to_intermediary(sys.argv[1])
+    #26.1+ is not obfuscated: without a mappings file, the named (Mojang) class names are the runtime names
+    mapping = load_named_to_intermediary(sys.argv[1]) if len(sys.argv) > 1 else None
     injected = {}
     mixins_common, mixins_client = [], []
     out_dir = ROOT / "src/fabric/java/mekanism/fabric/mixin/inject"
@@ -121,7 +127,7 @@ def main():
     for f in out_dir.glob("*.java"):
         f.unlink()
     for target, is_iface, generics, ifaces, client, manual in SPEC:
-        inter = mapping.get(target)
+        inter = target if mapping is None else mapping.get(target)
         if inter is None:
             if target.startswith("com/mojang/"):
                 inter = target  # not obfuscated

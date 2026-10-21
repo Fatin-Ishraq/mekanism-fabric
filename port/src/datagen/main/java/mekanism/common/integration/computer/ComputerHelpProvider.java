@@ -23,7 +23,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import mekanism.api.SerializationConstants;
-import mekanism.api.annotations.ParametersAreNotNullByDefault;
 import mekanism.common.MekanismDataGenerator;
 import mekanism.common.MekanismDataGenerator.IOConsumer;
 import mekanism.common.content.filter.IFilter;
@@ -49,21 +48,17 @@ import mekanism.common.tile.prefab.TileEntityProgressMachine;
 import mekanism.common.tile.qio.TileEntityQIOComponent;
 import mekanism.common.tile.qio.TileEntityQIOFilterHandler;
 import mekanism.common.util.MekCodecs;
-import net.minecraft.MethodsReturnNonnullByDefault;
-import net.minecraft.Util;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.CachedOutput;
 import net.minecraft.data.DataProvider;
 import net.minecraft.data.PackOutput;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.CsvOutput;
 import net.minecraft.util.CsvOutput.Builder;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.util.Util;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.nodes.Node;
 
-@MethodsReturnNonnullByDefault
-@ParametersAreNotNullByDefault
 public class ComputerHelpProvider implements DataProvider {
 
     private static final String[] METHOD_CSV_HEADERS = {"Class", "Method Name", "Params", "Returns", "Restriction", "Requires Public Security", "Description"};
@@ -99,12 +94,10 @@ public class ComputerHelpProvider implements DataProvider {
         });
     }
 
-    @NotNull
     private <DATA> CompletableFuture<?> makeJson(CachedOutput output, HolderLookup.Provider lookupProvider, DATA helpData, Codec<DATA> codec, String path) {
-        return DataProvider.saveStable(output, lookupProvider, codec, helpData, this.pathProvider.json(ResourceLocation.fromNamespaceAndPath(this.modid, path)));
+        return DataProvider.saveStable(output, lookupProvider, codec, helpData, this.pathProvider.json(Identifier.fromNamespaceAndPath(this.modid, path)));
     }
 
-    @NotNull
     private CompletableFuture<?> makeJekyllData(CachedOutput output, Map<Class<?>, List<MethodHelpData>> methods, Map<Class<?>, List<String>> enumValues) {
         return CompletableFuture.runAsync(() -> {
             JekyllData jekyllData = new JekyllData(methods, enumValues, BaseComputerHelper.BUILTIN_TABLES.get());
@@ -115,13 +108,12 @@ public class ComputerHelpProvider implements DataProvider {
                     YamlHelper.dump(writer, frontMatterNode, YAML_OPTIONS);
                     writer.write("---\n");
                 }
-            }, this.pathProvider.file(ResourceLocation.fromNamespaceAndPath(this.modid, "jekyll"), "md")).join();
+            }, this.pathProvider.file(Identifier.fromNamespaceAndPath(this.modid, "jekyll"), "md")).join();
         });
     }
 
-    @NotNull
     private CompletableFuture<?> makeMethodsCsv(CachedOutput pOutput, Map<Class<?>, List<MethodHelpData>> helpData) {
-        return saveCSV(pOutput, this.pathProvider.file(ResourceLocation.fromNamespaceAndPath(this.modid, "methods"), "csv"), METHOD_CSV_HEADERS, output -> {
+        return saveCSV(pOutput, this.pathProvider.file(Identifier.fromNamespaceAndPath(this.modid, "methods"), "csv"), METHOD_CSV_HEADERS, output -> {
             //NB: list is used as the IOException will be captured in saveCSV
             List<Map.Entry<String, List<MethodHelpData>>> friendlyList = helpData.entrySet().stream()
                   .map(entry -> Map.entry(getFriendlyName(entry.getKey()), entry.getValue()))
@@ -144,10 +136,9 @@ public class ComputerHelpProvider implements DataProvider {
         });
     }
 
-    @NotNull
     private CompletableFuture<?> makeEnumsCsv(CachedOutput pOutput, Map<Class<?>, List<String>> enumValues) {
         //gather the enums into a sorted map
-        return saveCSV(pOutput, this.pathProvider.file(ResourceLocation.fromNamespaceAndPath(this.modid, "enums"), "csv"), ENUM_CSV_HEADERS, csvOutput -> {
+        return saveCSV(pOutput, this.pathProvider.file(Identifier.fromNamespaceAndPath(this.modid, "enums"), "csv"), ENUM_CSV_HEADERS, csvOutput -> {
             for (Entry<Class<?>, List<String>> entry : enumValues.entrySet()) {
                 Class<?> clazz = entry.getKey();
                 List<String> values = entry.getValue();
@@ -156,7 +147,6 @@ public class ComputerHelpProvider implements DataProvider {
         });
     }
 
-    @NotNull
     private static Map<Class<?>, List<String>> getEnumValues(Map<Class<?>, List<MethodHelpData>> helpData) {
         Map<Class<?>, List<String>> enumToValues = new TreeMap<>(Comparator.comparing(Class::getSimpleName));
         for (List<MethodHelpData> methods : helpData.values()) {
@@ -166,8 +156,9 @@ public class ComputerHelpProvider implements DataProvider {
                     enumToValues.put(jType, method.returns().values());
                 }
                 for (Class<?> extraClass : method.returns().javaExtra()) {
-                    if (extraClass.isEnum()) {
-                        enumToValues.put(extraClass, MethodHelpData.getEnumConstantNames(extraClass));
+                    List<String> enumConstantNames = MethodHelpData.getEnumConstantNames(extraClass);
+                    if (enumConstantNames != null) {
+                        enumToValues.put(extraClass, enumConstantNames);
                     }
                 }
                 if (method.params() != null) {
@@ -248,7 +239,7 @@ public class ComputerHelpProvider implements DataProvider {
         return CLASS_NAME_SPLITTER.splitAsStream(simpleName).collect(Collectors.joining(" "));
     }
 
-    private static final Codec<Class<?>> CLASS_TO_FRIENDLY_NAME_CODEC = Codec.stringResolver(ComputerHelpProvider::getFriendlyName, p -> null);
+    private static final Codec<Class<?>> CLASS_TO_FRIENDLY_NAME_CODEC = MekCodecs.stringResolver(ComputerHelpProvider::getFriendlyName, _ -> null);
     private static final Codec<Map<Class<?>, List<MethodHelpData>>> METHODS_DATA_CODEC = Codec.unboundedMap(CLASS_TO_FRIENDLY_NAME_CODEC, MethodHelpData.CODEC.listOf());
     private static final Codec<Map<Class<?>, List<String>>> ENUMS_CODEC = Codec.unboundedMap(MekCodecs.CLASS_TO_STRING_CODEC, Codec.STRING.listOf());
 
@@ -262,7 +253,6 @@ public class ComputerHelpProvider implements DataProvider {
           Map.entry(OredictionificatorItemFilter.class, "Filter Wrapper (Oredictionificator Item)"),
           Map.entry(QIOFilter.class, "Filter Wrapper (QIO)"),
           Map.entry(SorterFilter.class, "Filter Wrapper (Logistical Sorter)"),
-          Map.entry(ComputerEnergyHelper.class, "API Global: computerEnergyHelper"),
           Map.entry(ComputerFilterHelper.class, "API Global: computerFilterHelper"),
           Map.entry(MultiblockData.class, "Multiblock (formed)"),
           Map.entry(TileEntityMekanism.class, "Generic Mekanism Machine"),

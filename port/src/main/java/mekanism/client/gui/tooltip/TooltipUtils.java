@@ -7,19 +7,22 @@ import mekanism.common.MekanismLang;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class TooltipUtils {
 
+    @Nullable
     public static final Tooltip BACK = create(MekanismLang.BACK);
 
     private TooltipUtils() {
     }
 
+    @Nullable
     public static Tooltip create(ILangEntry langEntry) {
         return create(langEntry.translate());
     }
 
+    @Nullable
     @Contract("null -> null")
     public static Tooltip create(@Nullable Component message) {
         if (message == null) {
@@ -28,6 +31,7 @@ public class TooltipUtils {
         return Tooltip.create(message);
     }
 
+    @Nullable
     public static Tooltip create(ILangEntry... langEntries) {
         if (langEntries == null || langEntries.length == 0) {
             throw new IllegalArgumentException("Messages cannot be null or empty");
@@ -39,9 +43,10 @@ public class TooltipUtils {
         for (ILangEntry langEntry : langEntries) {
             messages.add(langEntry.translate());
         }
-        return new MultiLineTooltip(List.copyOf(messages));
+        return MultiLineTooltip.create(messages);
     }
 
+    @Nullable
     public static Tooltip create(Component... messages) {
         if (messages == null || messages.length == 0) {
             throw new IllegalArgumentException("Messages cannot be null or empty");
@@ -49,7 +54,7 @@ public class TooltipUtils {
             //Note: This should never happen unless we are manually called with an explicit array
             return create(messages[0]);
         }
-        return new MultiLineTooltip(List.of(messages));
+        return MultiLineTooltip.create(List.of(messages));
     }
 
     @Nullable
@@ -59,6 +64,6 @@ public class TooltipUtils {
         } else if (messages.size() == 1) {
             return create(messages.getFirst());
         }
-        return new MultiLineTooltip(List.copyOf(messages));
+        return MultiLineTooltip.create(messages);
     }
 }

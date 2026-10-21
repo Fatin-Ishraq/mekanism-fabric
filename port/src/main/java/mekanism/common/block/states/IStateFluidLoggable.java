@@ -4,10 +4,12 @@ import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.StringRepresentable;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.BucketPickup;
 import net.minecraft.world.level.block.LiquidBlockContainer;
@@ -19,12 +21,11 @@ import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
 import mekanism.neoshim.neoforge.fluids.FluidType;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public interface IStateFluidLoggable extends BucketPickup, LiquidBlockContainer {
 
-    default boolean isValidFluid(@NotNull Fluid fluid) {
+    default boolean isValidFluid(Fluid fluid) {
         for (IFluidLogType possibleValue : getFluidLoggedProperty().getPossibleValues()) {
             if (possibleValue.getFluid() == fluid) {
                 return true;
@@ -33,20 +34,16 @@ public interface IStateFluidLoggable extends BucketPickup, LiquidBlockContainer 
         return false;
     }
 
-    /**
-     * Gets the fluids this fluid loggable block supports. Overriding this is an easy way to change the block from supporting water and lava logging to supporting
-     * specific different types of fluid, but dynamic fluid stuff cannot be done without a sizeable patch to forge/a change in vanilla so that
-     * {@link BlockState#getFluidState()} has position information.
-     *
-     * @return BlockState property for representing fluid loggable blocks
-     */
-    @NotNull
+    /// Gets the fluids this fluid loggable block supports. Overriding this is an easy way to change the block from supporting water and lava logging to supporting
+    /// specific different types of fluid, but dynamic fluid stuff cannot be done without a sizeable patch to forge/a change in vanilla so that
+    /// [BlockState#getFluidState()] has position information.
+    ///
+    /// @return BlockState property for representing fluid loggable blocks
     default EnumProperty<? extends IFluidLogType> getFluidLoggedProperty() {
         return BlockStateHelper.FLUID_LOGGED;
     }
 
-    @NotNull
-    default FluidState getFluid(@NotNull BlockState state) {
+    default FluidState getFluid(BlockState state) {
         IFluidLogType fluidLogged = state.getValue(getFluidLoggedProperty());
         if (!fluidLogged.isEmpty()) {
             Fluid fluid = fluidLogged.getFluid();
@@ -58,7 +55,7 @@ public interface IStateFluidLoggable extends BucketPickup, LiquidBlockContainer 
         return Fluids.EMPTY.defaultFluidState();
     }
 
-    default int getFluidLightLevel(@NotNull BlockState state) {
+    default int getFluidLightLevel(BlockState state) {
         FluidState fluid = getFluid(state);
         //TODO: Ideally we wouldn't have to hardcode this but the fluid type isn't registered yet so we can't just do getFluidType().getLightLevel()
         if (fluid.getType() == Fluids.LAVA) {
@@ -67,16 +64,16 @@ public interface IStateFluidLoggable extends BucketPickup, LiquidBlockContainer 
         return 0;
     }
 
-    default void updateFluids(@NotNull BlockState state, @NotNull LevelAccessor world, @NotNull BlockPos currentPos) {
+    default void updateFluids(LevelReader world, BlockPos currentPos, BlockState state, ScheduledTickAccess tickAccess) {
         IFluidLogType fluidLogged = state.getValue(getFluidLoggedProperty());
         if (!fluidLogged.isEmpty()) {
             Fluid fluid = fluidLogged.getFluid();
-            world.scheduleTick(currentPos, fluid, fluid.getTickDelay(world));
+            tickAccess.scheduleTick(currentPos, fluid, fluid.getTickDelay(world));
         }
     }
 
     @Override
-    default boolean canPlaceLiquid(@Nullable Player player, @NotNull BlockGetter world, @NotNull BlockPos pos, @NotNull BlockState state, @NotNull Fluid fluid) {
+    default boolean canPlaceLiquid(@Nullable LivingEntity owner, BlockGetter world, BlockPos pos, BlockState state, Fluid fluid) {
         return state.getValue(getFluidLoggedProperty()).isEmpty() && isValidFluid(fluid);
     }
 
@@ -93,11 +90,9 @@ public interface IStateFluidLoggable extends BucketPickup, LiquidBlockContainer 
         return state;
     }
 
-    /**
-     * Overwritten to check against canContainFluid instead of inlining the check to water directly.
-     */
+    /// Overwritten to check against canContainFluid instead of inlining the check to water directly.
     @Override
-    default boolean placeLiquid(@NotNull LevelAccessor world, @NotNull BlockPos pos, @NotNull BlockState state, @NotNull FluidState fluidState) {
+    default boolean placeLiquid(LevelAccessor world, BlockPos pos, BlockState state, FluidState fluidState) {
         Fluid fluid = fluidState.getType();
         if (canPlaceLiquid(null, world, pos, state, fluid)) {
             if (!world.isClientSide()) {
@@ -109,9 +104,8 @@ public interface IStateFluidLoggable extends BucketPickup, LiquidBlockContainer 
         return false;
     }
 
-    @NotNull
     @Override
-    default ItemStack pickupBlock(@Nullable Player player, @NotNull LevelAccessor world, @NotNull BlockPos pos, @NotNull BlockState state) {
+    default ItemStack pickupBlock(@Nullable LivingEntity owner, LevelAccessor world, BlockPos pos, BlockState state) {
         IFluidLogType fluidLogged = state.getValue(getFluidLoggedProperty());
         if (!fluidLogged.isEmpty()) {
             Fluid fluid = fluidLogged.getFluid();
@@ -124,13 +118,11 @@ public interface IStateFluidLoggable extends BucketPickup, LiquidBlockContainer 
         return ItemStack.EMPTY;
     }
 
-    @NotNull
     @Override
     default Optional<SoundEvent> getPickupSound() {
         return Optional.empty();
     }
 
-    @NotNull
     @Override
     default Optional<SoundEvent> getPickupSound(BlockState state) {
         return getFluid(state).getType().getPickupSound();

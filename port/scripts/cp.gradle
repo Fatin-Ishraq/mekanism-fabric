@@ -1,0 +1,11 @@
+allprojects {
+  afterEvaluate { p ->
+    p.tasks.register('dumpCp') {
+      doLast {
+        def out = new File(System.getProperty('java.io.tmpdir'), 'mek_cp.txt')
+        out.text = p.sourceSets.findAll { !it.name.toLowerCase().contains('test') }.collect { ss -> ss.compileClasspath.files }.flatten().unique().join('\n')
+        println "wrote ${out}"
+      }
+    }
+  }
+}

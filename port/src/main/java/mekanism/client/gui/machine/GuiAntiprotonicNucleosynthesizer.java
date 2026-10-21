@@ -1,18 +1,17 @@
 package mekanism.client.gui.machine;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import java.util.List;
 import java.util.function.Supplier;
 import mekanism.api.recipes.cache.CachedRecipe.OperationTracker.RecipeError;
 import mekanism.client.gui.GuiConfigurableTile;
 import mekanism.client.gui.element.GuiInnerScreen;
+import mekanism.client.gui.element.GuiInnerScreen.VerticalPositioning;
 import mekanism.client.gui.element.bar.GuiBar.IBarInfoHandler;
 import mekanism.client.gui.element.bar.GuiDynamicHorizontalRateBar;
 import mekanism.client.gui.element.gauge.GaugeType;
 import mekanism.client.gui.element.gauge.GuiChemicalGauge;
 import mekanism.client.gui.element.gauge.GuiEnergyGauge;
 import mekanism.client.gui.element.tab.GuiEnergyTab;
-import mekanism.client.render.MekanismRenderType;
-import mekanism.client.render.MekanismRenderer;
 import mekanism.client.render.lib.effect.BoltRenderer;
 import mekanism.common.MekanismLang;
 import mekanism.common.inventory.container.tile.MekanismTileContainer;
@@ -25,13 +24,11 @@ import mekanism.common.lib.effect.BoltEffect.FadeFunction;
 import mekanism.common.lib.effect.BoltEffect.SpawnFunction;
 import mekanism.common.tile.machine.TileEntityAntiprotonicNucleosynthesizer;
 import mekanism.common.util.text.TextUtils;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.NotNull;
 
 public class GuiAntiprotonicNucleosynthesizer extends GuiConfigurableTile<TileEntityAntiprotonicNucleosynthesizer,
       MekanismTileContainer<TileEntityAntiprotonicNucleosynthesizer>> {
@@ -46,24 +43,26 @@ public class GuiAntiprotonicNucleosynthesizer extends GuiConfigurableTile<TileEn
           .lifespan(1)
           .spawn(SpawnFunction.CONSECUTIVE)
           .fade(FadeFunction.NONE);
-    private GuiInnerScreen screen;
 
     public GuiAntiprotonicNucleosynthesizer(MekanismTileContainer<TileEntityAntiprotonicNucleosynthesizer> container, Inventory inv, Component title) {
-        super(container, inv, title);
+        super(container, inv, title, DEFAULT_IMAGE_WIDTH + 20, DEFAULT_IMAGE_HEIGHT + 27);
         dynamicSlots = true;
-        imageHeight += 27;
-        imageWidth += 20;
         inventoryLabelY = imageHeight - 93;
     }
 
     @Override
     protected void addGuiElements() {
         super.addGuiElements();
-        screen = addRenderableWidget(new GuiInnerScreen(this, 45, 18, 104, 68).recipeViewerCategory(tile));
-        addRenderableWidget(new GuiEnergyTab(this, tile.getEnergyContainer(), tile::getEnergyUsed));
-        addRenderableWidget(new GuiChemicalGauge(() -> tile.gasTank, () -> tile.getChemicalTanks(null), GaugeType.SMALL_MED, this, 5, 18))
+        addRenderableWidget(new GuiInnerScreen(this, 45, 18, 104, 68))
+              .text(() -> List.of(MekanismLang.PROCESS_RATE.translate(TextUtils.getPercent(tile.getProcessRate()))))
+              .alignment(TextAlignment.CENTER)
+              .verticalAlignment(VerticalPositioning.BOTTOM)
+              .padding(2)
+              .recipeViewerCategory(tile);
+        addRenderableWidget(new GuiEnergyTab(this, tile.energyContainer(), tile::getEnergyUsed));
+        addRenderableWidget(new GuiChemicalGauge(() -> tile.gasTank, tile::getChemicalTanks, GaugeType.SMALL_MED, this, 5, 18))
               .warning(WarningType.NO_MATCHING_RECIPE, tile.getWarningCheck(RecipeError.NOT_ENOUGH_SECONDARY_INPUT));
-        addRenderableWidget(new GuiEnergyGauge(tile.getEnergyContainer(), GaugeType.SMALL_MED, this, 172, 18))
+        addRenderableWidget(new GuiEnergyGauge(tile.energyContainer(), GaugeType.SMALL_MED, this, 172, 18))
               .warning(WarningType.NOT_ENOUGH_ENERGY, tile.getWarningCheck(RecipeError.NOT_ENOUGH_ENERGY));
         addRenderableWidget(new GuiDynamicHorizontalRateBar(this, new IBarInfoHandler() {
             @Override
@@ -80,20 +79,21 @@ public class GuiAntiprotonicNucleosynthesizer extends GuiConfigurableTile<TileEn
     }
 
     @Override
-    protected void drawForegroundText(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void drawForegroundText(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         renderTitleText(guiGraphics);
         renderInventoryText(guiGraphics);
-        screen.drawScrollingString(guiGraphics, MekanismLang.PROCESS_RATE.translate(TextUtils.getPercent(tile.getProcessRate())), 0,
-              screen.getHeight() - font().lineHeight - 2, TextAlignment.CENTER, screenTextColor(), 2, false);
         super.drawForegroundText(guiGraphics, mouseX, mouseY);
-        PoseStack pose = guiGraphics.pose();
-        pose.pushPose();
-        pose.translate(0, 0, 100);
-        MultiBufferSource.BufferSource renderer = guiGraphics.bufferSource();
-        float partialTicks = MekanismRenderer.getPartialTick();
-        bolt.update(this, boltSupplier.get(), partialTicks);
-        bolt.render(partialTicks, pose, renderer);
-        renderer.endBatch(MekanismRenderType.MEK_LIGHTNING);
-        pose.popPose();
+        //TODO - 26.1: gui rendering
+        //PoseStack pose = guiGraphics.pose();
+        //pose.pushPose();
+        //pose.translate(0, 0, 100);
+        ////TODO - 26.1: I think it is this?
+        ////guiGraphics.submitGuiElementRenderState();
+        //MultiBufferSource.BufferSource renderer = guiGraphics.bufferSource();
+        //float partialTicks = MekanismRenderer.getPartialTick();
+        //bolt.update(this, boltSupplier.get(), partialTicks);
+        //bolt.render(gameTime, partialTicks, pose, renderer);
+        //renderer.endBatch(MekanismRenderType.MEK_LIGHTNING);
+        //pose.popPose();
     }
 }

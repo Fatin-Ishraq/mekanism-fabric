@@ -1,12 +1,13 @@
 package mekanism.tools.client.render;
-
+//TODO - 26.1 glow armor model
+/*
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.Model;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.RenderType;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.util.LightCoordsUtil;
 
 public class GlowArmor extends Model {
 
@@ -14,7 +15,7 @@ public class GlowArmor extends Model {
     private HumanoidModel<?> base;
 
     private GlowArmor() {
-        super(RenderType::entityCutoutNoCull);
+        super(RenderTypes::entityCutoutNoCull);
     }
 
     public static GlowArmor wrap(HumanoidModel<?> base) {
@@ -23,10 +24,10 @@ public class GlowArmor extends Model {
     }
 
     @Override
-    public void renderToBuffer(@NotNull PoseStack matrix, @NotNull VertexConsumer vertexBuilder, int light, int overlayLight, int color) {
+    public void renderToBuffer(PoseStack matrix, VertexConsumer vertexBuilder, int light, int overlayLight, int color) {
         if (base != null) {
             //Make it render at full brightness
-            base.renderToBuffer(matrix, vertexBuilder, LightTexture.FULL_BRIGHT, overlayLight, color);
+            base.renderToBuffer(matrix, vertexBuilder, LightCoordsUtil.FULL_BRIGHT, overlayLight, color);
         }
     }
-}
+}*/

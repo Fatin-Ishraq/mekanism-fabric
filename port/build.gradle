@@ -1,5 +1,5 @@
 plugins {
-    id('fabric-loom').version("${loom_version}")
+    id('net.fabricmc.fabric-loom').version("${loom_version}")
     id('java')
 }
 
@@ -49,9 +49,20 @@ repositories {
 
 // Packages from upstream that are not (yet) compiled in the Fabric port. Each entry is tracked in NOTES.md "Stubbed / disabled".
 def excludedFromCompile = [
+        // 26.1 port, phase 1: all third-party integrations are compiled out until core builds
+        'mekanism/client/recipe_viewer/jei/**',
+        'mekanism/client/recipe_viewer/emi/**',
+        'mekanism/common/integration/crafttweaker/**',
+        'mekanism/common/integration/lookingat/**',
+        'mekanism/common/integration/computer/computercraft/**',
+        'mekanism/common/integration/gender/**',
         // Curios client renderer (Curios is NeoForge-only; Fabric equivalent TBD) - phase 9
         'mekanism/client/render/MekanismCurioRenderer.java',
+        // Trinkets integration sources (Trinkets is not on the 26.1 classpath yet) - phase 9
+        'mekanism/fabric/compat/trinkets/**',
         // Third-party integrations compiled against NeoForge builds of other mods - phase 9
+        'mekanism/fabric/compat/recipeviewer/**',
+        'mekanism/fabric/compat/computer/**',
         // CraftTweaker add-on bridges whose targets do not exist on Fabric 1.21.1 (ProjectE, JeiTweaker)
         'mekanism/common/integration/crafttweaker/projecte/**',
         'mekanism/common/integration/crafttweaker/jeitweaker/**',
@@ -72,12 +83,18 @@ def overridesDir = file('src/fabric/overrides/java')
 def overriddenFiles = overridesDir.exists() ? fileTree(overridesDir).matching { include('**/*.java') }.files.collect {
     overridesDir.toPath().relativize(it.toPath()).toString().replace(File.separator, '/')
 } : []
+// Exclusions apply to upstream sources only: an override may replace a file from an excluded package (stub of a disabled integration)
+def isExcludedPath = { String path ->
+    excludedFromCompile.any { pattern ->
+        pattern.endsWith('/**') ? path.startsWith(pattern.substring(0, pattern.length() - 3) + '/') : path == pattern
+    }
+}
 
 sourceSets {
     main {
         java {
             srcDirs = ['src/api/java', 'src/main/java', 'src/fabric/java', 'src/fabric/overrides/java']
-            exclude(excludedFromCompile)
+            exclude { FileTreeElement e -> !e.file.toPath().startsWith(overridesDir.toPath()) && isExcludedPath(e.relativePath.pathString) }
             // Drop the upstream copy of overridden files (but never the override itself)
             exclude { FileTreeElement e -> !e.file.toPath().startsWith(overridesDir.toPath()) && overriddenFiles.contains(e.relativePath.pathString) }
         }
@@ -90,7 +107,7 @@ sourceSets {
 }
 
 // Generators / Additions / Tools: each its own Fabric mod (src/<module> upstream code + src/fabric/<module> bootstrap)
-def mekModules = ['generators', 'additions', 'tools']
+def mekModules = []  // 26.1: core only for now; modules come back once core builds
 def moduleExcludes = [
 ]
 sourceSets {
@@ -141,20 +158,8 @@ loom {
         mekanism_fabric_gametest {
             sourceSet sourceSets.gametest
         }
-        mekanismgenerators_fabric {
-            sourceSet sourceSets.generators
-        }
-        mekanismadditions_fabric {
-            sourceSet sourceSets.additions
-        }
-        mekanismtools_fabric {
-            sourceSet sourceSets.tools
-        }
     }
     accessWidenerPath = file('src/fabric/resources/mekanism.accesswidener')
-    mixin {
-        defaultRefmapName = 'mekanism_fabric.refmap.json'
-    }
     runs {
         client {
             client()
@@ -201,63 +206,24 @@ loom {
 
 dependencies {
     minecraft("com.mojang:minecraft:${minecraft_version}")
-    mappings(loom.layered {
-        officialMojangMappings()
-        parchment("org.parchmentmc.data:parchment-${parchment_minecraft_version}:${parchment_mappings_version}@zip")
-    })
-    modImplementation("net.fabricmc:fabric-loader:${loader_version}")
-    modImplementation("net.fabricmc.fabric-api:fabric-api:${fabric_version}")
+    implementation("net.fabricmc:fabric-loader:${loader_version}")
+    implementation("net.fabricmc.fabric-api:fabric-api:${fabric_version}")
+    // Game test support (not bundled in the fabric-api umbrella)
+    gametestImplementation("net.fabricmc.fabric-api:fabric-gametest-api-v1:4.0.34+3434d6d95d")
 
     // Config: real NeoForge ModConfigSpec API on Fabric (NOTES.md D7). Required dependency, not bundled.
-    modApi("fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${fcap_version}")
+    implementation("fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${fcap_version}")
     // Energy interop (NOTES.md D8)
-    modApi(include("teamreborn:energy:${tr_energy_version}"))
+    implementation(include("teamreborn:energy:${tr_energy_version}"))
     // Listener event-type resolution for the shim event bus (NOTES.md D2)
     implementation(include("net.jodah:typetools:${typetools_version}"))
     // Provided transitively by NeoForge upstream
     compileOnly('com.google.code.findbugs:jsr305:3.0.2')
+    compileOnly('com.google.errorprone:error_prone_annotations:2.48.0')
+    compileOnly('org.checkerframework:checker-qual:3.42.0')
     implementation(include('org.apache.maven:maven-artifact:3.9.9')) { transitive = false }
 
-    // Third-party APIs (compile only) so upstream's integration-facing code compiles unchanged. Runtime integrations are phase 9.
-    compileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
-    modCompileOnly("mezz.jei:jei-${minecraft_version}-fabric-api:${jei_version}")
-    modCompileOnly("dev.emi:emi-fabric:${emi_version}:api")
-    modCompileOnly("mcp.mobius.waila:wthit-api:fabric-${wthit_version}") { transitive = false }
-    modCompileOnly("maven.modrinth:jade:${jade_version}") { transitive = false }
-    // "Looking at" overlays at dev runtime: -Plooking_at=jade|wthit (verification runs only; never bundled)
-    if (project.findProperty('looking_at') == 'jade') {
-        modLocalRuntime("maven.modrinth:jade:${jade_version}")
-    } else if (project.findProperty('looking_at') == 'wthit') {
-        modLocalRuntime("mcp.mobius.waila:wthit:fabric-${wthit_version}")
-        modLocalRuntime("lol.bai:badpackets:fabric-${badpackets_version}")
-    }
-    modCompileOnly("com.blamejared.crafttweaker:CraftTweaker-fabric-${minecraft_version}:${crafttweaker_version}") { transitive = false }
-    modCompileOnly("maven.modrinth:female-gender:${wildfire_gender_version}") { transitive = false }
-    modCompileOnly("dev.emi:trinkets:${trinkets_version}") { transitive = false }
-    modCompileOnly("org.ladysnake.cardinal-components-api:cardinal-components-base:${cca_version}") { transitive = false }
-    // Accessory slots at dev runtime: -Paccessories=trinkets (verification runs only; never bundled)
-    if (project.findProperty('accessories') == 'trinkets') {
-        modLocalRuntime("dev.emi:trinkets:${trinkets_version}")
-    }
-    // CraftTweaker at dev runtime: -Ptweaker=crt (verification runs only; never bundled)
-    if (project.findProperty('tweaker') == 'crt') {
-        modLocalRuntime("com.blamejared.crafttweaker:CraftTweaker-fabric-${minecraft_version}:${crafttweaker_version}")
-    }
-    // Wildfire's Female Gender Mod at dev runtime: -Pgender=true (verification runs only; never bundled)
-    if (project.findProperty('gender') == 'true') {
-        modLocalRuntime("maven.modrinth:female-gender:${wildfire_gender_version}")
-    }
-    // ComputerCraft at dev runtime: -Pcomputers=cc (verification runs only; never bundled)
-    if (project.findProperty('computers') == 'cc') {
-        modLocalRuntime("cc.tweaked:cc-tweaked-${minecraft_version}-fabric:${cc_tweaked_version}")
-    }
-    // Recipe viewers at dev runtime: -Precipe_viewer=jei|emi (verification runs only; never bundled)
-    if (project.findProperty('recipe_viewer') == 'jei') {
-        modLocalRuntime("mezz.jei:jei-${minecraft_version}-fabric:${jei_version}")
-    } else if (project.findProperty('recipe_viewer') == 'emi') {
-        modLocalRuntime("dev.emi:emi-fabric:${emi_version}")
-    }
-    compileOnly("cc.tweaked:cc-tweaked-${minecraft_version}-common-api:${cc_tweaked_version}")
+    // 26.1 port: third-party integration APIs are re-added per integration once core builds
 
     // Upstream's unit tests (src/test, plain JUnit 5 + jqwik)
     testImplementation("org.junit.jupiter:junit-jupiter-api:${junit_version}")
@@ -343,6 +309,8 @@ transformJson = { Object node ->
                 out[k] = '#c:' + v.substring('#neoforge:'.length())
             } else if (k == 'type' && neoIngredientTypes.contains(v)) {
                 out['fabric:type'] = v
+            } else if (k == 'neoforge:ingredient_type') {
+                out['fabric:type'] = v
             } else {
                 out[k] = transformJson(v)
             }
@@ -357,6 +325,22 @@ transformJson = { Object node ->
 
 (['processResources'] + mekModules.collect { "process${it.capitalize()}Resources".toString() }).each { taskName -> tasks.named(taskName, ProcessResources) {
     doLast {
+        // Model JSON: NeoForge selects custom model loaders with "loader", Fabric's model deserializer with "fabric:type"
+        def assetsDir = new File(destinationDir, 'assets')
+        if (assetsDir.exists()) {
+            assetsDir.eachFileRecurse { File f ->
+                if (f.name.endsWith('.json') && f.path.replace(File.separator, '/').contains('/models/')) {
+                    String text = f.getText('UTF-8')
+                    if (text.contains('"loader"')) {
+                        def json = new JsonSlurper().parseText(text)
+                        if (json instanceof Map && json.containsKey('loader')) {
+                            json['fabric:type'] = json.remove('loader')
+                            f.setText(JsonOutput.toJson(json), 'UTF-8')
+                        }
+                    }
+                }
+            }
+        }
         def dataDir = new File(destinationDir, 'data')
         if (dataDir.exists()) {
             dataDir.eachFileRecurse { File f ->
@@ -372,37 +356,6 @@ transformJson = { Object node ->
 }
 }
 
-// GameTest run with CraftTweaker: install the test script (and remove it again otherwise)
-tasks.matching { it.name == 'runGametest' }.configureEach {
-    doFirst {
-        def scripts = file('build/gametest/scripts')
-        if (project.findProperty('tweaker') == 'crt') {
-            copy { from('src/fabric/gametest/scripts'); into(scripts) }
-        } else {
-            delete(file('build/gametest/scripts/mekanism_port_test.zs'))
-        }
-    }
-}
-
-// Release jars: core (remapJar) plus one remapped jar per module, like upstream's separate Mekanism / Generators / Additions / Tools jars
-mekModules.each { moduleName ->
-    def displayName = "MekanismFabricated-${moduleName.capitalize()}"
-    def moduleJar = tasks.register("${moduleName}Jar", Jar) {
-        archiveBaseName = displayName
-        archiveClassifier = 'dev'
-        destinationDirectory = layout.buildDirectory.dir('devlibs')
-        from(sourceSets.getByName(moduleName).output)
-    }
-    def remapModuleJar = tasks.register("remap${moduleName.capitalize()}Jar", net.fabricmc.loom.task.RemapJarTask) {
-        inputFile = moduleJar.flatMap { it.archiveFile }
-        // Inherited Minecraft members called through core/module subclasses must be resolvable while remapping
-        classpath.from(sourceSets.getByName(moduleName).compileClasspath)
-        archiveBaseName = displayName
-        addNestedDependencies = false
-    }
-    tasks.named('build') { dependsOn(remapModuleJar) }
-}
-
 tasks.named('test', Test) {
     useJUnitPlatform()
 }
@@ -416,155 +369,4 @@ def propertyTest = tasks.register('propertyTest', Test) {
 }
 tasks.named('check') { dependsOn(propertyTest) }
 
-// Production (intermediary) runs of the release jars, for verification: the same automated smoke checks as the dev runs
-def productionMods = configurations.detachedConfiguration(
-        dependencies.create("net.fabricmc.fabric-api:fabric-api:${fabric_version}"),
-        dependencies.create("fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${fcap_version}"))
-productionMods.transitive = false
-['prodSmokeClient': 'mekanism_fabric.smokeTest', 'prodSmokeWorld': 'mekanism_fabric.smokeWorld'].each { taskName, flag ->
-    tasks.register(taskName, net.fabricmc.loom.task.prod.ClientProductionRunTask) {
-        group = 'verification'
-        dependsOn('bundleReleaseJar')
-        // Exactly the published jar plus its dependencies. setFrom, not from: Loom's production run task pre-adds the remapJar output (the core
-        // jar without the nested modules, same mod id), and Fabric would silently load only one of the two
-        mods.setFrom(layout.buildDirectory.file("release/MekanismFabricated-${project.version}.jar"), productionMods)
-        jvmArgs.add("-D${flag}=true")
-        runDir = file("run/${taskName}")
-    }
-}
-
-// Remapping trap: some Mekanism interfaces declare methods that classes only "implement" through an inherited Minecraft method (BlockEntity#getLevel,
-// #getBlockPos). Remapping renames the Minecraft method to intermediary but not Mekanism's own declarations, which throws AbstractMethodError in
-// production. After remapping, every Mekanism-declared method with one of these exact signatures (still named after its Mojang name) is renamed, with its
-// references, to the intermediary name of the vanilla method it mirrors - consistently across all jars. scripts/ImplChecker.java
-// (checkRemappedImplementations) verifies that no such gap remains.
-def interfaceBridgeRules = [
-        // [named name, intermediary descriptor, intermediary name of the Minecraft method it mirrors]
-        ['getLevel', '()Lnet/minecraft/class_1937;', 'method_10997'],
-        ['getBlockPos', '()Lnet/minecraft/class_2338;', 'method_11016'],
-]
-def collectBridgeMappings = { List<File> jars ->
-    def found = []
-    jars.each { File jarFile ->
-        new java.util.zip.ZipFile(jarFile).withCloseable { zip ->
-            zip.entries().findAll { it.name.endsWith('.class') && it.name.startsWith('mekanism/') }.each { entry ->
-                def reader = new org.objectweb.asm.ClassReader(zip.getInputStream(entry).bytes)
-                def owner = reader.className
-                reader.accept(new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9) {
-                    @Override
-                    org.objectweb.asm.MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
-                        def rule = interfaceBridgeRules.find { it[0] == name && it[1] == desc }
-                        if (rule != null && (access & org.objectweb.asm.Opcodes.ACC_STATIC) == 0) {
-                            found << [owner, name, desc, rule[2]]
-                        }
-                        return null
-                    }
-                }, org.objectweb.asm.ClassReader.SKIP_CODE)
-            }
-        }
-    }
-    return found
-}
-def intermediaryMinecraft = { loom.getMinecraftJars(net.fabricmc.loom.api.mappings.layered.MappingsNamespace.INTERMEDIARY) }
-// One TinyRemapper pass over all release jars together, so hierarchy and references resolve across jars (module classes inherit core methods).
-// Idempotent: once renamed, no matching Mojang-named declarations remain.
-def releaseJarTasks = { [tasks.named('remapJar')] + mekModules.collect { tasks.named("remap${it.capitalize()}Jar") } }
-def bridgeReleaseJars = tasks.register('bridgeReleaseJars') {
-    description = 'Renames Mekanism methods that mirror inherited Minecraft methods to their intermediary names in the release jars'
-    dependsOn(releaseJarTasks())
-    doLast {
-        def jars = releaseJarTasks().collect { it.get().archiveFile.get().asFile }
-        def mappings = collectBridgeMappings(jars)
-        if (mappings.isEmpty()) {
-            return
-        }
-        def remapper = net.fabricmc.tinyremapper.TinyRemapper.newRemapper()
-                .withMappings({ acceptor -> mappings.each { m -> acceptor.acceptMethod(new net.fabricmc.tinyremapper.IMappingProvider.Member(m[0], m[1], m[2]), m[3]) } } as net.fabricmc.tinyremapper.IMappingProvider)
-                .build()
-        def outputs = []
-        try {
-            intermediaryMinecraft().each { remapper.readClassPath(it) }
-            def tagged = jars.collect { jar ->
-                // Must end in .jar: TinyRemapper's output consumer treats other paths as directories
-                def output = new File(jar.parentFile, jar.name.replace('.jar', '-bridged.jar')).toPath()
-                def tag = remapper.createInputTag()
-                remapper.readInputs(tag, jar.toPath())
-                [jar.toPath(), output, tag]
-            }
-            tagged.each { input, output, tag ->
-                def consumer = new net.fabricmc.tinyremapper.OutputConsumerPath.Builder(output).build()
-                try {
-                    consumer.addNonClassFiles(input, net.fabricmc.tinyremapper.NonClassCopyMode.UNCHANGED, remapper)
-                    remapper.apply(consumer, tag)
-                } finally {
-                    consumer.close()
-                }
-                outputs << [input, output]
-            }
-        } finally {
-            remapper.finish()
-        }
-        outputs.each { input, output -> java.nio.file.Files.move(output, input, java.nio.file.StandardCopyOption.REPLACE_EXISTING) }
-        logger.lifecycle("Bridged ${mappings.size()} Mekanism method declarations in ${jars.size()} release jars")
-    }
-}
-tasks.named('build') { dependsOn(bridgeReleaseJars) }
-def implCheckerClasspath = configurations.detachedConfiguration(dependencies.create('org.ow2.asm:asm:9.7.1'))
-def checkRemappedImplementations = tasks.register('checkRemappedImplementations', JavaExec) {
-    group = 'verification'
-    description = 'Fails if a class in the release jars leaves an interface method unimplemented after remapping'
-    dependsOn(bridgeReleaseJars)
-    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of("${java_version}") }
-    classpath = implCheckerClasspath
-    mainClass = 'ImplChecker'
-    def releaseJars = [tasks.named('remapJar')] + mekModules.collect { tasks.named("remap${it.capitalize()}Jar") }
-    doFirst {
-        // Libraries: Minecraft (intermediary) and the Fabric API modules (their interfaces are injected into Minecraft classes too)
-        def fabricApiJars = configurations.modCompileClasspath.resolvedConfiguration.resolvedArtifacts
-                .findAll { it.moduleVersion.id.group == 'net.fabricmc.fabric-api' }.collect { it.file.absolutePath }
-        args = ['--fail', releaseJars.collect { it.get().archiveFile.get().asFile.absolutePath }.join(','),
-                (intermediaryMinecraft().collect { it.toAbsolutePath().toString() } + fabricApiJars).join(',')]
-        // Single-file source launch
-        jvmArgs = []
-        mainClass.set(file('scripts/ImplChecker.java').absolutePath)
-    }
-}
-tasks.named('check') { dependsOn(checkRemappedImplementations) }
-
-// The published artifact: one jar. Generators, Additions and Tools are nested in the core jar (Fabric jar-in-jar), so they still load as their own mods.
-def bundleReleaseJar = tasks.register('bundleReleaseJar') {
-    group = 'build'
-    description = 'Builds the single release jar (core with the module jars nested)'
-    dependsOn(bridgeReleaseJars)
-    def output = layout.buildDirectory.file("release/MekanismFabricated-${project.version}.jar")
-    outputs.file(output)
-    outputs.upToDateWhen { false }
-    doLast {
-        def core = tasks.named('remapJar').get().archiveFile.get().asFile
-        def modules = mekModules.collect { tasks.named("remap${it.capitalize()}Jar").get().archiveFile.get().asFile }
-        def target = output.get().asFile
-        target.parentFile.mkdirs()
-        new java.util.zip.ZipFile(core).withCloseable { zin ->
-            new java.util.zip.ZipOutputStream(new FileOutputStream(target)).withCloseable { zout ->
-                zin.entries().each { entry ->
-                    zout.putNextEntry(new java.util.zip.ZipEntry(entry.name))
-                    if (entry.name == 'fabric.mod.json') {
-                        def json = new groovy.json.JsonSlurper().parse(zin.getInputStream(entry), 'UTF-8')
-                        json.jars = (json.jars ?: []) + modules.collect { [file: "META-INF/jars/${it.name}".toString()] }
-                        zout.write(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(json)).getBytes('UTF-8'))
-                    } else if (!entry.isDirectory()) {
-                        zout << zin.getInputStream(entry)
-                    }
-                    zout.closeEntry()
-                }
-                modules.each { module ->
-                    zout.putNextEntry(new java.util.zip.ZipEntry("META-INF/jars/${module.name}"))
-                    zout << module.bytes
-                    zout.closeEntry()
-                }
-            }
-        }
-        logger.lifecycle("Release jar: ${target}")
-    }
-}
-tasks.named('build') { dependsOn(bundleReleaseJar) }
+// Release: 26.1 is not obfuscated, so the jar task output is the release jar (no remapping, no interface bridges needed)

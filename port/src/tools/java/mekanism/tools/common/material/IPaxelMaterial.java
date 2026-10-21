@@ -1,8 +1,7 @@
 package mekanism.tools.common.material;
 
-import net.minecraft.MethodsReturnNonnullByDefault;
+import net.minecraft.world.item.ToolMaterial;
 
-@MethodsReturnNonnullByDefault
 public interface IPaxelMaterial {
 
     float getPaxelDamage();
@@ -16,4 +15,6 @@ public interface IPaxelMaterial {
     float getPaxelEfficiency();
 
     int getPaxelEnchantability();
+
+    ToolMaterial toToolMaterial();
 }

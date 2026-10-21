@@ -13,16 +13,15 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
-import mekanism.neoshim.neoforge.items.IItemHandler;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
 
 public class RadiationUtil {
 
-    /**
-     * Calculates approximately how long in ticks radiation will take to decay
-     *
-     * @param magnitude Magnitude
-     * @param source    {@code true} for if it is a {@link IRadiationSource} or an {@link IRadiationEntity} decaying
-     */
+    /// Calculates approximately how long in ticks radiation will take to decay
+    ///
+    /// @param magnitude    Magnitude
+    /// @param source`true` for if it is a [IRadiationSource] or an [IRadiationEntity] decaying
     public static long getDecayTime(double magnitude, boolean source) {
         double decayRate = source ? MekanismConfig.general.radiationSourceDecayRate.get() : MekanismConfig.general.radiationTargetDecayRate.get();
         long ticks = 0;
@@ -46,10 +45,10 @@ public class RadiationUtil {
             }
         }
         if (resistance < 1 && Mekanism.hooks.curios.isLoaded()) {
-            IItemHandler handler = CuriosIntegration.getCuriosInventory(entity);
+            ResourceHandler<ItemResource> handler = CuriosIntegration.getCuriosInventory(entity);
             if (handler != null) {
-                for (int i = 0, slots = handler.getSlots(); i < slots; i++) {
-                    ItemStack stack = handler.getStackInSlot(i);
+                for (int i = 0, slots = handler.size(); i < slots; i++) {
+                    ItemStack stack = handler.getResource(i).toStack();
                     IRadiationShielding shielding = stack.getCapability(Capabilities.RADIATION_SHIELDING);
                     if (shielding != null) {
                         resistance += shielding.getRadiationShielding();

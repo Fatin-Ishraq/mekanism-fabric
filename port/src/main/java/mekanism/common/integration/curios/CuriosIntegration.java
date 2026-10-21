@@ -7,47 +7,49 @@ import mekanism.client.render.armor.ICustomArmor;
 import mekanism.client.render.armor.ISpecialGear;
 import mekanism.common.Mekanism;
 import mekanism.common.registries.MekanismItems;
+import mekanism.common.util.ItemAccessUtils;
 import net.minecraft.core.Holder;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import mekanism.neoshim.bus.api.IEventBus;
 import mekanism.neoshim.fml.event.lifecycle.FMLClientSetupEvent;
 import mekanism.neoshim.neoforge.client.extensions.common.IClientItemExtensions;
-import mekanism.neoshim.neoforge.items.IItemHandler;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import org.jspecify.annotations.Nullable;
 import top.theillusivec4.curios.api.CuriosCapability;
 import top.theillusivec4.curios.api.SlotResult;
-import top.theillusivec4.curios.api.client.CuriosRendererRegistry;
+import top.theillusivec4.curios.api.client.ICurioRenderer;
 import top.theillusivec4.curios.api.type.capability.ICuriosItemHandler;
 import top.theillusivec4.curios.api.type.inventory.ICurioStacksHandler;
 
 public class CuriosIntegration {
 
     public static void addListeners(IEventBus bus) {
-        bus.addListener((FMLClientSetupEvent event) -> registerRenderers(MekanismItems.JETPACK, MekanismItems.ARMORED_JETPACK));
+        bus.addListener((FMLClientSetupEvent _) -> registerRenderers(MekanismItems.JETPACK, MekanismItems.ARMORED_JETPACK));
     }
 
     @SafeVarargs
     private static void registerRenderers(Holder<Item>... items) {
-        for (Holder<Item> item : items) {
-            if (item.value() instanceof ArmorItem armor && IClientItemExtensions.of(armor) instanceof ISpecialGear gear) {
+        for (Holder<Item> holder : items) {
+            Item item = holder.value();
+            if (IClientItemExtensions.of(item) instanceof ISpecialGear gear) {
                 ICustomArmor customArmor = gear.gearModel();
-                CuriosRendererRegistry.register(armor, () -> new MekanismCurioRenderer(customArmor));
+                ICurioRenderer.register(item, () -> new MekanismCurioRenderer(customArmor));
             } else {
-                Mekanism.logger.warn("Attempted to register Curios renderer for non-special gear item: {}.", item.getRegisteredName());
+                Mekanism.logger.warn("Attempted to register Curios renderer for non-special gear item: {}.", holder.getRegisteredName());
             }
         }
     }
 
     @Nullable
-    public static IItemHandler getCuriosInventory(LivingEntity entity) {
+    public static ResourceHandler<ItemResource> getCuriosInventory(LivingEntity entity) {
         return entity.getCapability(CuriosCapability.ITEM_HANDLER);
     }
 
-    public static Optional<SlotResult> findFirstCurioAsResult(@NotNull LivingEntity entity, Predicate<ItemStack> filter) {
+    public static Optional<SlotResult> findFirstCurioAsResult(LivingEntity entity, Predicate<ItemStack> filter) {
         ICuriosItemHandler capability = entity.getCapability(CuriosCapability.INVENTORY);
         if (capability == null) {
             return Optional.empty();
@@ -55,13 +57,15 @@ public class CuriosIntegration {
         return capability.findFirstCurio(filter);
     }
 
-    public static ItemStack findFirstCurio(@NotNull LivingEntity entity, Predicate<ItemStack> filter) {
-        return findFirstCurioAsResult(entity, filter)
+    @Nullable
+    public static ItemAccess findFirstCurio(LivingEntity entity, Predicate<ItemAccess> filter) {
+        return findFirstCurioAsResult(entity, stack -> filter.test(ItemAccessUtils.sideEffectFreeAccess(stack)))
               .map(SlotResult::stack)
-              .orElse(ItemStack.EMPTY);
+              .map(ItemAccess::forStack)
+              .orElse(null);
     }
 
-    public static ItemStack getCurioStack(@NotNull LivingEntity entity, String slotType, int slot) {
+    public static ItemStack getCurioStack(LivingEntity entity, String slotType, int slot) {
         ICuriosItemHandler capability = entity.getCapability(CuriosCapability.INVENTORY);
         if (capability == null) {
             return ItemStack.EMPTY;

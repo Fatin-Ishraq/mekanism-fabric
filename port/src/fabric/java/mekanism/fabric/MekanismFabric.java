@@ -30,6 +30,7 @@ public class MekanismFabric implements ModInitializer {
         ModBusLifecycle.addMod(container);
 
         IngredientCodecs.registerNeoForgeIngredientTypes();
+        mekanism.neoshim.neoforge.fluids.crafting.display.FluidDisplays.init();
         GameEventBridge.init();
         mekanism.fabric.datamaps.DataMapLoader.init();
         mekanism.fabric.menu.ExtendedMenus.init();
@@ -55,7 +56,7 @@ public class MekanismFabric implements ModInitializer {
               count(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE), count(net.minecraft.core.registries.BuiltInRegistries.MENU),
               count(mekanism.api.MekanismAPI.CHEMICAL_REGISTRY));
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STARTED.register(server -> {
-            long recipes = server.getRecipeManager().getRecipes().stream().filter(r -> r.id().getNamespace().startsWith(Mekanism.MODID)).count();
+            long recipes = server.getRecipeManager().getRecipes().stream().filter(r -> r.id().identifier().getNamespace().startsWith(Mekanism.MODID)).count();
             Mekanism.logger.info("[Fabric port] Loaded {} recipes in mekanism* namespaces", recipes);
         });
     }

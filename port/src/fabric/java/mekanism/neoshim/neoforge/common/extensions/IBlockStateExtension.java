@@ -3,6 +3,7 @@ package mekanism.neoshim.neoforge.common.extensions;
 import mekanism.neoshim.neoforge.common.ItemAbility;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
@@ -17,7 +18,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.level.pathfinder.PathType;
-import net.minecraft.world.phys.HitResult;
 import org.jetbrains.annotations.Nullable;
 
 /** Injected into {@link BlockBehaviour.BlockStateBase}; delegates to {@link IBlockExtension}. */
@@ -35,15 +35,15 @@ public interface IBlockStateExtension {
         return self().getBlock().getExplosionResistance(self(), level, pos, explosion);
     }
 
-    default ItemStack getCloneItemStack(HitResult target, LevelReader level, BlockPos pos, Player player) {
-        return self().getBlock().getCloneItemStack(self(), target, level, pos, player);
+    default ItemStack getCloneItemStack(BlockPos pos, LevelReader level, boolean includeData, Player player) {
+        return self().getBlock().getCloneItemStack(level, pos, self(), includeData, player);
     }
 
-    default boolean onDestroyedByPlayer(Level level, BlockPos pos, Player player, boolean willHarvest, FluidState fluid) {
-        return self().getBlock().onDestroyedByPlayer(self(), level, pos, player, willHarvest, fluid);
+    default boolean onDestroyedByPlayer(Level level, BlockPos pos, Player player, ItemStack toolStack, boolean willHarvest, FluidState fluid) {
+        return self().getBlock().onDestroyedByPlayer(self(), level, pos, player, toolStack, willHarvest, fluid);
     }
 
-    default void onBlockExploded(Level level, BlockPos pos, Explosion explosion) {
+    default void onBlockExploded(ServerLevel level, BlockPos pos, Explosion explosion) {
         self().getBlock().onBlockExploded(self(), level, pos, explosion);
     }
 
@@ -64,7 +64,7 @@ public interface IBlockStateExtension {
         self().getBlock().onNeighborChange(self(), level, pos, neighbor);
     }
 
-    default boolean canConnectRedstone(BlockGetter level, BlockPos pos, @Nullable Direction direction) {
+    default boolean canRedstoneConnectTo(BlockGetter level, BlockPos pos, @Nullable Direction direction) {
         return self().getBlock().canConnectRedstone(self(), level, pos, direction);
     }
 

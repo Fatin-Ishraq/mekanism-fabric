@@ -1,15 +1,17 @@
 package mekanism.tools.common.material.impl.vanilla;
 
 import mekanism.tools.common.material.VanillaPaxelMaterial;
-import net.minecraft.MethodsReturnNonnullByDefault;
-import net.minecraft.world.item.Tiers;
+import net.minecraft.world.item.ToolMaterial;
 
-@MethodsReturnNonnullByDefault
 public class IronPaxelMaterialDefaults extends VanillaPaxelMaterial {
 
+    public IronPaxelMaterialDefaults() {
+        super("iron");
+    }
+
     @Override
-    public Tiers getVanillaTier() {
-        return Tiers.IRON;
+    public ToolMaterial getVanillaTier() {
+        return ToolMaterial.IRON;
     }
 
     @Override

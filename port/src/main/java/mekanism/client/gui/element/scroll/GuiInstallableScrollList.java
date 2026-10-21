@@ -3,18 +3,18 @@ package mekanism.client.gui.element.scroll;
 import java.util.List;
 import mekanism.api.text.EnumColor;
 import mekanism.client.gui.IGuiWrapper;
-import mekanism.client.render.MekanismRenderer;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.CommonColors;
 import net.minecraft.world.item.ItemStack;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public abstract class GuiInstallableScrollList<TYPE> extends GuiScrollList {
 
-    private final ResourceLocation texture;
+    private final Identifier texture;
     private final int textureWidth;
     private final int textureHeight;
     @Nullable
@@ -22,9 +22,9 @@ public abstract class GuiInstallableScrollList<TYPE> extends GuiScrollList {
     @Nullable
     protected ScreenRectangle cachedTooltipRect;
 
-    protected GuiInstallableScrollList(IGuiWrapper gui, int x, int y, int height, ResourceLocation background, int backgroundSideSize,
-          ResourceLocation texture, int textureWidth, int textureHeight) {
-        super(gui, x, y, textureWidth + 8, height, textureHeight / 3, background, backgroundSideSize);
+    protected GuiInstallableScrollList(IGuiWrapper gui, int x, int y, int height, Identifier background,
+          Identifier texture, int textureWidth, int textureHeight) {
+        super(gui, x, y, textureWidth + 8, height, textureHeight / 3, background);
         this.texture = texture;
         this.textureWidth = textureWidth;
         this.textureHeight = textureHeight;
@@ -32,7 +32,7 @@ public abstract class GuiInstallableScrollList<TYPE> extends GuiScrollList {
 
     protected abstract List<TYPE> getCurrentInstalled();
 
-    protected abstract void drawName(GuiGraphics guiGraphics, TYPE type, int multipliedElement);
+    protected abstract void drawName(GuiGraphicsExtractor guiGraphics, TYPE type, int multipliedElement);
 
     protected abstract ItemStack getRenderStack(TYPE type);
 
@@ -61,7 +61,7 @@ public abstract class GuiInstallableScrollList<TYPE> extends GuiScrollList {
         }
     }
 
-    protected abstract void setSelected(TYPE newType);
+    protected abstract void setSelected(@Nullable TYPE newType);
 
     @Override
     public void clearSelection() {
@@ -69,7 +69,7 @@ public abstract class GuiInstallableScrollList<TYPE> extends GuiScrollList {
     }
 
     @Override
-    public void renderForeground(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    public void renderForeground(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         super.renderForeground(guiGraphics, mouseX, mouseY);
         int currentSelection = getCurrentSelection();
         List<TYPE> currentInstalled = getCurrentInstalled();
@@ -79,11 +79,10 @@ public abstract class GuiInstallableScrollList<TYPE> extends GuiScrollList {
         }
     }
 
-    protected void drawNameText(GuiGraphics guiGraphics, int y, Component name, int color, float scale) {
+    protected void drawNameText(GuiGraphicsExtractor guiGraphics, int y, Component name, int color, float scale) {
         drawScaledScrollingString(guiGraphics, name, 13, y, TextAlignment.LEFT, color, barXShift - 16, 0, false, scale);
     }
 
-    @NotNull
     @Override
     protected ScreenRectangle getTooltipRectangle(int mouseX, int mouseY) {
         return cachedTooltipRect == null ? super.getTooltipRectangle(mouseX, mouseY) : cachedTooltipRect;
@@ -95,7 +94,7 @@ public abstract class GuiInstallableScrollList<TYPE> extends GuiScrollList {
     }
 
     @Override
-    public void renderElements(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void renderElements(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         //Draw elements
         List<TYPE> currentInstalled = getCurrentInstalled();
         int currentSelection = getCurrentSelection();
@@ -111,14 +110,8 @@ public abstract class GuiInstallableScrollList<TYPE> extends GuiScrollList {
                 j = 0;
             }
             EnumColor color = getColor(type);
-            if (color != null) {
-                MekanismRenderer.color(guiGraphics, color);
-            }
-            guiGraphics.blit(texture, relativeX + 1, relativeY + 1 + multipliedElement, 0, elementHeight * j, textureWidth,
-                  elementHeight, textureWidth, textureHeight);
-            if (color != null) {
-                MekanismRenderer.resetColor(guiGraphics);
-            }
+            guiGraphics.blit(RenderPipelines.GUI_TEXTURED, texture, relativeX + 1, relativeY + 1 + multipliedElement, 0, elementHeight * j, textureWidth,
+                  elementHeight, textureWidth, textureHeight, color == null ? CommonColors.WHITE : color.getPackedColor());
         }
         //Note: This needs to be in its own loop as rendering the items is likely to cause the texture manager to be bound to a different texture
         // and thus would make the selection area background get all screwed up
