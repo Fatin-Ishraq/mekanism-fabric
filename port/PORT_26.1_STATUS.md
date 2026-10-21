@@ -2,6 +2,8 @@
 
 Last compile: `./gradlew compileJava compileGametestJava compileTestJava` → **0 errors** (was 2,008 error lines at the ingredient-rewrite handoff). `test` + `propertyTest` (58 tests) → **BUILD SUCCESSFUL** under the Fabric Loader JUnit runtime.
 
+Merge: `origin/26.1` advanced by two "not compiled yet" WIP commits (dca50bf7) that reworked the client shim/mixin layer and deleted files this tree depends on (`VanillaFluidClientExtensions`, `AbstractContainerScreenInjectMixin`, `IScreenExtension`). The merge is resolved to the locally verified content — the merged tree is byte-identical to `c5a7b329` and the remote-only additions (dead fluid-ingredient island, orphan mixins) are dropped. Compile + tests re-green after the merge.
+
 ## Done
 - Toolchain: non-remapping Loom 1.19.1, Java 25, Gradle 9.8.1, Fabric API 0.155.3+26.1.2 (core only, integrations excluded).
 - Transfer layer: NeoForge 26.1 `ResourceHandler`/`Transaction`/`ItemAccess` shim over the Fabric Transfer API; `Capabilities` + `CapabilityBridge` rewritten.
