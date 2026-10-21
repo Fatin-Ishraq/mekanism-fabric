@@ -52,6 +52,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import mekanism.neoshim.neoforge.fluids.FluidStack;
 import org.jspecify.annotations.Nullable;
+import mekanism.neoshim.neoforge.util.ContextMaps;
 
 public abstract class BaseCrTExampleProvider implements DataProvider {
 
@@ -253,7 +254,7 @@ public abstract class BaseCrTExampleProvider implements DataProvider {
                   if (ingredient.ingredient() instanceof TagChemicalIngredient tagged) {
                       return CrTUtils.chemicalTags().tag(tagged.tag()).withAmount(ingredient.amount()).getCommandString();
                   } else {
-                      List<ChemicalStack> chemicals = ingredient.getRepresentations(ContextMap.EMPTY);
+                      List<ChemicalStack> chemicals = ingredient.getRepresentations(ContextMaps.EMPTY);
                       if (chemicals.size() == 1) {
                           return new CrTChemicalStack(chemicals.getFirst()).getCommandString();
                       }
@@ -268,7 +269,7 @@ public abstract class BaseCrTExampleProvider implements DataProvider {
             String tagRepresentation = tagManager.tag(tagged.tag()).getCommandString();
             return ingredientType + ".from(" + tagRepresentation + ", " + ingredient.amount() + ")";
         }
-        List<ChemicalStack> chemicals = ingredient.getRepresentations(ContextMap.EMPTY);
+        List<ChemicalStack> chemicals = ingredient.getRepresentations(ContextMaps.EMPTY);
         if (chemicals.size() == 1) {
             String stackRepresentation = singleDescription.apply(chemicals.getFirst()).getCommandString();
             return ingredientType + ".from(" + stackRepresentation + ")";

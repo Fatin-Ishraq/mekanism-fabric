@@ -38,7 +38,6 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import mekanism.neoshim.neoforge.client.network.ClientPacketDistributor;
 import mekanism.neoshim.neoforge.network.PacketDistributor;
-import mekanism.neoshim.neoforge.network.connection.ConnectionType;
 import mekanism.neoshim.neoforge.network.handling.IPayloadContext;
 import mekanism.neoshim.neoforge.server.ServerLifecycleHooks;
 import org.jspecify.annotations.Nullable;
@@ -77,7 +76,8 @@ public class PacketUtils {
     }
 
     public static <OBJ extends @Nullable Object> OBJ read(RegistryAccess registryAccess, byte[] rawData, Function<RegistryFriendlyByteBuf, OBJ> deserializer) {
-        RegistryFriendlyByteBuf buffer = new RegistryFriendlyByteBuf(Unpooled.wrappedBuffer(rawData), registryAccess, ConnectionType.NEOFORGE);
+        //FABRIC: vanilla buffers have no NeoForge connection-type argument; Fabric payloads carry their own type on the wire
+        RegistryFriendlyByteBuf buffer = new RegistryFriendlyByteBuf(Unpooled.wrappedBuffer(rawData), registryAccess);
         try {
             return deserializer.apply(buffer);
         } finally {

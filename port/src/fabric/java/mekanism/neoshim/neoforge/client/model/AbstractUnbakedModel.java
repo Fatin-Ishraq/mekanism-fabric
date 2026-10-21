@@ -22,9 +22,8 @@ public abstract class AbstractUnbakedModel implements UnbakedModel {
         return parameters.ambientOcclusion();
     }
 
-    @Nullable
     @Override
-    public UnbakedModel.GuiLight guiLight() {
+    public UnbakedModel.@Nullable GuiLight guiLight() {
         return parameters.guiLight();
     }
 

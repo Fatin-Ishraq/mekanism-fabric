@@ -2,26 +2,26 @@ package mekanism.neoshim.neoforge.client.event;
 
 import mekanism.neoshim.bus.api.Event;
 import mekanism.neoshim.bus.api.ICancellableEvent;
+import mekanism.neoshim.neoforge.client.gui.GuiLayer;
 import net.minecraft.client.DeltaTracker;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.LayeredDraw;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.resources.Identifier;
 
 public abstract class RenderGuiLayerEvent extends Event {
 
-    private final GuiGraphics guiGraphics;
+    private final GuiGraphicsExtractor guiGraphics;
     private final DeltaTracker partialTick;
     private final Identifier name;
-    private final LayeredDraw.Layer layer;
+    private final GuiLayer layer;
 
-    protected RenderGuiLayerEvent(GuiGraphics guiGraphics, DeltaTracker partialTick, Identifier name, LayeredDraw.Layer layer) {
+    protected RenderGuiLayerEvent(GuiGraphicsExtractor guiGraphics, DeltaTracker partialTick, Identifier name, GuiLayer layer) {
         this.guiGraphics = guiGraphics;
         this.partialTick = partialTick;
         this.name = name;
         this.layer = layer;
     }
 
-    public GuiGraphics getGuiGraphics() {
+    public GuiGraphicsExtractor getGuiGraphics() {
         return guiGraphics;
     }
 
@@ -33,20 +33,20 @@ public abstract class RenderGuiLayerEvent extends Event {
         return name;
     }
 
-    public LayeredDraw.Layer getLayer() {
+    public GuiLayer getLayer() {
         return layer;
     }
 
     public static class Pre extends RenderGuiLayerEvent implements ICancellableEvent {
 
-        public Pre(GuiGraphics guiGraphics, DeltaTracker partialTick, Identifier name, LayeredDraw.Layer layer) {
+        public Pre(GuiGraphicsExtractor guiGraphics, DeltaTracker partialTick, Identifier name, GuiLayer layer) {
             super(guiGraphics, partialTick, name, layer);
         }
     }
 
     public static class Post extends RenderGuiLayerEvent {
 
-        public Post(GuiGraphics guiGraphics, DeltaTracker partialTick, Identifier name, LayeredDraw.Layer layer) {
+        public Post(GuiGraphicsExtractor guiGraphics, DeltaTracker partialTick, Identifier name, GuiLayer layer) {
             super(guiGraphics, partialTick, name, layer);
         }
     }

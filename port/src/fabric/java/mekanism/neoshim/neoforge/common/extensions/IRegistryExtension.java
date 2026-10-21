@@ -29,7 +29,7 @@ public interface IRegistryExtension<T> {
 
     @Nullable
     default <A> A getData(DataMapType<T, A> type, ResourceKey<T> key) {
-        return self().getHolder(key).map(holder -> DataMapLoader.getData(type, (Holder<T>) holder)).orElse(null);
+        return self().get(key).map(holder -> DataMapLoader.getData(type, (Holder<T>) holder)).orElse(null);
     }
 
     default boolean containsValue(T value) {

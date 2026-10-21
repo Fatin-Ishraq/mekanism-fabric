@@ -52,6 +52,7 @@ import mekanism.neoshim.neoforge.fluids.FluidStack;
 import mekanism.neoshim.neoforge.fluids.FluidStackTemplate;
 import mekanism.neoshim.neoforge.registries.DeferredHolder;
 import org.jspecify.annotations.Nullable;
+import mekanism.neoshim.neoforge.util.ContextMaps;
 
 public abstract class TypedMekanismRecipeMapper<RECIPE extends MekanismRecipe<?>> implements IRecipeTypeMapper {
 
@@ -147,7 +148,7 @@ public abstract class TypedMekanismRecipeMapper<RECIPE extends MekanismRecipe<?>
           Function<STACK, OUTPUT> recipe, Predicate<OUTPUT> emptyChecker, Function<SequencedCollection<STACK>, Object2IntMap<NormalizedSimpleStack>> toIngredient,
           TriPredicate<IMappingCollector<NormalizedSimpleStack, Long>, OUTPUT, Object2IntMap<NormalizedSimpleStack>> conversionAdder) {
         Map<OUTPUT, List<STACK>> reverseLookup = new HashMap<>();
-        for (STACK representation : inputs.getRepresentations(ContextMap.EMPTY)) {
+        for (STACK representation : inputs.getRepresentations(ContextMaps.EMPTY)) {
             OUTPUT output = recipe.apply(representation);
             if (!emptyChecker.test(output)) {
                 reverseLookup.computeIfAbsent(output, k -> new ArrayList<>()).add(representation);

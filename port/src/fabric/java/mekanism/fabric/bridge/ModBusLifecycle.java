@@ -15,7 +15,7 @@ import mekanism.neoshim.neoforge.attachment.AttachmentType;
 import mekanism.neoshim.neoforge.capabilities.RegisterCapabilitiesEvent;
 import mekanism.neoshim.neoforge.common.NeoForge;
 import mekanism.neoshim.neoforge.common.world.chunk.RegisterTicketControllersEvent;
-import mekanism.neoshim.neoforge.event.AddReloadListenerEvent;
+import mekanism.neoshim.neoforge.event.AddServerReloadListenersEvent;
 import mekanism.neoshim.neoforge.event.BuildCreativeModeTabContentsEvent;
 import mekanism.neoshim.neoforge.event.ModifyDefaultComponentsEvent;
 import mekanism.neoshim.neoforge.event.entity.EntityAttributeCreationEvent;
@@ -27,9 +27,9 @@ import mekanism.neoshim.neoforge.registries.NeoForgeRegistries;
 import mekanism.neoshim.neoforge.registries.NewRegistryEvent;
 import mekanism.neoshim.neoforge.registries.RegisterEvent;
 import mekanism.neoshim.neoforge.registries.datamaps.RegisterDataMapTypesEvent;
-import fuzs.forgeconfigapiport.fabric.api.neoforge.v4.NeoForgeModConfigEvents;
+import fuzs.forgeconfigapiport.fabric.api.v5.ModConfigEvents;
 import net.fabricmc.fabric.api.item.v1.DefaultItemComponentEvents;
-import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
+import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents;
 import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
@@ -64,9 +64,9 @@ public final class ModBusLifecycle {
     public static void addMod(ModContainer container) {
         MODS.add(container);
         //Bridge Forge Config API Port's config events onto the mod bus
-        NeoForgeModConfigEvents.loading(container.getModId()).register(config -> container.getEventBus().post(new ModConfigEvent.Loading(config)));
-        NeoForgeModConfigEvents.reloading(container.getModId()).register(config -> container.getEventBus().post(new ModConfigEvent.Reloading(config)));
-        NeoForgeModConfigEvents.unloading(container.getModId()).register(config -> container.getEventBus().post(new ModConfigEvent.Unloading(config)));
+        ModConfigEvents.loading(container.getModId()).register(config -> container.getEventBus().post(new ModConfigEvent.Loading(config)));
+        ModConfigEvents.reloading(container.getModId()).register(config -> container.getEventBus().post(new ModConfigEvent.Reloading(config)));
+        ModConfigEvents.unloading(container.getModId()).register(config -> container.getEventBus().post(new ModConfigEvent.Unloading(config)));
     }
 
     private static void postAll(Supplier<? extends Event> event) {
@@ -102,7 +102,7 @@ public final class ModBusLifecycle {
             }
         }
         for (ResourceKey<? extends Registry<?>> key : keys) {
-            Registry<?> registry = BuiltInRegistries.REGISTRY.get(key.location());
+            Registry<?> registry = BuiltInRegistries.REGISTRY.getValue(key.location());
             for (ModContainer mod : MODS) {
                 mod.getEventBus().post(new RegisterEvent(key, registry));
             }
@@ -136,33 +136,35 @@ public final class ModBusLifecycle {
         }
 
         // 4. Server data reload listeners (collected once; NeoForge collects per reload)
-        AddReloadListenerEvent reloadEvent = new AddReloadListenerEvent();
-        NeoForge.EVENT_BUS.post(reloadEvent);
         int index = 0;
-        for (PreparableReloadListener listener : reloadEvent.getListeners()) {
-            Identifier id = Identifier.fromNamespaceAndPath("mekanism_fabric", "reload_listener_" + index++);
-            ResourceManagerHelper.get(PackType.SERVER_DATA).registerReloadListener(new IdentifiableResourceReloadListener() {
-                @Override
-                public Identifier getFabricId() {
-                    return id;
-                }
+        for (ModContainer mod : MODS) {
+            AddServerReloadListenersEvent reloadEvent = new AddServerReloadListenersEvent();
+            mod.getEventBus().post(reloadEvent);
+            for (PreparableReloadListener listener : reloadEvent.getListeners()) {
+                Identifier id = Identifier.fromNamespaceAndPath("mekanism_fabric", "reload_listener_" + index++);
+                ResourceManagerHelper.get(PackType.SERVER_DATA).registerReloadListener(new IdentifiableResourceReloadListener() {
+                    @Override
+                    public Identifier getFabricId() {
+                        return id;
+                    }
 
-                @Override
-                public java.util.Collection<Identifier> getFabricDependencies() {
-                    return List.of(ResourceReloadListenerKeys.RECIPES, ResourceReloadListenerKeys.TAGS);
-                }
+                    @Override
+                    public java.util.Collection<Identifier> getFabricDependencies() {
+                        return List.of(ResourceReloadListenerKeys.RECIPES);
+                    }
 
-                @Override
-                public java.util.concurrent.CompletableFuture<Void> reload(PreparationBarrier barrier, ResourceManager manager, ProfilerFiller prepProfiler,
-                      ProfilerFiller applyProfiler, java.util.concurrent.Executor backgroundExecutor, java.util.concurrent.Executor gameExecutor) {
-                    return listener.reload(barrier, manager, prepProfiler, applyProfiler, backgroundExecutor, gameExecutor);
-                }
+                    @Override
+                    public java.util.concurrent.CompletableFuture<Void> reload(PreparableReloadListener.SharedState state,
+                          java.util.concurrent.Executor backgroundExecutor, PreparationBarrier barrier, java.util.concurrent.Executor gameExecutor) {
+                        return listener.reload(state, backgroundExecutor, barrier, gameExecutor);
+                    }
 
-                @Override
-                public String getName() {
-                    return listener.getName();
-                }
-            });
+                    @Override
+                    public String getName() {
+                        return listener.getName();
+                    }
+                });
+            }
         }
     }
 
@@ -182,22 +184,16 @@ public final class ModBusLifecycle {
         DefaultItemComponentEvents.MODIFY.register(context -> {
             postAllShared(event);
             for (ModifyDefaultComponentsEvent.Modification modification : event.getModifications()) {
-                context.modify(modification.filter(), (builder, item) -> {
-                    DataComponentPatch.Builder patchBuilder = DataComponentPatch.builder();
-                    modification.patch().accept(patchBuilder);
-                    for (Map.Entry<DataComponentType<?>, java.util.Optional<?>> component : patchBuilder.build().entrySet()) {
-                        builder.set((DataComponentType) component.getKey(), component.getValue().orElse(null));
-                    }
-                });
+                context.modify(modification.filter(), modification.initializer()::run);
             }
         });
     }
 
     private static void hookCreativeTabs() {
-        ItemGroupEvents.MODIFY_ENTRIES_ALL.register((group, entries) -> {
+        CreativeModeTabEvents.MODIFY_OUTPUT_ALL.register((group, output) -> {
             ResourceKey<CreativeModeTab> key = BuiltInRegistries.CREATIVE_MODE_TAB.getResourceKey(group).orElse(null);
             if (key != null) {
-                postAllShared(new BuildCreativeModeTabContentsEvent(group, key, entries));
+                postAllShared(new BuildCreativeModeTabContentsEvent(group, key, output));
             }
         });
     }

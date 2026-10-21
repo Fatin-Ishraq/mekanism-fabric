@@ -70,17 +70,23 @@
       "net/minecraft/world/item/ItemInstance": [
         "mekanism/neoshim/neoforge/common/extensions/ItemInstanceExtension"
       ],
+      "net/minecraft/core/component/DataComponentGetter": [
+        "mekanism/neoshim/neoforge/common/extensions/IDataComponentGetterExtension"
+      ],
       "net/minecraft/core/component/DataComponentHolder": [
         "mekanism/neoshim/neoforge/common/extensions/IDataComponentHolderExtension"
+      ],
+      "net/minecraft/resources/ResourceKey": [
+        "mekanism/neoshim/neoforge/common/extensions/IResourceKeyExtension"
+      ],
+      "net/minecraft/resources/Identifier": [
+        "mekanism/neoshim/neoforge/common/extensions/IResourceLocationExtension"
       ],
       "net/minecraft/core/component/DataComponentMap$Builder": [
         "mekanism/neoshim/neoforge/common/extensions/IDataComponentMapBuilderExtension"
       ],
       "net/minecraft/core/component/DataComponentPatch$Builder": [
         "mekanism/neoshim/neoforge/common/extensions/IDataComponentPatchBuilderExtension"
-      ],
-      "net/minecraft/world/level/block/entity/BlockEntity$DataComponentInput": [
-        "mekanism/neoshim/neoforge/common/extensions/IBlockEntityDataComponentInputExtension"
       ],
       "net/minecraft/world/item/Item$Properties": [
         "mekanism/neoshim/neoforge/common/extensions/IItemPropertiesExtension"
@@ -135,6 +141,9 @@
       ],
       "net/minecraft/world/item/crafting/Ingredient": [
         "mekanism/neoshim/neoforge/common/extensions/IIngredientExtension"
+      ],
+      "net/minecraft/util/random/WeightedList$Builder": [
+        "mekanism/neoshim/neoforge/common/extensions/IWeightedListBuilderExtension<TE;>"
       ],
       "net/minecraft/world/effect/MobEffectInstance": [
         "mekanism/neoshim/neoforge/common/extensions/IMobEffectInstanceExtension"
@@ -208,9 +217,6 @@
       "net/minecraft/client/particle/TerrainParticle": [
         "mekanism/neoshim/neoforge/client/extensions/ITerrainParticleExtension"
       ],
-      "net/minecraft/client/particle/ParticleEngine": [
-        "mekanism/neoshim/neoforge/client/extensions/IParticleEngineExtension"
-      ],
       "net/minecraft/client/renderer/block/dispatch/BlockStateModel": [
         "mekanism/neoshim/neoforge/client/extensions/BlockStateModelExtension"
       ],
@@ -231,6 +237,12 @@
       ],
       "net/minecraft/client/resources/model/ModelBakery$BakingResult": [
         "mekanism/neoshim/neoforge/client/extensions/BakingResultExtension"
+      ],
+      "net/minecraft/world/level/storage/ValueInput": [
+        "mekanism/neoshim/neoforge/common/extensions/IValueInputExtension"
+      ],
+      "net/minecraft/world/level/storage/ValueOutput": [
+        "mekanism/neoshim/neoforge/common/extensions/IValueOutputExtension"
       ]
     }
   }

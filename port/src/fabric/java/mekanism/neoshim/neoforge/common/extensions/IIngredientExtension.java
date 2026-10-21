@@ -1,5 +1,7 @@
 package mekanism.neoshim.neoforge.common.extensions;
 
+import net.minecraft.core.HolderSet;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.crafting.Ingredient;
 
 /** Injected into {@link Ingredient}. */
@@ -9,15 +11,19 @@ public interface IIngredientExtension {
         return (Ingredient) (Object) this;
     }
 
+    default boolean isCustom() {
+        return self().getCustomIngredient() != null;
+    }
+
     default boolean isSimple() {
         return !self().requiresTesting();
     }
 
     default boolean hasNoItems() {
-        return self().getItems().length == 0;
+        return self().isEmpty();
     }
 
-    default Ingredient.Value[] getValues() {
+    default HolderSet<Item> getValues() {
         return self().values;
     }
 }

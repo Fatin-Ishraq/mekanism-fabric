@@ -265,16 +265,7 @@ public abstract class VirtualSlotContainerScreen<T extends AbstractContainerMenu
         }
     }
 
-    @Override
-    protected void renderSlotContents(GuiGraphicsExtractor graphics, ItemStack itemStack, Slot slot, @Nullable String itemCount) {
-        if (slot instanceof IVirtualSlot virtualSlot) {
-            //TODO - 26.1: Re-evaluate overriding this method? I don't think this should ever be called as we override extractSlot and change the render call?
-            virtualSlot.updateRenderInfo(itemStack, false, itemCount);
-        } else {
-            //If we are not a virtual slot, the super method is good enough
-            super.renderSlotContents(graphics, itemStack, slot, itemCount);
-        }
-    }
+    //FABRIC: NeoForge's renderSlotContents hook has no 26.1 Fabric equivalent; the extractSlot override above handles virtual slots directly
 
     public boolean slotClicked(Slot slot, MouseButtonEvent event, boolean doubleClick) {
         //Copy of super.mouseClicked, minus the call to all the sub elements as we know how we are interacting with it

@@ -23,10 +23,9 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.CommonLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.registry.FuelRegistry;
+import net.fabricmc.fabric.api.registry.FuelValueEvents;
 import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
-import net.fabricmc.fabric.api.resource.ResourceReloadListenerKeys;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Registry;
@@ -44,10 +43,10 @@ import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.tags.TagKey;
-import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.item.Item;
 import org.jetbrains.annotations.Nullable;
 
@@ -63,7 +62,6 @@ public final class DataMapLoader {
     /** Raw entries from the last reload, waiting for tags to be bound. */
     private static Map<DataMapType<?, ?>, List<RawEntry>> pending = Map.of();
     private static final Identifier FURNACE_FUELS = Identifier.fromNamespaceAndPath("neoforge", "furnace_fuels");
-    private static final Map<Item, Integer> appliedFuels = new HashMap<>();
 
     private record RawEntry(String key, JsonElement value, boolean remove) {
     }
@@ -100,14 +98,9 @@ public final class DataMapLoader {
             }
 
             @Override
-            public java.util.Collection<Identifier> getFabricDependencies() {
-                return List.of(ResourceReloadListenerKeys.TAGS);
-            }
-
-            @Override
-            public CompletableFuture<Void> reload(PreparationBarrier barrier, ResourceManager manager, ProfilerFiller prepProfiler, ProfilerFiller applyProfiler,
-                  Executor backgroundExecutor, Executor gameExecutor) {
-                return CompletableFuture.supplyAsync(() -> load(manager), backgroundExecutor)
+            public CompletableFuture<Void> reload(PreparableReloadListener.SharedState state, Executor backgroundExecutor, PreparationBarrier barrier,
+                  Executor gameExecutor) {
+                return CompletableFuture.supplyAsync(() -> load(state.resourceManager()), backgroundExecutor)
                       .thenCompose(barrier::wait)
                       .thenAcceptAsync(loaded -> pending = loaded, gameExecutor);
             }
@@ -117,10 +110,18 @@ public final class DataMapLoader {
                 resolve(registries);
             }
         });
-        PayloadTypeRegistry.playS2C().register(SyncPayload.TYPE, SyncPayload.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(SyncPayload.TYPE, SyncPayload.STREAM_CODEC);
         ServerLifecycleEvents.SYNC_DATA_PACK_CONTENTS.register((player, joined) -> {
-            if (!player.server.isSingleplayerOwner(player.getGameProfile())) {
+            if (!player.server.isSingleplayerOwner(player.nameAndId())) {
                 ServerPlayNetworking.send(player, createSyncPayload(player.registryAccess()));
+            }
+        });
+        //Fabric has no FuelRegistry anymore: fuel values are built through FuelValueEvents, after the datapack tags have been bound
+        FuelValueEvents.BUILD.register((builder, context) -> {
+            Map<ResourceKey<?>, Object> values = VALUES.getOrDefault(TYPES.get(FURNACE_FUELS), Map.of());
+            for (Map.Entry<ResourceKey<?>, Object> entry : values.entrySet()) {
+                net.minecraft.core.registries.BuiltInRegistries.ITEM.getOptional(entry.getKey().location())
+                      .ifPresent(item -> builder.add(item, ((FurnaceFuel) entry.getValue()).burnTime()));
             }
         });
     }
@@ -166,7 +167,7 @@ public final class DataMapLoader {
         RegistryOps<JsonElement> ops = registries.createSerializationContext(JsonOps.INSTANCE);
         for (Map.Entry<DataMapType<?, ?>, List<RawEntry>> entry : pending.entrySet()) {
             DataMapType type = entry.getKey();
-            Registry registry = (Registry) registries.registry(type.registryKey()).orElse(null);
+            Registry registry = (Registry) registries.lookup(type.registryKey()).orElse(null);
             if (registry == null) {
                 continue;
             }
@@ -175,7 +176,9 @@ public final class DataMapLoader {
                 List<ResourceKey<?>> keys = new ArrayList<>();
                 if (raw.key().startsWith("#")) {
                     TagKey tag = TagKey.create(type.registryKey(), Identifier.parse(raw.key().substring(1)));
-                    registry.getTag(tag).ifPresent(set -> ((Iterable<Holder>) set).forEach(h -> h.unwrapKey().ifPresent(k -> keys.add((ResourceKey<?>) k))));
+                    for (Holder holder : (Iterable<Holder>) registry.getTagOrEmpty(tag)) {
+                        holder.unwrapKey().ifPresent(k -> keys.add((ResourceKey<?>) k));
+                    }
                 } else {
                     keys.add(ResourceKey.create(type.registryKey(), Identifier.parse(raw.key())));
                 }
@@ -190,27 +193,10 @@ public final class DataMapLoader {
             VALUES.put(type, new ConcurrentHashMap<>(resolved));
             fireUpdated(registries, registry, DataMapsUpdatedEvent.UpdateCause.SERVER_RELOAD);
         }
-        applyFurnaceFuels();
     }
 
     private static void fireUpdated(RegistryAccess registries, Registry<?> registry, DataMapsUpdatedEvent.UpdateCause cause) {
         NeoForge.EVENT_BUS.post(new DataMapsUpdatedEvent(registries, registry, cause));
-    }
-
-    private static void applyFurnaceFuels() {
-        DataMapType<?, ?> fuels = TYPES.get(FURNACE_FUELS);
-        for (Item item : appliedFuels.keySet()) {
-            FuelRegistry.INSTANCE.remove(item);
-        }
-        appliedFuels.clear();
-        Map<ResourceKey<?>, Object> values = VALUES.getOrDefault(fuels, Map.of());
-        for (Map.Entry<ResourceKey<?>, Object> entry : values.entrySet()) {
-            net.minecraft.core.registries.BuiltInRegistries.ITEM.getOptional(entry.getKey().location()).ifPresent(item -> {
-                int burnTime = ((FurnaceFuel) entry.getValue()).burnTime();
-                FuelRegistry.INSTANCE.add(item, burnTime);
-                appliedFuels.put(item, burnTime);
-            });
-        }
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -240,19 +226,19 @@ public final class DataMapLoader {
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static void applySync(CompoundTag root, RegistryAccess registries) {
         RegistryOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
-        for (String typeId : root.getAllKeys()) {
+        for (String typeId : root.keySet()) {
             DataMapType type = TYPES.get(Identifier.parse(typeId));
             if (type == null || type.networkCodec() == null) {
                 continue;
             }
             Map<ResourceKey<?>, Object> values = new ConcurrentHashMap<>();
-            for (Tag element : root.getList(typeId, Tag.TAG_COMPOUND)) {
+            for (Tag element : root.getListOrEmpty(typeId)) {
                 CompoundTag pair = (CompoundTag) element;
-                ResourceKey<?> key = ResourceKey.create(type.registryKey(), Identifier.parse(pair.getString("key")));
+                ResourceKey<?> key = ResourceKey.create(type.registryKey(), Identifier.parse(pair.getStringOr("key", "")));
                 ((Codec) type.networkCodec()).parse(ops, pair.get("value")).result().ifPresent(v -> values.put(key, v));
             }
             VALUES.put(type, values);
-            registries.registry(type.registryKey()).ifPresent(registry -> fireUpdated(registries, (Registry<?>) registry, DataMapsUpdatedEvent.UpdateCause.CLIENT_SYNC));
+            registries.lookup(type.registryKey()).ifPresent(registry -> fireUpdated(registries, (Registry<?>) registry, DataMapsUpdatedEvent.UpdateCause.CLIENT_SYNC));
         }
     }
 

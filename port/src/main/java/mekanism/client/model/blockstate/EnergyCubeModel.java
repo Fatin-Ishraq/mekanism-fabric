@@ -23,7 +23,6 @@ import net.minecraft.client.renderer.block.dispatch.ModelState;
 import net.minecraft.client.renderer.block.dispatch.Variant;
 import net.minecraft.client.resources.model.ModelBaker;
 import net.minecraft.client.resources.model.ResolvableModel;
-import net.minecraft.client.resources.model.ResolvedModel;
 import net.minecraft.client.resources.model.SimpleModelWrapper;
 import net.minecraft.client.resources.model.geometry.BakedQuad.MaterialFlags;
 import net.minecraft.client.resources.model.sprite.Material.Baked;
@@ -132,24 +131,24 @@ public class EnergyCubeModel implements DynamicBlockStateModel {
         @Override
         public EnergyCubeModel bake(ModelBaker baker) {
             Map<RelativeSide, Map<CubeSideState, BlockStateModelPart>> dynamicParts = new EnumMap<>(RelativeSide.class);
-            ResolvedModel model = baker.getModel(tierModel.modelLocation());
+            Identifier modelLocation = tierModel.modelLocation();
 
             ModelState tierModelState = tierModel.modelState().asModelState();
-            BlockStateModelPart frame = SimpleModelWrapper.bake(baker, model, tierModelState);
+            BlockStateModelPart frame = SimpleModelWrapper.bake(baker, modelLocation, tierModelState);
 
             for (RelativeSide side : EnumUtils.SIDES) {
                 Map<CubeSideState, BlockStateModelPart> sideMap = new HashMap<>(2);
                 dynamicParts.put(side, sideMap);
-                addSideState(baker, side, sideMap, model, tierModelState, CubeSideState.ACTIVE_LIT);
-                addSideState(baker, side, sideMap, model, tierModelState, CubeSideState.ACTIVE_UNLIT);
-                addSideState(baker, side, sideMap, model, tierModelState, CubeSideState.INACTIVE);
+                addSideState(baker, side, sideMap, modelLocation, tierModelState, CubeSideState.ACTIVE_LIT);
+                addSideState(baker, side, sideMap, modelLocation, tierModelState, CubeSideState.ACTIVE_UNLIT);
+                addSideState(baker, side, sideMap, modelLocation, tierModelState, CubeSideState.INACTIVE);
             }
 
             return new EnergyCubeModel(frame, dynamicParts);
         }
 
-        private static void addSideState(ModelBaker baker, RelativeSide side, Map<CubeSideState, BlockStateModelPart> sideMap, ResolvedModel model, ModelState tierModelState, CubeSideState sideState) {
-            sideMap.put(sideState, SimpleModelWrapper.bake(baker, model, new CubeSideModelState(tierModelState, side, sideState)));
+        private static void addSideState(ModelBaker baker, RelativeSide side, Map<CubeSideState, BlockStateModelPart> sideMap, Identifier modelLocation, ModelState tierModelState, CubeSideState sideState) {
+            sideMap.put(sideState, SimpleModelWrapper.bake(baker, modelLocation, new CubeSideModelState(tierModelState, side, sideState)));
         }
 
         @Override

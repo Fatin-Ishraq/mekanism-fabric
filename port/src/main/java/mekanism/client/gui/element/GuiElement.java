@@ -584,9 +584,7 @@ public abstract class GuiElement extends AbstractWidget implements IFancyFontRen
 
     @Override
     public int getFGColor() {
-        if (packedFGColor != UNSET_FG_COLOR) {
-            return packedFGColor;
-        }
+        //FABRIC: NeoForge adds a packedFGColor override to widgets; Fabric has no equivalent and Mekanism never sets it
         return this.active ? activeButtonTextColor() : inactiveButtonTextColor();
     }
 

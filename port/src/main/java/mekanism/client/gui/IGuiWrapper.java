@@ -77,7 +77,7 @@ public interface IGuiWrapper extends ContainerEventHandler, IFancyFontRenderer {
         } else {
             List<Component> tooltip = new ArrayList<>(Screen.getTooltipFromItem(Minecraft.getInstance(), stack));
             tooltip.addAll(toAppend);
-            guiGraphics.setTooltipForNextFrame(font(), tooltip, stack.getTooltipImage(), stack, xAxis, yAxis);
+            guiGraphics.setTooltipForNextFrame(font(), tooltip, stack.getTooltipImage(), xAxis, yAxis);
         }
     }
 

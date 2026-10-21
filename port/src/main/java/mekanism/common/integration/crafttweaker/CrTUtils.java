@@ -66,8 +66,9 @@ public class CrTUtils {
                   if (list.stream().anyMatch(part -> part.ingredient().amount() != amount)) {
                       throw new IllegalArgumentException("Compound fluid ingredients must use a single amount: " + ingredient.getCommandString());
                   }
+                  //FABRIC: NeoForge's CompoundFluidIngredient has no Stream overload, so materialize the list first
                   return IngredientCreatorAccess.fluid().from(mekanism.neoshim.neoforge.fluids.crafting.CompoundFluidIngredient.of(
-                        list.stream().map(part -> part.ingredient().ingredient())), amount);
+                        list.stream().map(part -> part.ingredient().ingredient()).toList()), amount);
               });
     }
 

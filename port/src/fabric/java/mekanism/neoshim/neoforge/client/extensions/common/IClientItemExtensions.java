@@ -1,12 +1,10 @@
 package mekanism.neoshim.neoforge.client.extensions.common;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.HumanoidArm;
@@ -59,10 +57,6 @@ public interface IClientItemExtensions {
     }
 
     default void renderHelmetOverlay(ItemStack stack, net.minecraft.world.entity.player.Player player, int width, int height, float partialTick) {
-    }
-
-    default BlockEntityWithoutLevelRenderer getCustomRenderer() {
-        return Minecraft.getInstance().getItemRenderer().getBlockEntityRenderer();
     }
 
     default boolean shouldBobAsEntity(ItemStack stack) {

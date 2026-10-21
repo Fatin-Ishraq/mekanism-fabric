@@ -1,7 +1,6 @@
 package mekanism.fabric.mixin;
 
 import mekanism.fabric.NeoAttributes;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.player.Abilities;
 import net.minecraft.world.entity.player.Player;
@@ -56,14 +55,14 @@ public abstract class PlayerHooksMixin {
     }
 
     @Inject(method = "addAdditionalSaveData", at = @At("TAIL"))
-    private void mekanism$saveFlight(CompoundTag tag, CallbackInfo ci) {
+    private void mekanism$saveFlight(net.minecraft.world.level.storage.ValueOutput output, CallbackInfo ci) {
         if (mekanism$attributeFlight) {
-            tag.putBoolean(GRANTED_FLIGHT_KEY, true);
+            output.putBoolean(GRANTED_FLIGHT_KEY, true);
         }
     }
 
     @Inject(method = "readAdditionalSaveData", at = @At("TAIL"))
-    private void mekanism$loadFlight(CompoundTag tag, CallbackInfo ci) {
-        mekanism$attributeFlight = tag.getBoolean(GRANTED_FLIGHT_KEY);
+    private void mekanism$loadFlight(net.minecraft.world.level.storage.ValueInput input, CallbackInfo ci) {
+        mekanism$attributeFlight = input.getBooleanOr(GRANTED_FLIGHT_KEY, false);
     }
 }

@@ -97,7 +97,7 @@ public final class BiomeModifierBridge {
 
     private static void applyCustom(Identifier id, String type, JsonObject json) {
         com.mojang.serialization.MapCodec<? extends mekanism.neoshim.neoforge.common.world.BiomeModifier> codec =
-              mekanism.neoshim.neoforge.registries.NeoForgeRegistries.BIOME_MODIFIER_SERIALIZERS.get(Identifier.parse(type));
+              mekanism.neoshim.neoforge.registries.NeoForgeRegistries.BIOME_MODIFIER_SERIALIZERS.getValue(Identifier.parse(type));
         if (codec == null) {
             Mekanism.logger.warn("[Fabric port] Unsupported biome modifier type {} in {}", type, id);
             return;
@@ -114,10 +114,11 @@ public final class BiomeModifierBridge {
             BiomeModifications.create(id.withSuffix("/" + phase.name().toLowerCase(Locale.ROOT))).add(fabricPhase, BiomeSelectors.all(), (selection, context) -> {
                 mekanism.neoshim.neoforge.common.world.MobSpawnSettingsBuilder spawns =
                       new mekanism.neoshim.neoforge.common.world.MobSpawnSettingsBuilder(selection.getBiome().getMobSettings());
-                modifier.modify(selection.getBiomeRegistryEntry(), phase, new mekanism.neoshim.neoforge.common.world.ModifiableBiomeInfo.BiomeInfo.Builder(
+                modifier.modify(selection.getBiomeHolder(), phase, new mekanism.neoshim.neoforge.common.world.ModifiableBiomeInfo.BiomeInfo.Builder(
                       new net.minecraft.world.level.biome.BiomeGenerationSettings.PlainBuilder(), spawns));
-                spawns.getAddedSpawners().forEach((category, added) -> added.forEach(spawner -> context.getSpawnSettings().addSpawn(category, spawner)));
-                spawns.getAddedCosts().forEach((entityType, cost) -> context.getSpawnSettings().setSpawnCost(entityType, cost.charge(), cost.energyBudget()));
+                spawns.getAddedSpawners().forEach((category, added) -> added.forEach(spawner ->
+                      context.getMobSpawnSettings().addSpawn(category, spawner.value(), spawner.weight())));
+                spawns.getAddedCosts().forEach((entityType, cost) -> context.getMobSpawnSettings().addMobCharge(entityType, cost.charge(), cost.energyBudget()));
             });
         }
         Mekanism.logger.debug("[Fabric port] Applied biome modifier {} ({})", id, type);

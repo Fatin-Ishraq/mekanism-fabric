@@ -98,7 +98,7 @@ public class RenderEnergyCubeItem implements SpecialModelRenderer<RenderEnergyCu
             modelRenderState.tintLayers().add(tier.getBaseTier().getPackedColor());
         } else {
             //weird, but ok, try to render something
-            mc().getBlockModelResolver().update(modelRenderState, blockState, ModelUtil.BLOCK_DISPLAY_NO_CONTEXT);
+            mc().blockModelResolver.update(modelRenderState, blockState, ModelUtil.BLOCK_DISPLAY_NO_CONTEXT);
         }
 
         float ticks = mc().levelRenderer.getTicks() + MekanismRenderer.getPartialTick();

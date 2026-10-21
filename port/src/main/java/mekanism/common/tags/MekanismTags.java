@@ -18,9 +18,6 @@ import mekanism.common.util.EnumUtils;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
-import net.minecraft.tags.BlockTags;
-import net.minecraft.tags.FluidTags;
-import net.minecraft.tags.ItemTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
@@ -163,11 +160,12 @@ public class MekanismTags {
         public static final TagKey<Item> COLORABLE_BANNERS = tag("colorable/banners");
 
         private static TagKey<Item> commonTag(String name) {
-            return ItemTags.create(Identifier.fromNamespaceAndPath("c", name));
+            //FABRIC: NeoForge adds public ItemTags.create; vanilla 26.1 needs TagKey.create
+            return TagKey.create(Registries.ITEM, Identifier.fromNamespaceAndPath("c", name));
         }
 
         private static TagKey<Item> tag(String name) {
-            return ItemTags.create(Mekanism.rl(name));
+            return TagKey.create(Registries.ITEM, Mekanism.rl(name));
         }
     }
 
@@ -215,11 +213,12 @@ public class MekanismTags {
         public static final TagKey<Block> STORAGE_BLOCKS_FLUORITE = commonTag("storage_blocks/fluorite");
 
         private static TagKey<Block> commonTag(String name) {
-            return BlockTags.create(Identifier.fromNamespaceAndPath("c", name));
+            //FABRIC: NeoForge adds public BlockTags.create; vanilla 26.1 needs TagKey.create
+            return TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath("c", name));
         }
 
         private static TagKey<Block> tag(String name) {
-            return BlockTags.create(Mekanism.rl(name));
+            return TagKey.create(Registries.BLOCK, Mekanism.rl(name));
         }
     }
 
@@ -281,7 +280,8 @@ public class MekanismTags {
         public static final TagKey<Fluid> NUTRITIONAL_PASTE = commonTag("nutritional_paste");
 
         private static TagKey<Fluid> commonTag(String name) {
-            return FluidTags.create(Identifier.fromNamespaceAndPath("c", name));
+            //FABRIC: NeoForge adds public FluidTags.create; vanilla 26.1 needs TagKey.create
+            return TagKey.create(Registries.FLUID, Identifier.fromNamespaceAndPath("c", name));
         }
     }
 

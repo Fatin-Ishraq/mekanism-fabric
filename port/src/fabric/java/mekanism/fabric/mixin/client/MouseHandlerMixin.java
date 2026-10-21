@@ -25,7 +25,7 @@ public abstract class MouseHandlerMixin {
 
     @Inject(method = "onScroll", at = @At("HEAD"), cancellable = true)
     private void mekanism$scroll(long window, double xOffset, double yOffset, CallbackInfo ci) {
-        if (window != minecraft.getWindow().getWindow() || minecraft.screen != null || minecraft.player == null) {
+        if (window != minecraft.getWindow().handle() || minecraft.screen != null || minecraft.player == null) {
             return;
         }
         double sensitivity = minecraft.options.mouseWheelSensitivity().get();

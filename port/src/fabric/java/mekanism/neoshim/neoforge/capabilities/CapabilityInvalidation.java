@@ -57,7 +57,7 @@ public final class CapabilityInvalidation {
                 return;
             }
             for (long key : map.keySet()) {
-                if (BlockPos.getX(key) >> 4 == chunkPos.x && BlockPos.getZ(key) >> 4 == chunkPos.z) {
+                if (BlockPos.getX(key) >> 4 == chunkPos.x() && BlockPos.getZ(key) >> 4 == chunkPos.z()) {
                     positions.add(key);
                 }
             }

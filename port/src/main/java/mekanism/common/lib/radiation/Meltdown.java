@@ -165,7 +165,7 @@ public class Meltdown {
                 toBlow.add(wallPos);
                 damageCalculator.wallExploded = true;
             }
-            hurtEntities(toBlow);
+            hurtEntities();//FABRIC: vanilla's hurtEntities() gathers entities from the explosion bounds itself and takes no position list
             if (interactsWithBlocks()) {
                 ProfilerFiller profiler = Profiler.get();
                 profiler.push("explosion_blocks");

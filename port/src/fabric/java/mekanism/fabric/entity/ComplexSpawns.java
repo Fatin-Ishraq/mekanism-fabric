@@ -40,7 +40,7 @@ public final class ComplexSpawns {
     }
 
     public static void init() {
-        PayloadTypeRegistry.playS2C().register(SpawnDataPayload.TYPE, SpawnDataPayload.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(SpawnDataPayload.TYPE, SpawnDataPayload.STREAM_CODEC);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -51,7 +51,7 @@ public final class ComplexSpawns {
             byte[] data = new byte[buf.readableBytes()];
             buf.readBytes(data);
             //The custom payload packet is a common packet; the client game listener handles it inside bundles as well
-            return (Packet) ServerPlayNetworking.createS2CPacket(new SpawnDataPayload(entity.getId(), data));
+            return (Packet) ServerPlayNetworking.createClientboundPacket(new SpawnDataPayload(entity.getId(), data));
         } finally {
             buf.release();
         }

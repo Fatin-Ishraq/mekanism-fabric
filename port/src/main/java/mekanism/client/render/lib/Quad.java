@@ -44,7 +44,7 @@ public class Quad {
         sprite = quad.materialInfo().sprite();
         tintIndex = quad.materialInfo().tintIndex();
         shade = quad.materialInfo().shade();
-        hasAmbientOcclusion = quad.materialInfo().ambientOcclusion();
+        hasAmbientOcclusion = quad.materialInfo().shade();
         BakedQuadUnpacker unpacker = new BakedQuadUnpacker();
         //TODO - 26.1: no existy. Hopefully yeet this class. Validate this properly works, it used to pass readAlpha as true, but that no longer is a parameter
         //unpacker.putBulkData(new PoseStack().last(), quad, 1, 1, 1, 1, 0, OverlayTexture.NO_OVERLAY);

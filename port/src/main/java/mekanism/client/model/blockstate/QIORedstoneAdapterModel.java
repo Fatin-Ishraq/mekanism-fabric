@@ -11,7 +11,6 @@ import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.block.dispatch.ModelState;
 import net.minecraft.client.renderer.block.dispatch.Variant;
 import net.minecraft.client.resources.model.ModelBaker;
-import net.minecraft.client.resources.model.ResolvedModel;
 import net.minecraft.client.resources.model.SimpleModelWrapper;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.client.resources.model.sprite.Material;
@@ -76,8 +75,7 @@ public class QIORedstoneAdapterModel implements DynamicBlockStateModel {
         }
 
         private static BlockStateModelPart bakePart(ModelBaker baker, ModelState modelState, Identifier identifier) {
-            ResolvedModel model = baker.getModel(identifier);
-            return SimpleModelWrapper.bake(baker, model, modelState);
+            return SimpleModelWrapper.bake(baker, identifier, modelState);
         }
 
         @Override

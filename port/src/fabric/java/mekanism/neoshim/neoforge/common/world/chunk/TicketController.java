@@ -1,6 +1,5 @@
 package mekanism.neoshim.neoforge.common.world.chunk;
 
-import java.util.Comparator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
@@ -17,7 +16,9 @@ import org.jetbrains.annotations.Nullable;
 public record TicketController(Identifier id, @Nullable LoadingValidationCallback callback) {
 
     static final Map<Identifier, TicketController> CONTROLLERS = new ConcurrentHashMap<>();
-    private static final TicketType<BlockPos> BLOCK_TICKET = TicketType.create("mekanism_fabric:forced_block", Comparator.comparingLong(BlockPos::asLong));
+    //Custom ticket types are not persisted by vanilla (no FLAG_PERSIST): ForcedChunkStore owns persistence and reinstates on server start
+    private static final TicketType LOADING_TICKET = new TicketType(TicketType.NO_TIMEOUT, TicketType.FLAG_LOADING);
+    private static final TicketType TICKING_TICKET = new TicketType(TicketType.NO_TIMEOUT, TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION);
 
     public TicketController {
         CONTROLLERS.put(id, this);
@@ -31,12 +32,13 @@ public record TicketController(Identifier id, @Nullable LoadingValidationCallbac
         ChunkPos chunkPos = new ChunkPos(chunkX, chunkZ);
         //Level 2 = entity ticking for ticking tickets, 3 = block ticking (approximation of NeoForge's behavior)
         int distance = ticking ? 2 : 3;
+        TicketType type = ticking ? TICKING_TICKET : LOADING_TICKET;
         if (add) {
-            level.getChunkSource().addRegionTicket(BLOCK_TICKET, chunkPos, distance, owner.immutable());
+            level.getChunkSource().addTicketWithRadius(type, chunkPos, distance);
         } else {
-            level.getChunkSource().removeRegionTicket(BLOCK_TICKET, chunkPos, distance, owner.immutable());
+            level.getChunkSource().removeTicketWithRadius(type, chunkPos, distance);
         }
-        ForcedChunkStore.get(level).update(id, owner, chunkPos.toLong(), add, ticking);
+        ForcedChunkStore.get(level).update(id, owner, chunkPos.pack(), add, ticking);
         return true;
     }
 

@@ -19,8 +19,8 @@ public interface IShearable {
     }
 
     default List<ItemStack> onSheared(@Nullable Player player, ItemStack item, Level level, BlockPos pos) {
-        if (this instanceof net.minecraft.world.entity.Shearable shearable && level instanceof net.minecraft.server.level.ServerLevel) {
-            shearable.shear(player == null ? SoundSource.BLOCKS : SoundSource.PLAYERS);
+        if (this instanceof net.minecraft.world.entity.Shearable shearable && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            shearable.shear(serverLevel, player == null ? SoundSource.BLOCKS : SoundSource.PLAYERS, ItemStack.EMPTY);
         }
         return List.of();
     }

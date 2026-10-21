@@ -173,11 +173,12 @@ public class MekanismRenderer {
 
     public static int getColorARGB(TypedInstance<Fluid> typedInstance) {
         FluidModel fluidModel = getFluidModel(typedInstance);
-        FluidTintSource tintSource = fluidModel.fluidTintSource();
-        if (tintSource == null) {
+        //FABRIC: vanilla FluidModel exposes its BlockTintSource; NeoForge added a separate fluidTintSource() accessor
+        net.minecraft.client.color.block.BlockTintSource tintSource = fluidModel.tintSource();
+        if (!(tintSource instanceof FluidTintSource source)) {
             return CommonColors.WHITE;
         }
-        return tintSource.color(typedInstance.typeHolder().value().defaultFluidState());
+        return source.color(typedInstance.typeHolder().value().defaultFluidState());
     }
 
     public static int getColorARGB(FluidResource fluidType, float fluidScale) {

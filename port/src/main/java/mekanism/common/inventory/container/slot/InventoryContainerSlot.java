@@ -10,12 +10,11 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import mekanism.neoshim.neoforge.transfer.item.ItemResource;
-import mekanism.neoshim.neoforge.transfer.item.ResourceHandlerSlot;
 import mekanism.neoshim.neoforge.transfer.transaction.TransactionContext;
 import mekanism.neoshim.neoforge.world.inventory.StackCopySlot;
 import org.jspecify.annotations.Nullable;
 
-/// Like [ResourceHandlerSlot], except directly interacts with the [IInventorySlot] instead
+/// Like NeoForge's ResourceHandlerSlot, except directly interacts with the [IInventorySlot] instead
 public class InventoryContainerSlot extends StackCopySlot implements ITransactionalSlot {
 
     private final ContainerSlotType slotType;

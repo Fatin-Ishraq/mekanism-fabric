@@ -45,7 +45,7 @@ public final class ExtendedMenus {
     }
 
     public static void init() {
-        PayloadTypeRegistry.playS2C().register(MenuDataPayload.TYPE, MenuDataPayload.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(MenuDataPayload.TYPE, MenuDataPayload.STREAM_CODEC);
     }
 
     /** Client: called by the payload receiver. */

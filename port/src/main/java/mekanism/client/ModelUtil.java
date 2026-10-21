@@ -16,7 +16,7 @@ public class ModelUtil {
 
     public static Vector3fc[] computeExtents(BlockRegistryObject<?, ?> blockRegistryObject) {
         BlockModelRenderState state = new BlockModelRenderState();
-        Minecraft.getInstance().getBlockModelResolver().update(state, blockRegistryObject.defaultState(), BLOCK_DISPLAY_NO_CONTEXT);
+        Minecraft.getInstance().blockModelResolver.update(state, blockRegistryObject.defaultState(), BLOCK_DISPLAY_NO_CONTEXT);//FABRIC: 26.1 exposes the resolver as a field
         List<BakedQuad> bakedQuads = state.setupModel(IDENTITY, false).stream().flatMap(part -> part.getQuads(null).stream()).toList();
         return CuboidItemModelWrapper.computeExtents(bakedQuads);
     }

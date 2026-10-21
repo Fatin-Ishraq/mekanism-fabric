@@ -1,21 +1,23 @@
 package mekanism.neoshim.neoforge.client.event;
 
+import com.mojang.serialization.MapCodec;
+import java.util.List;
 import mekanism.neoshim.bus.api.Event;
 import mekanism.neoshim.fml.event.IModBusEvent;
-import net.fabricmc.fabric.api.client.rendering.v1.ColorProviderRegistry;
-import net.minecraft.client.color.block.BlockColor;
 import net.minecraft.client.color.block.BlockColors;
-import net.minecraft.client.color.item.ItemColor;
-import net.minecraft.client.color.item.ItemColors;
-import net.minecraft.world.level.ItemLike;
+import net.minecraft.client.color.block.BlockTintSource;
+import net.minecraft.client.color.item.ItemTintSource;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.ExtraCodecs;
+import net.minecraft.world.level.block.Block;
 
 public abstract class RegisterColorHandlersEvent extends Event implements IModBusEvent {
 
-    public static class Block extends RegisterColorHandlersEvent {
+    public static class BlockTintSources extends RegisterColorHandlersEvent {
 
         private final BlockColors blockColors;
 
-        public Block(BlockColors blockColors) {
+        public BlockTintSources(BlockColors blockColors) {
             this.blockColors = blockColors;
         }
 
@@ -23,31 +25,21 @@ public abstract class RegisterColorHandlersEvent extends Event implements IModBu
             return blockColors;
         }
 
-        public void register(BlockColor blockColor, net.minecraft.world.level.block.Block... blocks) {
-            ColorProviderRegistry.BLOCK.register(blockColor, blocks);
+        public void register(List<BlockTintSource> tintSources, Block... blocks) {
+            blockColors.register(tintSources, blocks);
         }
     }
 
-    public static class Item extends RegisterColorHandlersEvent {
+    public static class ItemTintSources extends RegisterColorHandlersEvent {
 
-        private final ItemColors itemColors;
-        private final BlockColors blockColors;
+        private final ExtraCodecs.LateBoundIdMapper<Identifier, MapCodec<? extends ItemTintSource>> idMapper;
 
-        public Item(ItemColors itemColors, BlockColors blockColors) {
-            this.itemColors = itemColors;
-            this.blockColors = blockColors;
+        public ItemTintSources(ExtraCodecs.LateBoundIdMapper<Identifier, MapCodec<? extends ItemTintSource>> idMapper) {
+            this.idMapper = idMapper;
         }
 
-        public ItemColors getItemColors() {
-            return itemColors;
-        }
-
-        public BlockColors getBlockColors() {
-            return blockColors;
-        }
-
-        public void register(ItemColor itemColor, ItemLike... items) {
-            ColorProviderRegistry.ITEM.register(itemColor, items);
+        public void register(Identifier id, MapCodec<? extends ItemTintSource> codec) {
+            idMapper.put(id, codec);
         }
     }
 }

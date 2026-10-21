@@ -8,14 +8,14 @@ import mekanism.neoshim.neoforge.common.SoundAction;
 import mekanism.neoshim.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariantAttributes;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
-import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
@@ -148,7 +148,7 @@ public class FluidType {
         return this.canDrown;
     }
 
-    public boolean supportsBoating(net.minecraft.world.entity.vehicle.Boat boat) {
+    public boolean supportsBoating(net.minecraft.world.entity.vehicle.boat.Boat boat) {
         return this.supportsBoating;
     }
 
@@ -265,13 +265,13 @@ public class FluidType {
     }
 
     public boolean isVaporizedOnPlacement(Level level, BlockPos pos, FluidStack stack) {
-        return level.dimensionType().ultraWarm() && this == VanillaTypes.WATER;
+        return level.environmentAttributes().getValue(net.minecraft.world.attribute.EnvironmentAttributes.WATER_EVAPORATES, pos) && this == VanillaTypes.WATER;
     }
 
     public void onVaporize(@Nullable net.minecraft.world.entity.player.Player player, Level level, BlockPos pos, FluidStack stack) {
         SoundEvent sound = this.getSound(player, level, pos, mekanism.neoshim.neoforge.common.SoundActions.FLUID_VAPORIZE);
         level.playSound(player, pos, sound != null ? sound : net.minecraft.sounds.SoundEvents.FIRE_EXTINGUISH, net.minecraft.sounds.SoundSource.BLOCKS, 0.5F,
-              2.6F + (level.random.nextFloat() - level.random.nextFloat()) * 0.8F);
+              2.6F + (level.getRandom().nextFloat() - level.getRandom().nextFloat()) * 0.8F);
         for (int i = 0; i < 8; ++i) {
             level.addAlwaysVisibleParticle(net.minecraft.core.particles.ParticleTypes.LARGE_SMOKE, pos.getX() + Math.random(), pos.getY() + Math.random(),
                   pos.getZ() + Math.random(), 0.0D, 0.0D, 0.0D);
@@ -283,6 +283,14 @@ public class FluidType {
     }
 
     public boolean canBePlacedInLevel(BlockAndTintGetter level, BlockPos pos, FluidStack stack) {
+        return !stack.isEmpty() && !stack.getFluid().defaultFluidState().createLegacyBlock().isAir();
+    }
+
+    /** Convenience for plain {@link Level} call sites (e.g. block entities); mirrors the default stack check when no render view is available. */
+    public boolean canBePlacedInLevel(Level level, BlockPos pos, FluidStack stack) {
+        if (level instanceof BlockAndTintGetter tintGetter) {
+            return canBePlacedInLevel(tintGetter, pos, stack);
+        }
         return !stack.isEmpty() && !stack.getFluid().defaultFluidState().createLegacyBlock().isAir();
     }
 

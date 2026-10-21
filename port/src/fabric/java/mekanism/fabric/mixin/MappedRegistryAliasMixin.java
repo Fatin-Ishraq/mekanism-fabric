@@ -20,17 +20,17 @@ public abstract class MappedRegistryAliasMixin<T> {
     public abstract ResourceKey<? extends Registry<T>> key();
 
     @Shadow
-    public abstract T get(Identifier name);
+    public abstract Optional<Holder.Reference<T>> get(Identifier name);
 
     @Shadow
-    public abstract Optional<Holder.Reference<T>> getHolder(Identifier location);
+    public abstract T getValue(Identifier name);
 
     @Shadow
     public abstract boolean containsKey(Identifier name);
 
-    @ModifyReturnValue(method = "get(Lnet/minecraft/resources/Identifier;)Ljava/lang/Object;", at = @At("RETURN"))
-    private T mekanism$aliasGet(T value, Identifier name) {
-        if (value == null) {
+    @ModifyReturnValue(method = "get(Lnet/minecraft/resources/Identifier;)Ljava/util/Optional;", at = @At("RETURN"))
+    private Optional<Holder.Reference<T>> mekanism$aliasGet(Optional<Holder.Reference<T>> value, Identifier name) {
+        if (value.isEmpty()) {
             Identifier alias = RegistryAliases.resolve(key(), name);
             if (alias != null) {
                 return get(alias);
@@ -39,10 +39,10 @@ public abstract class MappedRegistryAliasMixin<T> {
         return value;
     }
 
-    @ModifyReturnValue(method = "get(Lnet/minecraft/resources/ResourceKey;)Ljava/lang/Object;", at = @At("RETURN"))
-    private T mekanism$aliasGetKey(T value, ResourceKey<T> key) {
-        if (value == null && key != null) {
-            Identifier alias = RegistryAliases.resolve(key(), key.location());
+    @ModifyReturnValue(method = "get(Lnet/minecraft/resources/ResourceKey;)Ljava/util/Optional;", at = @At("RETURN"))
+    private Optional<Holder.Reference<T>> mekanism$aliasGetKey(Optional<Holder.Reference<T>> value, ResourceKey<T> key) {
+        if (value.isEmpty() && key != null) {
+            Identifier alias = RegistryAliases.resolve(this.key(), key.location());
             if (alias != null) {
                 return get(alias);
             }
@@ -50,23 +50,23 @@ public abstract class MappedRegistryAliasMixin<T> {
         return value;
     }
 
-    @ModifyReturnValue(method = "getHolder(Lnet/minecraft/resources/Identifier;)Ljava/util/Optional;", at = @At("RETURN"))
-    private Optional<Holder.Reference<T>> mekanism$aliasHolder(Optional<Holder.Reference<T>> value, Identifier location) {
-        if (value.isEmpty()) {
-            Identifier alias = RegistryAliases.resolve(key(), location);
+    @ModifyReturnValue(method = "getValue(Lnet/minecraft/resources/Identifier;)Ljava/lang/Object;", at = @At("RETURN"))
+    private T mekanism$aliasGetValue(T value, Identifier name) {
+        if (value == null) {
+            Identifier alias = RegistryAliases.resolve(key(), name);
             if (alias != null) {
-                return getHolder(alias);
+                return getValue(alias);
             }
         }
         return value;
     }
 
-    @ModifyReturnValue(method = "getHolder(Lnet/minecraft/resources/ResourceKey;)Ljava/util/Optional;", at = @At("RETURN"))
-    private Optional<Holder.Reference<T>> mekanism$aliasHolderKey(Optional<Holder.Reference<T>> value, ResourceKey<T> key) {
-        if (value.isEmpty()) {
-            Identifier alias = RegistryAliases.resolve(key(), key.location());
+    @ModifyReturnValue(method = "getValue(Lnet/minecraft/resources/ResourceKey;)Ljava/lang/Object;", at = @At("RETURN"))
+    private T mekanism$aliasGetValueKey(T value, ResourceKey<T> key) {
+        if (value == null && key != null) {
+            Identifier alias = RegistryAliases.resolve(this.key(), key.location());
             if (alias != null) {
-                return getHolder(alias);
+                return getValue(alias);
             }
         }
         return value;

@@ -74,7 +74,7 @@ public class RenderFluidTankItem implements SpecialModelRenderer<RenderFluidTank
         //todo - 26.1: do this with the block model from model manager (copy Energy cube item)
         BlockState blockState = ((BlockItem) stack.getItem()).getBlock().defaultBlockState();
         BlockModelRenderState blockModel = new BlockModelRenderState();
-        mc().getBlockModelResolver().update(blockModel, blockState, ModelUtil.BLOCK_DISPLAY_NO_CONTEXT);
+        mc().blockModelResolver.update(blockModel, blockState, ModelUtil.BLOCK_DISPLAY_NO_CONTEXT);
         //blockModel.tintLayers().add(tierTint);
         return new TankRenderState(fluidLight, fluidColor, contentsMaxY, fluidTexture, blockModel);
     }

@@ -2,21 +2,21 @@ package mekanism.neoshim.neoforge.event;
 
 import mekanism.neoshim.bus.api.Event;
 import mekanism.neoshim.fml.event.IModBusEvent;
-import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroupEntries;
+import net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTabOutput;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ItemLike;
 
-/** Wraps Fabric's {@link FabricItemGroupEntries} (fired per tab from ItemGroupEvents.MODIFY_ENTRIES_ALL). */
+/** Wraps Fabric's {@link FabricCreativeModeTabOutput} (fired per tab from CreativeModeTabEvents.MODIFY_OUTPUT_ALL). */
 public class BuildCreativeModeTabContentsEvent extends Event implements IModBusEvent, CreativeModeTab.Output {
 
     private final CreativeModeTab tab;
     private final ResourceKey<CreativeModeTab> tabKey;
-    private final FabricItemGroupEntries entries;
+    private final FabricCreativeModeTabOutput entries;
 
-    public BuildCreativeModeTabContentsEvent(CreativeModeTab tab, ResourceKey<CreativeModeTab> tabKey, FabricItemGroupEntries entries) {
+    public BuildCreativeModeTabContentsEvent(CreativeModeTab tab, ResourceKey<CreativeModeTab> tabKey, FabricCreativeModeTabOutput entries) {
         this.tab = tab;
         this.tabKey = tabKey;
         this.entries = entries;
@@ -48,11 +48,11 @@ public class BuildCreativeModeTabContentsEvent extends Event implements IModBusE
     }
 
     public void insertAfter(ItemStack existingEntry, ItemStack newEntry, CreativeModeTab.TabVisibility visibility) {
-        entries.addAfter(existingEntry, java.util.List.of(newEntry), visibility);
+        entries.insertAfter(existingEntry, java.util.List.of(newEntry), visibility);
     }
 
     public void insertBefore(ItemStack existingEntry, ItemStack newEntry, CreativeModeTab.TabVisibility visibility) {
-        entries.addBefore(existingEntry, java.util.List.of(newEntry), visibility);
+        entries.insertBefore(existingEntry, java.util.List.of(newEntry), visibility);
     }
 
     public void acceptAll(java.util.Collection<ItemStack> stacks) {

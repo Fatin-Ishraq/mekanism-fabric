@@ -7,8 +7,6 @@ import mekanism.api.recipes.ingredients.creator.IChemicalIngredientCreator;
 import mekanism.api.recipes.ingredients.creator.IChemicalStackIngredientCreator;
 import mekanism.api.recipes.ingredients.creator.IFluidStackIngredientCreator;
 import mekanism.api.recipes.ingredients.creator.IItemStackIngredientCreator;
-import mekanism.client.recipe_viewer.jei.MekanismJEIHelper;
-import mekanism.common.Mekanism;
 import mekanism.common.recipe.ingredients.ChemicalIngredientCreator;
 import mekanism.common.recipe.ingredients.creator.ChemicalStackIngredientCreator;
 import mekanism.common.recipe.ingredients.creator.FluidStackIngredientCreator;
@@ -18,9 +16,8 @@ import mekanism.common.recipe.ingredients.creator.ItemStackIngredientCreator;
 public class MekanismAccess implements IMekanismAccess {
 
     @Override
-    public IMekanismJEIHelper jeiHelper() {
-        Mekanism.hooks.jei.assertLoaded();
-        return MekanismJEIHelper.INSTANCE;
+    public IMekanismJEIHelper jeiHelper() {//FABRIC: JEI is not on the 26.1 Fabric classpath (phase 9)
+        throw new IllegalStateException("JEI not included");
     }
 
     @Override

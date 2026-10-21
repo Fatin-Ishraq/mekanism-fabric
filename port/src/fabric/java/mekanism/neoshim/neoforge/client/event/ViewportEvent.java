@@ -1,11 +1,13 @@
 package mekanism.neoshim.neoforge.client.event;
 
-import com.mojang.blaze3d.shaders.FogShape;
 import mekanism.neoshim.bus.api.Event;
 import mekanism.neoshim.bus.api.ICancellableEvent;
 import net.minecraft.client.Camera;
-import net.minecraft.client.renderer.FogRenderer;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.fog.FogData;
+import net.minecraft.client.renderer.fog.environment.FogEnvironment;
+import net.minecraft.world.level.material.FogType;
+import org.joml.Vector4f;
 
 public abstract class ViewportEvent extends Event {
 
@@ -33,97 +35,89 @@ public abstract class ViewportEvent extends Event {
 
     public static class RenderFog extends ViewportEvent implements ICancellableEvent {
 
-        private final FogRenderer.FogMode mode;
-        private final net.minecraft.world.level.material.FogType type;
-        private float farPlaneDistance;
-        private float nearPlaneDistance;
-        private FogShape fogShape;
+        private final FogEnvironment environment;
+        private final FogType type;
+        private final FogData fogData;
 
-        public RenderFog(FogRenderer.FogMode mode, net.minecraft.world.level.material.FogType type, Camera camera, float partialTicks, float nearPlaneDistance, float farPlaneDistance, FogShape fogShape) {
+        public RenderFog(FogEnvironment environment, FogType type, Camera camera, float partialTicks, FogData fogData) {
             super(net.minecraft.client.Minecraft.getInstance().gameRenderer, camera, partialTicks);
-            this.mode = mode;
+            this.environment = environment;
             this.type = type;
-            this.farPlaneDistance = farPlaneDistance;
-            this.nearPlaneDistance = nearPlaneDistance;
-            this.fogShape = fogShape;
+            this.fogData = fogData;
         }
 
-        public FogRenderer.FogMode getMode() {
-            return mode;
+        public FogEnvironment getEnvironment() {
+            return environment;
         }
 
-        public net.minecraft.world.level.material.FogType getType() {
+        public FogType getType() {
             return type;
         }
 
+        public FogData getFogData() {
+            return fogData;
+        }
+
         public float getFarPlaneDistance() {
-            return farPlaneDistance;
+            return fogData.environmentalEnd;
         }
 
         public float getNearPlaneDistance() {
-            return nearPlaneDistance;
-        }
-
-        public FogShape getFogShape() {
-            return fogShape;
+            return fogData.environmentalStart;
         }
 
         public void setFarPlaneDistance(float distance) {
-            farPlaneDistance = distance;
+            fogData.environmentalEnd = distance;
         }
 
         public void setNearPlaneDistance(float distance) {
-            nearPlaneDistance = distance;
-        }
-
-        public void setFogShape(FogShape shape) {
-            fogShape = shape;
+            fogData.environmentalStart = distance;
         }
 
         public void scaleFarPlaneDistance(float factor) {
-            farPlaneDistance *= factor;
+            fogData.environmentalEnd *= factor;
         }
 
         public void scaleNearPlaneDistance(float factor) {
-            nearPlaneDistance *= factor;
+            fogData.environmentalStart *= factor;
         }
     }
 
     public static class ComputeFogColor extends ViewportEvent {
 
-        private float red;
-        private float green;
-        private float blue;
+        private final Vector4f color;
 
-        public ComputeFogColor(Camera camera, float partialTicks, float red, float green, float blue) {
+        public ComputeFogColor(Camera camera, float partialTicks, Vector4f color) {
             super(net.minecraft.client.Minecraft.getInstance().gameRenderer, camera, partialTicks);
-            this.red = red;
-            this.green = green;
-            this.blue = blue;
+            this.color = color;
+        }
+
+        public Vector4f getColor() {
+            return color;
         }
 
         public float getRed() {
-            return red;
+            return color.x;
         }
 
         public void setRed(float red) {
-            this.red = red;
+            color.x = red;
         }
 
         public float getGreen() {
-            return green;
+            return color.y;
         }
 
         public void setGreen(float green) {
-            this.green = green;
+            color.y = green;
         }
 
         public float getBlue() {
-            return blue;
+            return color.z;
         }
 
         public void setBlue(float blue) {
-            this.blue = blue;
+            color.z = blue;
         }
     }
 }

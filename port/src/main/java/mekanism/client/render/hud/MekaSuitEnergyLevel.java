@@ -49,11 +49,11 @@ public class MekaSuitEnergyLevel implements GuiLayer {
         }
         if (capacity > 0) {
             int x = graphics.guiWidth() / 2 - 91;
-            int y = graphics.guiHeight() - minecraft.gui.leftHeight + 2;
+            int y = graphics.guiHeight() - mekanism.fabric.client.HudHeights.leftHeight + 2;//FABRIC: Gui#leftHeight is a NeoForge field
             int length = (int) Math.round(((double) stored / capacity) * 79);
             graphics.blitSprite(RenderPipelines.GUI_TEXTURED, GuiBar.BAR, x, y, 81, 6);
             graphics.blit(RenderPipelines.GUI_TEXTURED, POWER_BAR, x + 1, y + 1, 0, 0, length, 4, length, 4, 79, 4);
-            minecraft.gui.leftHeight += 8;
+            mekanism.fabric.client.HudHeights.leftHeight += 8;//FABRIC: Gui#leftHeight is a NeoForge field
         }
     }
 }

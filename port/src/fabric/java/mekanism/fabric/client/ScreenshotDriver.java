@@ -6,9 +6,12 @@ import mekanism.common.Mekanism;
 import mekanism.common.tile.base.TileEntityMekanism;
 import mekanism.common.tile.prefab.TileEntityMultiblock;
 import mekanism.common.content.tank.TankMultiblockData;
+import mekanism.api.AutomationType;
+import mekanism.api.fluid.IFluidTank;
 import mekanism.api.inventory.IInventorySlot;
 import mekanism.api.energy.IEnergyContainer;
-import mekanism.neoshim.neoforge.fluids.FluidStack;
+import mekanism.neoshim.neoforge.transfer.fluid.FluidResource;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
@@ -26,7 +29,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.WorldDataConfiguration;
@@ -34,12 +37,15 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.minecraft.world.level.saveddata.WeatherData;
+import net.minecraft.world.clock.WorldClocks;
 import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import java.util.Set;
 
 /**
  * Automated screenshots for the project pages ({@code -Dmekanism_fabric.screenshots=true}, {@code gradlew runScreenshots}): builds staged scenes in a fresh flat
@@ -70,18 +76,20 @@ public final class ScreenshotDriver {
     }
 
     private static Block block(String id) {
-        return BuiltInRegistries.BLOCK.get(Identifier.fromNamespaceAndPath("mekanism", id));
+        return BuiltInRegistries.BLOCK.getValue(Identifier.fromNamespaceAndPath("mekanism", id));
     }
 
     private static ItemStack item(String id) {
-        return new ItemStack(BuiltInRegistries.ITEM.get(Identifier.fromNamespaceAndPath("mekanism", id)));
+        return new ItemStack(BuiltInRegistries.ITEM.getValue(Identifier.fromNamespaceAndPath("mekanism", id)));
     }
 
     private static BlockState facing(Block block, Direction direction) {
         BlockState state = block.defaultBlockState();
         for (var property : state.getProperties()) {
-            if (property instanceof DirectionProperty directionProperty && property.getName().equals("facing") && directionProperty.getPossibleValues().contains(direction)) {
-                state = state.setValue(directionProperty, direction);
+            if (property instanceof EnumProperty<?> enumProperty && property.getName().equals("facing") && enumProperty.getPossibleValues().contains(direction)) {
+                @SuppressWarnings("unchecked")
+                EnumProperty<Direction> facing = (EnumProperty<Direction>) enumProperty;
+                state = state.setValue(facing, direction);
             }
         }
         return state;
@@ -99,13 +107,13 @@ public final class ScreenshotDriver {
     /** Fills the machine's energy and puts {@code input} in the first empty slot that accepts it. */
     private static void feed(ServerLevel level, BlockPos pos, ItemStack input) {
         if (level.getBlockEntity(pos) instanceof TileEntityMekanism tile) {
-            for (IEnergyContainer container : tile.getEnergyContainers(null)) {
-                container.setEnergy(container.getMaxEnergy());
-            }
+            IEnergyContainer energy = tile.getEnergyContainer();
+            energy.setEnergy(energy.getCapacityAsLong(), null);
             if (!input.isEmpty()) {
-                for (IInventorySlot slot : tile.getInventorySlots(null)) {
-                    if (slot.isEmpty() && slot.isItemValid(input)) {
-                        slot.setStack(input);
+                ItemResource resource = ItemResource.of(input);
+                for (IInventorySlot slot : tile.getInventorySlots()) {
+                    if (slot.isEmpty() && slot.isValid(resource)) {
+                        slot.insert(resource, input.count(), null, AutomationType.INTERNAL);
                         break;
                     }
                 }
@@ -123,19 +131,23 @@ public final class ScreenshotDriver {
             ServerPlayer player = player(server);
             player.getAbilities().flying = true;
             player.onUpdateAbilities();
-            player.teleportTo(player.serverLevel(), x, y, z, yaw, pitch);
+            player.teleportTo((ServerLevel) player.level(), x, y, z, Set.of(), yaw, pitch, true);
         });
     }
 
     private static void buildScenes(MinecraftServer server) {
         server.execute(() -> {
             ServerPlayer player = player(server);
-            ServerLevel level = player.serverLevel();
-            level.getGameRules().getRule(GameRules.RULE_DAYLIGHT).set(false, server);
-            level.getGameRules().getRule(GameRules.RULE_WEATHER_CYCLE).set(false, server);
-            level.getGameRules().getRule(GameRules.RULE_DOMOBSPAWNING).set(false, server);
-            level.setDayTime(6000);
-            level.setWeatherParameters(6000, 0, false, false);
+            ServerLevel level = (ServerLevel) player.level();
+            GameRules rules = level.getGameRules();
+            rules.set(GameRules.ADVANCE_TIME, false, server);
+            rules.set(GameRules.ADVANCE_WEATHER, false, server);
+            rules.set(GameRules.SPAWN_MOBS, false, server);
+            level.clockManager().setTotalTicks(level.registryAccess().lookupOrThrow(Registries.WORLD_CLOCK).getOrThrow(WorldClocks.OVERWORLD), 6000);
+            WeatherData weather = level.getWeatherData();
+            weather.setClearWeatherTime(6000);
+            weather.setRaining(false);
+            weather.setThundering(false);
             base = player.blockPosition().offset(-4, 0, -6);
             //Floor
             for (int x = -3; x <= 13; x++) {
@@ -201,10 +213,11 @@ public final class ScreenshotDriver {
 
     private static void fillTank(MinecraftServer server) {
         server.execute(() -> {
-            ServerLevel level = player(server).serverLevel();
+            ServerLevel level = (ServerLevel) player(server).level();
             if (level.getBlockEntity(tank) instanceof TileEntityMultiblock<?> tile && tile.getMultiblock() instanceof TankMultiblockData data && data.isFormed()) {
-                var fluidTank = data.mergedTank.getFluidTank();
-                fluidTank.setStack(new FluidStack(Fluids.WATER, (int) Math.min(Integer.MAX_VALUE, fluidTank.getCapacity() * 3L / 4)));
+                IFluidTank fluidTank = data.mergedTank.getFluidTank();
+                long capacity = fluidTank.capacityAsLong(FluidResource.EMPTY);
+                fluidTank.insert(FluidResource.of(Fluids.WATER), (int) Math.min(Integer.MAX_VALUE, capacity * 3L / 4), null, AutomationType.INTERNAL);
                 log("dynamic tank filled");
             } else {
                 log("dynamic tank not formed");
@@ -215,7 +228,7 @@ public final class ScreenshotDriver {
     private static void openGui(MinecraftServer server, BlockPos pos) {
         server.execute(() -> {
             ServerPlayer player = player(server);
-            ServerLevel level = player.serverLevel();
+            ServerLevel level = (ServerLevel) player.level();
             level.getBlockState(pos).useWithoutItem(level, player, new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false));
         });
     }
@@ -249,7 +262,7 @@ public final class ScreenshotDriver {
         SHOTS.add(new Shot("mekanism_gui_enrichment_chamber", () -> {
             client.options.setCameraType(CameraType.FIRST_PERSON);
             client.options.hideGui = false;
-            client.getToasts().clear();
+            client.getToastManager().clear();
             server.execute(() -> {
                 //Without the (uncharged) MekaSuit its HUD stays off in the GUI shots
                 ServerPlayer player = player(server);
@@ -270,14 +283,14 @@ public final class ScreenshotDriver {
             BuiltInRegistries.CREATIVE_MODE_TAB.entrySet().stream().filter(e -> e.getKey().location().equals(Mekanism.rl("mekanism")))
                   .findFirst().ifPresent(e -> {
                       //Modded tabs live on Fabric's extra creative tab pages
-                      var fabricScreen = (net.fabricmc.fabric.api.client.itemgroup.v1.FabricCreativeInventoryScreen) screen;
+                      var fabricScreen = (net.fabricmc.fabric.api.client.creativetab.v1.FabricCreativeModeInventoryScreen) screen;
                       for (int page = 0; page < fabricScreen.getPageCount(); page++) {
-                          if (fabricScreen.getItemGroupsOnPage(page).contains(e.getValue())) {
+                          if (fabricScreen.getTabsOnPage(page).contains(e.getValue())) {
                               fabricScreen.switchToPage(page);
                               break;
                           }
                       }
-                      screen.selectTab(e.getValue());
+                      fabricScreen.setSelectedTab(e.getValue());
                   });
         }, 30));
     }
@@ -291,10 +304,10 @@ public final class ScreenshotDriver {
                     //No "Move with W, A, S and D" tutorial toast in the shots
                     client.getTutorial().setStep(net.minecraft.client.tutorial.TutorialSteps.NONE);
                     log("creating world");
-                    LevelSettings settings = new LevelSettings("mekanism_screenshots", GameType.CREATIVE, false, Difficulty.PEACEFUL, true, new GameRules(),
+                    LevelSettings settings = new LevelSettings("mekanism_screenshots", GameType.CREATIVE, new LevelSettings.DifficultySettings(Difficulty.PEACEFUL, false, false), true,
                           WorldDataConfiguration.DEFAULT);
                     client.createWorldOpenFlows().createFreshLevel("mekanism_screenshots_" + System.currentTimeMillis(), settings, new WorldOptions(1L, false, false),
-                          registries -> registries.registryOrThrow(Registries.WORLD_PRESET).getHolderOrThrow(WorldPresets.FLAT).value().createWorldDimensions(),
+                          registries -> registries.lookupOrThrow(Registries.WORLD_PRESET).getOrThrow(WorldPresets.FLAT).value().createWorldDimensions(),
                           client.screen);
                 }
             }
@@ -328,7 +341,7 @@ public final class ScreenshotDriver {
                     shot.setup().run();
                 }
                 if (++ticks > shot.waitTicks()) {
-                    Screenshot.grab(client.gameDirectory, shot.name() + ".png", client.getMainRenderTarget(), message -> log("{}", message.getString()));
+                    Screenshot.grab(client.gameDirectory, shot.name() + ".png", client.getMainRenderTarget(), 1, message -> log("{}", message.getString()));
                     shotIndex++;
                     ticks = 0;
                 }

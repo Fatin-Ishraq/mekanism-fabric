@@ -191,9 +191,10 @@ public class ClientRegistrationUtil {
                     }
 
                     @Override
-                    public void modifyFogColor(Camera camera, float partialTick, ClientLevel level, int renderDistance, float darkenWorldAmount, Vector4f fluidFogColor) {
+                    public Vector4f modifyFogColor(Camera camera, float partialTick, ClientLevel level, int renderDistance, float darkenWorldAmount, Vector4f fluidFogColor) {
                         //TODO - 26.1: is alpha needed?
                         fluidFogColor.set(ARGB.redFloat(fluidTint), ARGB.greenFloat(fluidTint), ARGB.blueFloat(fluidTint));
+                        return fluidFogColor;
                     }
 
                     @Override

@@ -1,18 +1,22 @@
 package mekanism.neoshim.neoforge.attachment;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import mekanism.neoshim.neoforge.common.util.INBTSerializable;
+import mekanism.neoshim.neoforge.common.util.ValueIOSerializable;
 import mekanism.neoshim.neoforge.server.ServerLifecycleHooks;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.TagValueOutput;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -42,17 +46,21 @@ public final class AttachmentType<T> {
         return new Builder<>(holder -> defaultValueConstructor.apply((IAttachmentHolder) holder));
     }
 
-    public static <S extends Tag, T extends INBTSerializable<S>> Builder<T> serializable(Supplier<T> defaultValueSupplier) {
-        return builder(defaultValueSupplier).serialize(nbtCodec(defaultValueSupplier));
+    public static <T extends ValueIOSerializable> Builder<T> serializable(Supplier<T> defaultValueSupplier) {
+        return builder(defaultValueSupplier).serialize(valueIOCodec(defaultValueSupplier));
     }
 
-    @SuppressWarnings("unchecked")
-    private static <S extends Tag, T extends INBTSerializable<S>> Codec<T> nbtCodec(Supplier<T> factory) {
+    private static <T extends ValueIOSerializable> Codec<T> valueIOCodec(Supplier<T> factory) {
         return Codec.PASSTHROUGH.xmap(dynamic -> {
             T value = factory.get();
-            value.deserializeNBT(provider(), (S) dynamic.convert(NbtOps.INSTANCE).getValue());
+            CompoundTag tag = (CompoundTag) dynamic.convert(NbtOps.INSTANCE).getValue();
+            value.deserialize(TagValueInput.create(ProblemReporter.DISCARDING, provider(), tag));
             return value;
-        }, value -> new com.mojang.serialization.Dynamic<>(NbtOps.INSTANCE, value.serializeNBT(provider())));
+        }, value -> {
+            TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, provider());
+            value.serialize(output);
+            return new com.mojang.serialization.Dynamic<>(NbtOps.INSTANCE, output.buildResult());
+        });
     }
 
     private static HolderLookup.Provider provider() {
@@ -99,9 +107,17 @@ public final class AttachmentType<T> {
             return this;
         }
 
+        public Builder<T> serialize(MapCodec<T> codec) {
+            return serialize(codec.codec());
+        }
+
         /** The "should serialize" predicate is not supported by Fabric attachments; values are always written. */
         public Builder<T> serialize(Codec<T> codec, Predicate<? super T> shouldSerialize) {
             return serialize(codec);
+        }
+
+        public Builder<T> serialize(MapCodec<T> codec, Predicate<? super T> shouldSerialize) {
+            return serialize(codec.codec());
         }
 
         public Builder<T> copyOnDeath() {

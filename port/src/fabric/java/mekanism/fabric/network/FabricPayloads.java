@@ -26,7 +26,7 @@ public final class FabricPayloads {
     @SuppressWarnings("unchecked")
     public static <T extends CustomPacketPayload> void playToClient(CustomPacketPayload.Type<T> type, StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
           @Nullable IPayloadHandler<T> handler) {
-        PayloadTypeRegistry.playS2C().register(type, (StreamCodec<RegistryFriendlyByteBuf, T>) codec);
+        PayloadTypeRegistry.clientboundPlay().register(type, (StreamCodec<RegistryFriendlyByteBuf, T>) codec);
         if (handler != null && FMLEnvironment.dist.isClient()) {
             mekanism.fabric.client.network.ClientPayloads.registerPlay(type, handler);
         }
@@ -35,7 +35,7 @@ public final class FabricPayloads {
     @SuppressWarnings("unchecked")
     public static <T extends CustomPacketPayload> void playToServer(CustomPacketPayload.Type<T> type, StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
           IPayloadHandler<T> handler) {
-        PayloadTypeRegistry.playC2S().register(type, (StreamCodec<RegistryFriendlyByteBuf, T>) codec);
+        PayloadTypeRegistry.serverboundPlay().register(type, (StreamCodec<RegistryFriendlyByteBuf, T>) codec);
         ServerPlayNetworking.registerGlobalReceiver(type, (payload, context) -> handler.handle(payload, new IPayloadContext() {
             @Override
             public PacketListener listener() {
@@ -72,7 +72,7 @@ public final class FabricPayloads {
     @SuppressWarnings("unchecked")
     public static <T extends CustomPacketPayload> void configurationToClient(CustomPacketPayload.Type<T> type, StreamCodec<? super FriendlyByteBuf, T> codec,
           IPayloadHandler<T> handler) {
-        PayloadTypeRegistry.configurationS2C().register(type, (StreamCodec<FriendlyByteBuf, T>) codec);
+        PayloadTypeRegistry.clientboundConfiguration().register(type, (StreamCodec<FriendlyByteBuf, T>) codec);
         if (FMLEnvironment.dist.isClient()) {
             mekanism.fabric.client.network.ClientPayloads.registerConfiguration(type, handler);
         }
@@ -81,11 +81,11 @@ public final class FabricPayloads {
     @SuppressWarnings("unchecked")
     public static <T extends CustomPacketPayload> void configurationToServer(CustomPacketPayload.Type<T> type, StreamCodec<? super FriendlyByteBuf, T> codec,
           IPayloadHandler<T> handler) {
-        PayloadTypeRegistry.configurationC2S().register(type, (StreamCodec<FriendlyByteBuf, T>) codec);
+        PayloadTypeRegistry.serverboundConfiguration().register(type, (StreamCodec<FriendlyByteBuf, T>) codec);
         ServerConfigurationNetworking.registerGlobalReceiver(type, (payload, context) -> handler.handle(payload, new IPayloadContext() {
             @Override
             public PacketListener listener() {
-                return context.networkHandler();
+                return context.packetListener();
             }
 
             @Override
@@ -100,7 +100,7 @@ public final class FabricPayloads {
 
             @Override
             public void disconnect(Component reason) {
-                context.networkHandler().disconnect(reason);
+                context.packetListener().disconnect(reason);
             }
 
             @Override

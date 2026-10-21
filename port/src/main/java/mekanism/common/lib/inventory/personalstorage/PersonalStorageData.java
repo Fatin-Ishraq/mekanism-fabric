@@ -68,6 +68,6 @@ class PersonalStorageData extends SavedData {
 
 
     public static SavedDataType<PersonalStorageData> createType(UUID id) {
-        return new SavedDataType<>(Mekanism.rl("personal_storage/" + id), PersonalStorageData::new, CODEC);
+        return new SavedDataType<>(Mekanism.rl("personal_storage/" + id), PersonalStorageData::new, CODEC, net.minecraft.util.datafix.DataFixTypes.LEVEL);
     }
 }

@@ -282,7 +282,7 @@ public class CommonPlayerTickHandler {
                     }
                 } else {
                     float distanceRemaining = (float) (damageRemaining / damageMultiplier);
-                    event.setDistance(distanceRemaining + safeFallDistance);
+                    event.setDistance((float) (distanceRemaining + safeFallDistance));
                 }
             }
         }

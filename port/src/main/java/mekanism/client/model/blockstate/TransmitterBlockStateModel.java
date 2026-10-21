@@ -26,7 +26,6 @@ import net.minecraft.client.renderer.block.dispatch.Variant;
 import net.minecraft.client.resources.model.ModelBaker;
 import net.minecraft.client.resources.model.ModelDebugName;
 import net.minecraft.client.resources.model.ResolvedModel;
-import net.minecraft.client.resources.model.SimpleModelWrapper;
 import net.minecraft.client.resources.model.UnbakedModel;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.client.resources.model.sprite.Material;
@@ -36,11 +35,11 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
-import net.minecraft.util.context.ContextKeySet;
 import net.minecraft.util.context.ContextMap;
 import net.minecraft.world.level.block.state.BlockState;
 import mekanism.neoshim.neoforge.client.model.ComposedModelState;
 import mekanism.neoshim.neoforge.client.model.DynamicBlockStateModel;
+import mekanism.neoshim.neoforge.client.model.ModelBaking;
 import mekanism.neoshim.neoforge.client.model.NeoForgeModelProperties;
 import mekanism.neoshim.neoforge.client.model.block.CustomUnbakedBlockStateModel;
 import mekanism.neoshim.neoforge.model.data.ModelData;
@@ -190,13 +189,13 @@ public class TransmitterBlockStateModel implements DynamicBlockStateModel {
                     partsVisibility.put(partName, true);
 
                     //bake core
-                    BlockStateModelPart baked = SimpleModelWrapper.bake(bakerToUse, partVisibilityDelegate.as(baseModel), modelStateToUse);
+                    BlockStateModelPart baked = ModelBaking.bake(bakerToUse, partVisibilityDelegate.as(baseModel), modelStateToUse);
                     materialFlags |= baked.materialFlags();
                     baseParts.put(direction, connectionType, baked);
 
                     //if we have glass, bake that
                     if (glassModel != null) {
-                        baked = SimpleModelWrapper.bake(bakerToUse, partVisibilityDelegate.as(glassModel), modelStateToUse);
+                        baked = ModelBaking.bake(bakerToUse, partVisibilityDelegate.as(glassModel), modelStateToUse);
                         glassParts.put(direction, connectionType, baked);
                         materialFlags |= baked.materialFlags();
                     }
@@ -269,7 +268,7 @@ public class TransmitterBlockStateModel implements DynamicBlockStateModel {
             var builder = new ContextMap.Builder();
             fillAdditionalProperties(this, builder);
             builder.withParameter(NeoForgeModelProperties.PART_VISIBILITY, visibilityMap);
-            return builder.create(ContextKeySet.EMPTY);
+            return NeoForgeModelProperties.create(builder);
         }
 
         @Override

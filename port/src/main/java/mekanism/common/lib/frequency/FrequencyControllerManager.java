@@ -46,7 +46,8 @@ public class FrequencyControllerManager {
             SavedDataType<FrequencyLookup<FREQ>> dataType = new SavedDataType<>(
                   FrequencyLookup.getId(uuid, securityMode, frequencyType),
                   () -> new FrequencyLookup<>(frequencyType, uuid, securityMode),
-                codec
+                codec,
+                net.minecraft.util.datafix.DataFixTypes.LEVEL
             );
             lookup = dataStorage.computeIfAbsent(dataType);
         }

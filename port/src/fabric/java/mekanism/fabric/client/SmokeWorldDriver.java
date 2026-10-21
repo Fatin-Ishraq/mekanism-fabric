@@ -2,6 +2,7 @@ package mekanism.fabric.client;
 
 import java.util.ArrayList;
 import java.util.List;
+import mekanism.api.AutomationType;
 import mekanism.common.Mekanism;
 import mekanism.common.registries.MekanismBlocks;
 import mekanism.common.tile.TileEntityEnergyCube;
@@ -16,15 +17,17 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.WorldDataConfiguration;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
+import mekanism.neoshim.neoforge.transfer.fluid.FluidResource;
 import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.phys.BlockHitResult;
@@ -73,10 +76,10 @@ public final class SmokeWorldDriver {
                     //An unfocused window would otherwise pause the integrated server and desync the driver's tick counting
                     client.options.pauseOnLostFocus = false;
                     log("creating world");
-                    LevelSettings settings = new LevelSettings("mekanism_smoke", GameType.CREATIVE, false, Difficulty.PEACEFUL, true, new GameRules(),
+                    LevelSettings settings = new LevelSettings("mekanism_smoke", GameType.CREATIVE, new LevelSettings.DifficultySettings(Difficulty.PEACEFUL, false, false), true,
                           WorldDataConfiguration.DEFAULT);
                     client.createWorldOpenFlows().createFreshLevel("mekanism_smoke_" + System.currentTimeMillis(), settings, new WorldOptions(1L, false, false),
-                          registries -> registries.registryOrThrow(Registries.WORLD_PRESET).getHolderOrThrow(WorldPresets.FLAT).value().createWorldDimensions(),
+                          registries -> registries.lookupOrThrow(Registries.WORLD_PRESET).getOrThrow(WorldPresets.FLAT).value().createWorldDimensions(),
                           client.screen);
                 }
             }
@@ -135,8 +138,8 @@ public final class SmokeWorldDriver {
                     client.setScreen(screen);
                 }
                 int tab = ticks / 10;
-                if (tab < tabs.size() && ticks % 10 == 0 && client.screen instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen screen) {
-                    screen.selectTab(tabs.get(tab));
+                if (tab < tabs.size() && ticks % 10 == 0 && client.screen instanceof net.fabricmc.fabric.api.client.creativetab.v1.FabricCreativeModeInventoryScreen screen) {
+                    screen.setSelectedTab(tabs.get(tab));
                 }
                 ticks++;
                 if (tab >= tabs.size()) {
@@ -197,7 +200,7 @@ public final class SmokeWorldDriver {
             placedAtTick = -1;
             server.execute(() -> {
                 ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
-                ServerLevel level = player.serverLevel();
+                ServerLevel level = (ServerLevel) player.level();
                 BlockPos pos = base.above(3);
                 level.setBlockAndUpdate(pos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
                 place(level, pos, block.defaultBlockState());
@@ -235,7 +238,7 @@ public final class SmokeWorldDriver {
             lastUseResult = "";
             server.execute(() -> {
                 ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
-                ServerLevel level = player.serverLevel();
+                ServerLevel level = (ServerLevel) player.level();
                 BlockPos pos = base.above(3);
                 InteractionResult result = level.getBlockState(pos).useWithoutItem(level, player, new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false));
                 lastUseResult = result + " state=" + level.getBlockState(pos) + " be=" + level.getBlockEntity(pos);
@@ -274,7 +277,9 @@ public final class SmokeWorldDriver {
     private static BlockState facing(Block block, Direction direction) {
         BlockState state = block.defaultBlockState();
         for (var property : state.getProperties()) {
-            if (property instanceof DirectionProperty directionProperty && property.getName().equals("facing") && directionProperty.getPossibleValues().contains(direction)) {
+            if (property instanceof EnumProperty<?> enumProperty && property.getName().equals("facing") && enumProperty.getPossibleValues().contains(direction)) {
+                @SuppressWarnings("unchecked")
+                EnumProperty<Direction> directionProperty = (EnumProperty<Direction>) enumProperty;
                 state = state.setValue(directionProperty, direction);
             }
         }
@@ -293,18 +298,18 @@ public final class SmokeWorldDriver {
     private static void placeSetup(MinecraftServer server) {
         server.execute(() -> {
             ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
-            ServerLevel level = player.serverLevel();
+            ServerLevel level = (ServerLevel) player.level();
             base = player.blockPosition().offset(3, 0, 0);
             place(level, base, MekanismBlocks.ENRICHMENT_CHAMBER.value().defaultBlockState());
             place(level, base.east(), MekanismBlocks.BASIC_UNIVERSAL_CABLE.value().defaultBlockState());
             place(level, base.east(2), MekanismBlocks.BASIC_UNIVERSAL_CABLE.value().defaultBlockState());
             place(level, base.east(3), facing(MekanismBlocks.CREATIVE_ENERGY_CUBE.value(), Direction.WEST));
             if (level.getBlockEntity(base.east(3)) instanceof TileEntityEnergyCube cube) {
-                cube.getEnergyContainer().setEnergy(Long.MAX_VALUE);
+                cube.getEnergyContainer().setEnergy(Long.MAX_VALUE, null);
             }
             place(level, base.south(2), MekanismBlocks.BASIC_FLUID_TANK.value().defaultBlockState());
             if (level.getBlockEntity(base.south(2)) instanceof mekanism.common.tile.TileEntityFluidTank tank) {
-                tank.fluidTank.setStack(new mekanism.neoshim.neoforge.fluids.FluidStack(net.minecraft.world.level.material.Fluids.LAVA, 4_000));
+                tank.fluidTank.insert(FluidResource.of(net.minecraft.world.level.material.Fluids.LAVA), 4_000, null, AutomationType.INTERNAL);
             }
             place(level, base.south(2).east(), MekanismBlocks.BASIC_ENERGY_CUBE.value().defaultBlockState());
             place(level, base.north(2), MekanismBlocks.BASIC_LOGISTICAL_TRANSPORTER.value().defaultBlockState());
@@ -361,16 +366,16 @@ public final class SmokeWorldDriver {
         if (!foundBalloon) {
             fail("client has no balloon entity");
         }
-        if (client.level.getBlockEntity(base) instanceof TileEntityMekanism tile && tile.getEnergyContainer(0, null) != null) {
-            log("client-side chamber energy {}", tile.getEnergyContainer(0, null).getEnergy());
+        if (client.level.getBlockEntity(base) instanceof TileEntityMekanism tile && tile.getEnergyContainer() != null) {
+            log("client-side chamber energy {}", tile.getEnergyContainer().getAmountAsLong());
         }
     }
 
     private static void checkServerState(MinecraftServer server) {
         server.executeBlocking(() -> {
             ServerLevel level = server.overworld();
-            if (level.getBlockEntity(base) instanceof TileEntityMekanism tile && tile.getEnergyContainer(0, null) != null) {
-                long energy = tile.getEnergyContainer(0, null).getEnergy();
+            if (level.getBlockEntity(base) instanceof TileEntityMekanism tile && tile.getEnergyContainer() != null) {
+                long energy = tile.getEnergyContainer().getAmountAsLong();
                 if (energy <= 0) {
                     fail("enrichment chamber received no energy from the creative cube through the cables");
                 } else {
@@ -385,7 +390,7 @@ public final class SmokeWorldDriver {
     private static void openGui(MinecraftServer server) {
         server.execute(() -> {
             ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
-            ServerLevel level = player.serverLevel();
+            ServerLevel level = (ServerLevel) player.level();
             BlockState state = level.getBlockState(base);
             BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(base), Direction.UP, base, false);
             InteractionResult result = state.useWithoutItem(level, player, hit);

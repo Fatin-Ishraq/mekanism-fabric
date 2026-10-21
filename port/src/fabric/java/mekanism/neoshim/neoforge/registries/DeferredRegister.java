@@ -127,7 +127,7 @@ public class DeferredRegister<T> {
     @Nullable
     @SuppressWarnings("unchecked")
     public Registry<T> getRegistry() {
-        return (Registry<T>) net.minecraft.core.registries.BuiltInRegistries.REGISTRY.get(this.registryKey.location());
+        return (Registry<T>) net.minecraft.core.registries.BuiltInRegistries.REGISTRY.getValue(this.registryKey.location());
     }
 
     private void addEntries(RegisterEvent event) {

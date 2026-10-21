@@ -114,7 +114,7 @@ public class MekanismPermissions {
         public boolean test(CommandSourceStack source) {
             //See https://github.com/MinecraftForge/MinecraftForge/commit/f7eea35cb9b043aae0a3866a9578724aa7560585 for details on why
             // has permission is checked first and the implications
-            return fallbackLevel.check(source.permissions()) || source.source instanceof ServerPlayer player && PermissionAPI.getPermission(player, node);
+            return fallbackLevel.check(source.permissions()) || source.getEntity() instanceof ServerPlayer player && PermissionAPI.getPermission(player, node);//FABRIC: CommandSourceStack.source is private; getEntity() is the player-backed source
         }
     }
 

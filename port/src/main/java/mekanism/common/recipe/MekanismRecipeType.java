@@ -247,7 +247,7 @@ public class MekanismRecipeType<VANILLA_INPUT extends RecipeInput, RECIPE extend
 
     private boolean checkMyIncompleteRecipes(RecipeManager recipeManager) {
         boolean incomplete = false;
-        for (RecipeHolder<RECIPE> holder : getRecipesUncached(recipeManager.recipeMap())) {
+        for (RecipeHolder<RECIPE> holder : getRecipesUncached(RecipeMap.create(recipeManager.getRecipes()))) {
             if (!holder.value().isIncomplete()) {
                 continue;
             }
@@ -260,7 +260,7 @@ public class MekanismRecipeType<VANILLA_INPUT extends RecipeInput, RECIPE extend
 
     private static RecipeMap getRecipeMap(@Nullable Level level) {
         if (level instanceof ServerLevel serverLevel) {
-            return serverLevel.recipeAccess().recipeMap();
+            return RecipeMap.create(serverLevel.recipeAccess().getRecipes());
         } else if (level != null) {
             if (level.isClientSide()) {
                 return MekanismClient.clientRecipes();
@@ -272,7 +272,7 @@ public class MekanismRecipeType<VANILLA_INPUT extends RecipeInput, RECIPE extend
         } else {
             MinecraftServer currentServer = ServerLifecycleHooks.getCurrentServer();
             if (currentServer != null) {
-                return currentServer.getRecipeManager().recipeMap();
+                return RecipeMap.create(currentServer.getRecipeManager().getRecipes());
             }
         }
         return RecipeMap.EMPTY;

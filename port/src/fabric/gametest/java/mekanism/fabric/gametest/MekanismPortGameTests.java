@@ -1,31 +1,42 @@
 package mekanism.fabric.gametest;
 
+import java.util.List;
 import mekanism.api.MekanismAPI;
 import mekanism.api.chemical.Chemical;
 import mekanism.api.datamaps.IMekanismDataMapTypes;
+import mekanism.api.energy.IEnergyContainer;
 import mekanism.common.registries.MekanismBlocks;
 import mekanism.common.registries.MekanismChemicals;
 import mekanism.common.tile.base.TileEntityMekanism;
+import mekanism.common.util.EnergyUtils;
 import mekanism.neoshim.neoforge.capabilities.Capabilities;
-import mekanism.neoshim.neoforge.items.IItemHandler;
-import net.fabricmc.fabric.api.gametest.v1.FabricGameTest;
+import mekanism.neoshim.neoforge.transfer.ResourceHandler;
+import mekanism.neoshim.neoforge.transfer.access.ItemAccess;
+import mekanism.neoshim.neoforge.transfer.energy.EnergyHandler;
+import mekanism.neoshim.neoforge.transfer.fluid.FluidResource;
+import mekanism.neoshim.neoforge.transfer.item.ItemResource;
+import mekanism.neoshim.neoforge.transfer.transaction.Transaction;
+import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidConstants;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidStorage;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
+import net.fabricmc.fabric.api.transfer.v1.item.ContainerStorage;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
 import net.fabricmc.fabric.api.transfer.v1.storage.Storage;
 import net.fabricmc.fabric.api.transfer.v1.storage.StorageView;
-import net.fabricmc.fabric.api.transfer.v1.transaction.Transaction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
-import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.level.material.Fluids;
 import team.reborn.energy.api.EnergyStorage;
 
@@ -33,14 +44,14 @@ import team.reborn.energy.api.EnergyStorage;
  * Headless functional checks for the Fabric port (run with {@code gradlew runGametest}). They exercise real Mekanism block entities through
  * the Fabric Transfer API / Team Reborn Energy bridges, recipes, ticking and data maps.
  */
-public class MekanismPortGameTests implements FabricGameTest {
+public class MekanismPortGameTests {
 
     private static final BlockPos POS = new BlockPos(1, 1, 1);
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest
     public void machineBlockEntityTicks(GameTestHelper helper) {
         helper.setBlock(POS, MekanismBlocks.ENRICHMENT_CHAMBER.value());
-        BlockEntity be = helper.getBlockEntity(POS);
+        BlockEntity be = helper.getBlockEntity(POS, BlockEntity.class);
         helper.assertTrue(be instanceof TileEntityMekanism, "Enrichment chamber has no Mekanism block entity: " + be);
         helper.runAfterDelay(5, helper::succeed);
     }
@@ -48,12 +59,12 @@ public class MekanismPortGameTests implements FabricGameTest {
     /** Places a block and applies its item's default components, like placing it from an item does (side config defaults etc.). */
     private static void placeLikeItem(GameTestHelper helper, net.minecraft.world.level.block.Block block) {
         helper.setBlock(POS, block);
-        BlockEntity be = helper.getBlockEntity(POS);
+        BlockEntity be = helper.getBlockEntity(POS, BlockEntity.class);
         be.applyComponentsFromItemStack(new ItemStack(block));
         be.setChanged();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 400)
+    @GameTest(maxTicks = 400)
     public void enrichmentChamberProcessesViaTransferApi(GameTestHelper helper) {
         placeLikeItem(helper, MekanismBlocks.ENRICHMENT_CHAMBER.value());
         BlockPos absolute = helper.absolutePos(POS);
@@ -63,17 +74,18 @@ public class MekanismPortGameTests implements FabricGameTest {
         for (Direction side : Direction.values()) {
             EnergyStorage energy = EnergyStorage.SIDED.find(helper.getLevel(), absolute, side);
             report.append(side).append('=').append(energy == null ? "none" : energy.getAmount() + "/" + energy.getCapacity())
-                  .append(",strict=").append(mekanism.common.capabilities.Capabilities.STRICT_ENERGY.block().getCapability(helper.getLevel(), absolute, null, null, side))
-                  .append(",fe=").append(Capabilities.EnergyStorage.BLOCK.getCapability(helper.getLevel(), absolute, null, null, side)).append(' ');
+                  .append(",strict=").append(mekanism.common.capabilities.Capabilities.ENERGY.block().getCapability(helper.getLevel(), absolute, null, null, side))
+                  .append(",fe=").append(Capabilities.Energy.BLOCK.getCapability(helper.getLevel(), absolute, null, null, side)).append(' ');
             if (energy != null) {
-                try (Transaction transaction = Transaction.openOuter()) {
+                try (net.fabricmc.fabric.api.transfer.v1.transaction.Transaction transaction =
+                      net.fabricmc.fabric.api.transfer.v1.transaction.Transaction.openOuter()) {
                     totalInserted += energy.insert(1_000_000, transaction);
                     transaction.commit();
                 }
             }
         }
-        report.append(" null-side strict=").append(mekanism.common.capabilities.Capabilities.STRICT_ENERGY.block().getCapability(helper.getLevel(), absolute, null, null, null))
-              .append(" items(up)=").append(Capabilities.ItemHandler.BLOCK.getCapability(helper.getLevel(), absolute, null, null, Direction.UP))
+        report.append(" null-side strict=").append(mekanism.common.capabilities.Capabilities.ENERGY.block().getCapability(helper.getLevel(), absolute, null, null, null))
+              .append(" items(up)=").append(Capabilities.Item.BLOCK.getCapability(helper.getLevel(), absolute, null, null, Direction.UP))
               .append(" be=").append(helper.getLevel().getBlockEntity(absolute))
               .append(" facing=").append(((TileEntityMekanism) helper.getLevel().getBlockEntity(absolute)).getDirection())
               .append(" energyConfig=").append(describeEnergyConfig((TileEntityMekanism) helper.getLevel().getBlockEntity(absolute)))
@@ -82,23 +94,29 @@ public class MekanismPortGameTests implements FabricGameTest {
         //Input through the Fabric item Transfer API
         Storage<ItemVariant> items = ItemStorage.SIDED.find(helper.getLevel(), absolute, Direction.UP);
         helper.assertTrue(items != null, "No item storage exposed by the enrichment chamber");
-        try (Transaction transaction = Transaction.openOuter()) {
+        try (net.fabricmc.fabric.api.transfer.v1.transaction.Transaction transaction =
+              net.fabricmc.fabric.api.transfer.v1.transaction.Transaction.openOuter()) {
             long inserted = items.insert(ItemVariant.of(Items.IRON_ORE), 1, transaction);
             helper.assertTrue(inserted == 1, "Could not insert iron ore (inserted " + inserted + ")");
             transaction.commit();
         }
         helper.succeedWhen(() -> {
-            IItemHandler handler = Capabilities.ItemHandler.BLOCK.getCapability(helper.getLevel(), absolute, null, null, null);
+            ResourceHandler<ItemResource> handler = Capabilities.Item.BLOCK.getCapability(helper.getLevel(), absolute, null, null, null);
             helper.assertTrue(handler != null, "No item handler");
             boolean found = false;
-            for (int slot = 0; slot < handler.getSlots(); slot++) {
-                ItemStack stack = handler.getStackInSlot(slot);
-                if (stack.getItem().builtInRegistryHolder().key().location().getPath().equals("dust_iron") && stack.getCount() == 2) {
+            for (int slot = 0; slot < handler.size(); slot++) {
+                if (handler.getResource(slot).getItem().builtInRegistryHolder().key().location().getPath().equals("dust_iron")
+                      && handler.getAmountAsInt(slot) == 2) {
                     found = true;
                 }
             }
             helper.assertTrue(found, "Iron ore was not enriched into 2 iron dust yet");
         });
+    }
+
+    @SuppressWarnings("unchecked")
+    private static EnumProperty<Direction> facingProperty(net.minecraft.world.level.block.state.properties.Property<?> property) {
+        return (EnumProperty<Direction>) property;
     }
 
     private static String describeEnergyConfig(TileEntityMekanism tile) {
@@ -116,13 +134,14 @@ public class MekanismPortGameTests implements FabricGameTest {
         return builder.toString();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest
     public void fluidTankAcceptsFabricFluids(GameTestHelper helper) {
         placeLikeItem(helper, MekanismBlocks.BASIC_FLUID_TANK.value());
         BlockPos absolute = helper.absolutePos(POS);
         Storage<FluidVariant> storage = FluidStorage.SIDED.find(helper.getLevel(), absolute, Direction.UP);
         helper.assertTrue(storage != null, "No fluid storage exposed by the fluid tank");
-        try (Transaction transaction = Transaction.openOuter()) {
+        try (net.fabricmc.fabric.api.transfer.v1.transaction.Transaction transaction =
+              net.fabricmc.fabric.api.transfer.v1.transaction.Transaction.openOuter()) {
             long inserted = storage.insert(FluidVariant.of(Fluids.WATER), FluidConstants.BUCKET * 2, transaction);
             helper.assertTrue(inserted == FluidConstants.BUCKET * 2, "Inserted " + inserted + " droplets instead of 2 buckets");
             transaction.commit();
@@ -135,19 +154,22 @@ public class MekanismPortGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest
     public void vanillaChestVisibleAsItemHandler(GameTestHelper helper) {
         helper.setBlock(POS, Blocks.CHEST);
         BlockPos absolute = helper.absolutePos(POS);
-        IItemHandler handler = Capabilities.ItemHandler.BLOCK.getCapability(helper.getLevel(), absolute, null, null, Direction.UP);
+        ResourceHandler<ItemResource> handler = Capabilities.Item.BLOCK.getCapability(helper.getLevel(), absolute, null, null, Direction.UP);
         helper.assertTrue(handler != null, "Vanilla chest is not visible through the NeoForge item capability bridge");
-        ItemStack remainder = handler.insertItem(0, new ItemStack(Items.DIAMOND, 5), false);
-        helper.assertTrue(remainder.isEmpty(), "Chest did not accept diamonds");
-        helper.assertTrue(handler.getStackInSlot(0).getCount() == 5, "Chest slot does not contain the diamonds");
+        try (Transaction transaction = Transaction.openRoot()) {
+            int inserted = handler.insert(ItemResource.of(Items.DIAMOND), 5, transaction);
+            helper.assertTrue(inserted == 5, "Chest only accepted " + inserted + " of 5 diamonds");
+            transaction.commit();
+        }
+        helper.assertTrue(handler.getResource(0).is(Items.DIAMOND) && handler.getAmountAsInt(0) == 5, "Chest slot does not contain the diamonds");
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest
     public void chemicalDataMapsLoaded(GameTestHelper helper) {
         Holder<Chemical> hydrogen = MekanismChemicals.HYDROGEN;
         Object fuel = hydrogen.getData(IMekanismDataMapTypes.INSTANCE.chemicalFuel());
@@ -156,52 +178,59 @@ public class MekanismPortGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 300)
+    @GameTest(maxTicks = 300)
     public void universalCablesFormNetworkAndDeliverEnergy(GameTestHelper helper) {
         BlockPos machine = new BlockPos(1, 1, 1);
         helper.setBlock(machine, MekanismBlocks.ENRICHMENT_CHAMBER.value());
-        BlockEntity machineTile = helper.getBlockEntity(machine);
+        BlockEntity machineTile = helper.getBlockEntity(machine, BlockEntity.class);
         machineTile.applyComponentsFromItemStack(new ItemStack(MekanismBlocks.ENRICHMENT_CHAMBER.value()));
         BlockPos cableA = new BlockPos(2, 1, 1);
         BlockPos cableB = new BlockPos(3, 1, 1);
         helper.setBlock(cableA, MekanismBlocks.BASIC_UNIVERSAL_CABLE.value());
         helper.setBlock(cableB, MekanismBlocks.BASIC_UNIVERSAL_CABLE.value());
         helper.runAfterDelay(5, () -> {
-            var transmitter = ((mekanism.common.tile.transmitter.TileEntityTransmitter) helper.getBlockEntity(cableA)).getTransmitter();
+            var transmitter = ((mekanism.common.tile.transmitter.TileEntityTransmitter) helper.getBlockEntity(cableA, BlockEntity.class)).getTransmitter();
             helper.assertTrue(transmitter.hasTransmitterNetwork(), "Universal cable did not form a network");
             helper.assertTrue(transmitter.getTransmitterNetwork().transmittersSize() == 2,
                   "Cable network has " + transmitter.getTransmitterNetwork().transmittersSize() + " transmitters instead of 2");
             //Real energy source: a creative energy cube whose front (output by default) faces the cable network
             BlockPos cube = new BlockPos(4, 1, 1);
-            var cubeState = MekanismBlocks.CREATIVE_ENERGY_CUBE.value().defaultBlockState();
+            BlockState cubeState = MekanismBlocks.CREATIVE_ENERGY_CUBE.value().defaultBlockState();
             for (var property : cubeState.getProperties()) {
-                if (property.getName().equals("facing")) {
-                    cubeState = cubeState.setValue((net.minecraft.world.level.block.state.properties.DirectionProperty) property, Direction.WEST);
+                if (property.getName().equals("facing") && property instanceof EnumProperty) {
+                    cubeState = cubeState.setValue(facingProperty(property), Direction.WEST);
                 }
             }
             helper.setBlock(cube, cubeState);
-            helper.getBlockEntity(cube).applyComponentsFromItemStack(new ItemStack(MekanismBlocks.CREATIVE_ENERGY_CUBE.value()));
+            helper.getBlockEntity(cube, BlockEntity.class).applyComponentsFromItemStack(new ItemStack(MekanismBlocks.CREATIVE_ENERGY_CUBE.value()));
             //Fill it (the "filled" creative cube only exists as a creative-tab item variant)
-            ((mekanism.common.tile.TileEntityEnergyCube) helper.getBlockEntity(cube)).getEnergyContainer().setEnergy(Long.MAX_VALUE);
+            ((mekanism.common.tile.TileEntityEnergyCube) helper.getBlockEntity(cube, BlockEntity.class)).getEnergyContainer()
+                  .setEnergy(Long.MAX_VALUE, null);
             helper.succeedWhen(() -> {
-                var strict = mekanism.common.capabilities.Capabilities.STRICT_ENERGY.block().getCapability(helper.getLevel(), helper.absolutePos(machine), null, null, null);
-                if (strict == null || strict.getEnergy(0) <= 0) {
-                    var cubeStrict = mekanism.common.capabilities.Capabilities.STRICT_ENERGY.block().getCapability(helper.getLevel(), helper.absolutePos(cube), null, null, null);
-                    var cableB2 = (mekanism.common.content.network.transmitter.UniversalCable) ((mekanism.common.tile.transmitter.TileEntityTransmitter) helper.getBlockEntity(cableB)).getTransmitter();
-                    var cableA2 = (mekanism.common.content.network.transmitter.UniversalCable) ((mekanism.common.tile.transmitter.TileEntityTransmitter) helper.getBlockEntity(cableA)).getTransmitter();
-                    var cubeFacing = ((TileEntityMekanism) helper.getBlockEntity(cube)).getDirection();
-                    var cubeWest = mekanism.common.capabilities.Capabilities.STRICT_ENERGY.block().getCapability(helper.getLevel(), helper.absolutePos(cube), null, null, Direction.WEST);
-                    helper.fail("Energy did not reach the machine: cube=" + (cubeStrict == null ? "null" : cubeStrict.getEnergy(0) + "/" + cubeStrict.getMaxEnergy(0))
+                EnergyHandler strict = mekanism.common.capabilities.Capabilities.ENERGY.block()
+                      .getCapability(helper.getLevel(), helper.absolutePos(machine), null, null, null);
+                if (strict == null || strict.getAmountAsLong() <= 0) {
+                    EnergyHandler cubeStrict = mekanism.common.capabilities.Capabilities.ENERGY.block()
+                          .getCapability(helper.getLevel(), helper.absolutePos(cube), null, null, null);
+                    var cableB2 = (mekanism.common.content.network.transmitter.UniversalCable) ((mekanism.common.tile.transmitter.TileEntityTransmitter) helper.getBlockEntity(
+                          cableB, BlockEntity.class)).getTransmitter();
+                    var cableA2 = (mekanism.common.content.network.transmitter.UniversalCable) ((mekanism.common.tile.transmitter.TileEntityTransmitter) helper.getBlockEntity(
+                          cableA, BlockEntity.class)).getTransmitter();
+                    var cubeFacing = ((TileEntityMekanism) helper.getBlockEntity(cube, BlockEntity.class)).getDirection();
+                    EnergyHandler cubeWest = mekanism.common.capabilities.Capabilities.ENERGY.block()
+                          .getCapability(helper.getLevel(), helper.absolutePos(cube), null, null, Direction.WEST);
+                    helper.fail("Energy did not reach the machine: cube=" + (cubeStrict == null ? "null" : cubeStrict.getAmountAsLong() + "/" + cubeStrict.getCapacityAsLong())
                                 + " cubeFacing=" + cubeFacing + " cubeWestCap=" + cubeWest
                                 + " cableB east=" + cableB2.getConnectionType(Direction.EAST) + " cableA west=" + cableA2.getConnectionType(Direction.WEST)
-                                + " net energy=" + (cableB2.hasTransmitterNetwork() ? cableB2.getTransmitterNetwork().energyContainer.getEnergy() + " acceptors=" + cableB2.getTransmitterNetwork().getAcceptorCount() : "none"));
+                                + " net energy=" + (cableB2.hasTransmitterNetwork()
+                                                     ? cableB2.getTransmitterNetwork().energyContainer.getAmountAsLong()
+                                                       + " acceptors=" + cableB2.getTransmitterNetwork().getAcceptorCount() : "none"));
                 }
             });
         });
     }
 
-
-    @GameTest(template = EMPTY_STRUCTURE, timeoutTicks = 200)
+    @GameTest(maxTicks = 200)
     public void dynamicTankMultiblockForms(GameTestHelper helper) {
         for (int x = 0; x < 3; x++) {
             for (int y = 1; y < 4; y++) {
@@ -214,15 +243,15 @@ public class MekanismPortGameTests implements FabricGameTest {
             }
         }
         helper.succeedWhen(() -> {
-            var tile = (mekanism.common.tile.prefab.TileEntityMultiblock<?>) helper.getBlockEntity(new BlockPos(0, 1, 0));
+            var tile = (mekanism.common.tile.prefab.TileEntityMultiblock<?>) helper.getBlockEntity(new BlockPos(0, 1, 0), BlockEntity.class);
             helper.assertTrue(tile.getMultiblock().isFormed(), "Dynamic tank did not form");
         });
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest
     public void oresAddedToOverworldBiomes(GameTestHelper helper) {
-        var biomes = helper.getLevel().registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
-        var plains = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.PLAINS);
+        var biomes = helper.getLevel().registryAccess().lookupOrThrow(Registries.BIOME);
+        var plains = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.PLAINS).value();
         boolean found = plains.getGenerationSettings().features().stream()
               .flatMap(set -> set.stream())
               .anyMatch(feature -> feature.unwrapKey().map(key -> key.location().toString().equals("mekanism:ore_osmium_upper")).orElse(false));
@@ -231,11 +260,11 @@ public class MekanismPortGameTests implements FabricGameTest {
     }
 
     /** ItemAttributeModifierEvent: the Meka-Tool has no static attribute modifiers, its attack damage comes only from the event. */
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest
     public void mekaToolAttributesFromEvent(GameTestHelper helper) {
         ItemStack mekaTool = new ItemStack(mekanism.common.registries.MekanismItems.MEKA_TOOL.get());
         double[] attackDamage = {0};
-        mekaTool.forEachModifier(net.minecraft.world.entity.EquipmentSlotGroup.MAINHAND, (attribute, modifier) -> {
+        mekaTool.forEachModifier(net.minecraft.world.entity.EquipmentSlotGroup.MAINHAND, (attribute, modifier, display) -> {
             if (attribute.is(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE)) {
                 attackDamage[0] += modifier.amount();
             }
@@ -245,14 +274,15 @@ public class MekanismPortGameTests implements FabricGameTest {
     }
 
     /** LivingFallEvent: charged free runners absorb fall damage, an unequipped mob takes it. */
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest
     public void freeRunnersCancelFallDamage(GameTestHelper helper) {
-        net.minecraft.world.entity.animal.Pig control = helper.spawn(net.minecraft.world.entity.EntityType.PIG, new BlockPos(1, 2, 1));
-        net.minecraft.world.entity.animal.Pig runner = helper.spawn(net.minecraft.world.entity.EntityType.PIG, new BlockPos(3, 2, 3));
+        var control = helper.spawn(net.minecraft.world.entity.EntityType.PIG, new BlockPos(1, 2, 1));
+        var runner = helper.spawn(net.minecraft.world.entity.EntityType.PIG, new BlockPos(3, 2, 3));
         ItemStack freeRunners = new ItemStack(mekanism.common.registries.MekanismItems.FREE_RUNNERS.get());
-        mekanism.api.energy.IEnergyContainer container = mekanism.common.util.StorageUtils.getEnergyContainer(freeRunners, 0);
+        IEnergyContainer container = EnergyUtils.getEnergyContainer(
+              Capabilities.Energy.ITEM.getCapability(freeRunners, ItemAccess.forStack(freeRunners)));
         helper.assertTrue(container != null, "Free runners have no energy container");
-        container.setEnergy(container.getMaxEnergy());
+        container.setEnergy(container.getCapacityAsLong(), null);
         runner.setItemSlot(net.minecraft.world.entity.EquipmentSlot.FEET, freeRunners);
         control.causeFallDamage(8, 1, control.damageSources().fall());
         runner.causeFallDamage(8, 1, runner.damageSources().fall());
@@ -262,18 +292,18 @@ public class MekanismPortGameTests implements FabricGameTest {
     }
 
     /** EntityInvulnerabilityCheckEvent: entity types in mekanism:radiation_immune ignore radiation damage. */
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest
     public void radiationImmuneEntitiesInvulnerable(GameTestHelper helper) {
         var golem = helper.spawn(net.minecraft.world.entity.EntityType.IRON_GOLEM, new BlockPos(1, 2, 1));
         var pig = helper.spawn(net.minecraft.world.entity.EntityType.PIG, new BlockPos(3, 2, 3));
         var radiation = mekanism.common.registries.MekanismDamageTypes.RADIATION.source(helper.getLevel());
-        helper.assertTrue(golem.isInvulnerableTo(radiation), "Iron golem is not immune to radiation");
-        helper.assertFalse(pig.isInvulnerableTo(radiation), "Pig is immune to radiation");
+        helper.assertTrue(golem.isInvulnerableTo(helper.getLevel(), radiation), "Iron golem is not immune to radiation");
+        helper.assertFalse(pig.isInvulnerableTo(helper.getLevel(), radiation), "Pig is immune to radiation");
         helper.succeed();
     }
 
     /** neoforge:swim_speed and neoforge:creative_flight exist and are on the default attribute suppliers. */
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest
     public void neoForgeAttributesPresent(GameTestHelper helper) {
         var pig = helper.spawn(net.minecraft.world.entity.EntityType.PIG, new BlockPos(1, 2, 1));
         var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
@@ -283,7 +313,7 @@ public class MekanismPortGameTests implements FabricGameTest {
     }
 
     /** Forced chunks are recorded in the per-level store (saved with the world and reinstated on server start) and removed again. */
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest
     public void chunkLoaderTicketsPersisted(GameTestHelper helper) {
         var level = helper.getLevel();
         var controller = mekanism.common.tile.component.TileComponentChunkLoader.TICKET_CONTROLLER;
@@ -292,10 +322,10 @@ public class MekanismPortGameTests implements FabricGameTest {
         int chunkZ = owner.getZ() >> 4;
         var store = mekanism.neoshim.neoforge.common.world.chunk.ForcedChunkStore.get(level);
         controller.forceChunk(level, owner, chunkX, chunkZ, true, false);
-        net.minecraft.nbt.CompoundTag saved = store.save(new net.minecraft.nbt.CompoundTag(), level.registryAccess());
+        CompoundTag saved = store.toCompoundTag();
         helper.assertTrue(saved.contains(controller.id().toString()), "Forced chunk not recorded for " + controller.id() + ": " + saved);
         controller.forceChunk(level, owner, chunkX, chunkZ, false, false);
-        saved = store.save(new net.minecraft.nbt.CompoundTag(), level.registryAccess());
+        saved = store.toCompoundTag();
         helper.assertFalse(saved.contains(controller.id().toString()), "Forced chunk not removed: " + saved);
         helper.succeed();
     }
@@ -304,13 +334,14 @@ public class MekanismPortGameTests implements FabricGameTest {
      * Position-aware light emission of a lava filled fluid tank. Propagation through the light engine is checked client side by the world smoke test (the server
      * light engine runs off thread, where vanilla returns no block entities; upstream Mekanism only rechecks tank lighting on the client too).
      */
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest
     public void fluidTankEmitsFluidLight(GameTestHelper helper) {
         placeLikeItem(helper, MekanismBlocks.BASIC_FLUID_TANK.value());
         BlockPos absolute = helper.absolutePos(POS);
         Storage<FluidVariant> storage = FluidStorage.SIDED.find(helper.getLevel(), absolute, Direction.UP);
         helper.assertTrue(storage != null, "No fluid storage exposed by the fluid tank");
-        try (Transaction transaction = Transaction.openOuter()) {
+        try (net.fabricmc.fabric.api.transfer.v1.transaction.Transaction transaction =
+              net.fabricmc.fabric.api.transfer.v1.transaction.Transaction.openOuter()) {
             storage.insert(FluidVariant.of(Fluids.LAVA), FluidConstants.BUCKET, transaction);
             transaction.commit();
         }
@@ -320,136 +351,83 @@ public class MekanismPortGameTests implements FabricGameTest {
     }
 
     /** Additions' custom biome modifier type (mekanismadditions:baby_mob_spawn) is decoded and replayed: plains spawn baby skeletons. */
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest
     public void babyMobsSpawnInPlains(GameTestHelper helper) {
-        var biomes = helper.getLevel().registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
-        var plains = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.PLAINS);
+        if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("mekanismadditions")) {
+            helper.succeed();
+            return;
+        }
+        var biomes = helper.getLevel().registryAccess().lookupOrThrow(Registries.BIOME);
+        var plains = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.PLAINS).value();
         boolean found = plains.getMobSettings().getMobs(net.minecraft.world.entity.MobCategory.MONSTER).unwrap().stream()
-              .anyMatch(spawner -> net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(spawner.type).toString().equals("mekanismadditions:baby_skeleton"));
+              .anyMatch(spawner -> net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(spawner.value().type()).toString().equals("mekanismadditions:baby_skeleton"));
         helper.assertTrue(found, "Plains biome does not spawn Mekanism Additions baby skeletons");
         helper.succeed();
     }
 
     /** NeoForge registry aliases: the pre-chemical-merge item id resolves to its replacement. */
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest
     public void registryAliasesResolve(GameTestHelper helper) {
-        var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(mekanism.common.Mekanism.rl("upgrade_gas"));
+        var item = net.minecraft.core.registries.BuiltInRegistries.ITEM.getValue(mekanism.common.Mekanism.rl("upgrade_gas"));
         helper.assertTrue(item == mekanism.common.registries.MekanismItems.CHEMICAL_UPGRADE.get(), "mekanism:upgrade_gas resolved to " + item);
         helper.succeed();
     }
 
-    /** Item fluid capability import: vanilla buckets (Fabric fluid storage) work as IFluidHandlerItem, including the container swap. */
-    @GameTest(template = EMPTY_STRUCTURE)
-    public void vanillaBucketsAsFluidHandlerItems(GameTestHelper helper) {
-        var drainCap = Capabilities.FluidHandler.ITEM.getCapability(new ItemStack(Items.WATER_BUCKET), null);
-        helper.assertTrue(drainCap != null, "Water bucket has no IFluidHandlerItem");
-        var drained = drainCap.drain(1000, mekanism.neoshim.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
-        helper.assertTrue(drained.getAmount() == 1000 && drained.getFluid() == Fluids.WATER, "Drained " + drained.getAmount() + " of " + drained.getFluid());
-        helper.assertTrue(drainCap.getContainer().is(Items.BUCKET), "Drained container is " + drainCap.getContainer());
-        var fillCap = Capabilities.FluidHandler.ITEM.getCapability(new ItemStack(Items.BUCKET), null);
-        helper.assertTrue(fillCap != null, "Empty bucket has no IFluidHandlerItem");
-        int filled = fillCap.fill(new mekanism.neoshim.neoforge.fluids.FluidStack(Fluids.LAVA, 1000),
-              mekanism.neoshim.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
-        helper.assertTrue(filled == 1000 && fillCap.getContainer().is(Items.LAVA_BUCKET), "Filled " + filled + ", container " + fillCap.getContainer());
+    /** Item fluid capability import: vanilla buckets (Fabric fluid storage) work as resource handlers, including the container swap. */
+    @GameTest
+    public void vanillaBucketsAsFluidHandlers(GameTestHelper helper) {
+        ItemStack waterBucket = new ItemStack(Items.WATER_BUCKET);
+        ResourceHandler<FluidResource> drainHandler = Capabilities.Fluid.ITEM.getCapability(waterBucket, ItemAccess.forStack(waterBucket));
+        helper.assertTrue(drainHandler != null, "Water bucket has no fluid handler");
+        try (Transaction transaction = Transaction.openRoot()) {
+            int drained = drainHandler.extract(0, FluidResource.of(Fluids.WATER), 1000, transaction);
+            helper.assertTrue(drained == 1000, "Drained " + drained + " mB instead of 1000");
+            transaction.commit();
+        }
+        helper.assertTrue(waterBucket.is(Items.BUCKET), "Drained container is " + waterBucket);
+        ItemStack emptyBucket = new ItemStack(Items.BUCKET);
+        ResourceHandler<FluidResource> fillHandler = Capabilities.Fluid.ITEM.getCapability(emptyBucket, ItemAccess.forStack(emptyBucket));
+        helper.assertTrue(fillHandler != null, "Empty bucket has no fluid handler");
+        try (Transaction transaction = Transaction.openRoot()) {
+            int filled = fillHandler.insert(FluidResource.of(Fluids.LAVA), 1000, transaction);
+            helper.assertTrue(filled == 1000, "Filled " + filled + " mB instead of 1000");
+            transaction.commit();
+        }
+        helper.assertTrue(emptyBucket.is(Items.LAVA_BUCKET), "Filled container is " + emptyBucket);
         helper.succeed();
     }
 
     /** Item capability export: a fluid tank item accepts fluid through FluidStorage.ITEM, an energy tablet charges through EnergyStorage.ITEM. */
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest
     public void mekanismItemsExportFabricItemStorage(GameTestHelper helper) {
         net.minecraft.world.SimpleContainer inventory = new net.minecraft.world.SimpleContainer(2);
         inventory.setItem(0, new ItemStack(MekanismBlocks.BASIC_FLUID_TANK.value()));
         inventory.setItem(1, new ItemStack(mekanism.common.registries.MekanismItems.ENERGY_TABLET.get()));
-        var slots = net.fabricmc.fabric.api.transfer.v1.item.InventoryStorage.of(inventory, null);
+        ContainerStorage slots = ContainerStorage.of(inventory, null);
         var tankContext = net.fabricmc.fabric.api.transfer.v1.context.ContainerItemContext.ofSingleSlot(slots.getSlot(0));
         Storage<FluidVariant> tank = FluidStorage.ITEM.find(inventory.getItem(0), tankContext);
         helper.assertTrue(tank != null, "Fluid tank item exposes no FluidStorage.ITEM");
-        try (Transaction transaction = Transaction.openOuter()) {
+        try (net.fabricmc.fabric.api.transfer.v1.transaction.Transaction transaction =
+              net.fabricmc.fabric.api.transfer.v1.transaction.Transaction.openOuter()) {
             long inserted = tank.insert(FluidVariant.of(Fluids.WATER), FluidConstants.BUCKET, transaction);
             helper.assertTrue(inserted == FluidConstants.BUCKET, "Inserted " + inserted + " droplets into the fluid tank item");
             transaction.commit();
         }
-        var tankHandler = Capabilities.FluidHandler.ITEM.getCapability(inventory.getItem(0), null);
-        helper.assertTrue(tankHandler != null && tankHandler.getFluidInTank(0).getAmount() == 1000, "Fluid tank item holds "
-              + (tankHandler == null ? "?" : tankHandler.getFluidInTank(0).getAmount()) + " mB after the exchange");
+        ResourceHandler<FluidResource> tankHandler = Capabilities.Fluid.ITEM.getCapability(inventory.getItem(0), ItemAccess.forStack(inventory.getItem(0)));
+        helper.assertTrue(tankHandler != null && tankHandler.getAmountAsInt(0) == 1000, "Fluid tank item holds "
+              + (tankHandler == null ? "?" : tankHandler.getAmountAsInt(0)) + " mB after the exchange");
         var tabletContext = net.fabricmc.fabric.api.transfer.v1.context.ContainerItemContext.ofSingleSlot(slots.getSlot(1));
         EnergyStorage tablet = EnergyStorage.ITEM.find(inventory.getItem(1), tabletContext);
         helper.assertTrue(tablet != null, "Energy tablet exposes no EnergyStorage.ITEM");
-        try (Transaction transaction = Transaction.openOuter()) {
+        try (net.fabricmc.fabric.api.transfer.v1.transaction.Transaction transaction =
+              net.fabricmc.fabric.api.transfer.v1.transaction.Transaction.openOuter()) {
             long inserted = tablet.insert(10_000, transaction);
             helper.assertTrue(inserted > 0, "Energy tablet accepted no energy");
             transaction.commit();
         }
-        mekanism.api.energy.IEnergyContainer container = mekanism.common.util.StorageUtils.getEnergyContainer(inventory.getItem(1), 0);
-        helper.assertTrue(container != null && container.getEnergy() > 0, "Energy tablet has no energy after the exchange");
-        helper.succeed();
-    }
-
-    /** ComputerCraft (only when CC: Tweaked is installed, -Pcomputers=cc): machines are peripherals through CC:T's Fabric lookup. */
-    @GameTest(template = EMPTY_STRUCTURE)
-    public void machinesArePeripheralsWithComputerCraft(GameTestHelper helper) {
-        if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("computercraft")) {
-            helper.succeed();
-            return;
-        }
-        placeLikeItem(helper, MekanismBlocks.ENRICHMENT_CHAMBER.value());
-        BlockPos absolute = helper.absolutePos(POS);
-        var lookup = net.fabricmc.fabric.api.lookup.v1.block.BlockApiLookup.get(net.minecraft.resources.Identifier.fromNamespaceAndPath("computercraft", "peripheral"),
-              dan200.computercraft.api.peripheral.IPeripheral.class, Direction.class);
-        var peripheral = lookup.find(helper.getLevel(), absolute, Direction.UP);
-        helper.assertTrue(peripheral != null, "Enrichment chamber is not a ComputerCraft peripheral");
-        mekanism.common.Mekanism.logger.info("[Fabric port] GameTest: enrichment chamber peripheral type {}", peripheral.getType());
-        helper.succeed();
-    }
-
-    /** Accessory slots (only when Trinkets is installed, -Paccessories=trinkets; the test mod defines a chest/back slot): a jetpack worn there is found. */
-    @GameTest(template = EMPTY_STRUCTURE)
-    public void jetpackFoundInTrinketSlot(GameTestHelper helper) {
-        if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("trinkets")) {
-            helper.succeed();
-            return;
-        }
-        var player = helper.makeMockServerPlayerInLevel();
-        var component = dev.emi.trinkets.api.TrinketsApi.getTrinketComponent(player).orElseThrow();
-        var group = component.getInventory().get("chest");
-        helper.assertTrue(group != null && group.containsKey("back"), "Player has no chest/back trinket slot: " + component.getInventory().keySet());
-        ItemStack jetpack = new ItemStack(mekanism.common.registries.MekanismItems.JETPACK.get());
-        group.get("back").setItem(0, jetpack);
-        helper.assertTrue(mekanism.common.integration.curios.CuriosIntegration.findFirstCurio(player, stack -> stack.getItem() instanceof mekanism.common.item.interfaces.IJetpackItem)
-              == jetpack, "Jetpack in trinket slot not found");
-        helper.assertTrue(mekanism.common.integration.curios.CuriosIntegration.getCurioStack(player, "chest/back", 0) == jetpack, "getCurioStack(chest/back, 0) mismatch");
-        var handler = mekanism.common.integration.curios.CuriosIntegration.getCuriosInventory(player);
-        helper.assertTrue(handler != null && handler.getSlots() >= 1, "No accessory item handler");
-        helper.assertTrue(mekanism.common.Mekanism.hooks.curios.isLoaded(), "Mekanism does not see the accessory integration as loaded");
-        helper.succeed();
-    }
-
-    /** CraftTweaker (only when installed, -Ptweaker=crt): the test script's enrichment recipe is registered through Mekanism's CrT integration. */
-    @GameTest(template = EMPTY_STRUCTURE)
-    public void craftTweakerAddsMekanismRecipe(GameTestHelper helper) {
-        if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("crafttweaker")) {
-            helper.succeed();
-            return;
-        }
-        var recipe = helper.getLevel().getRecipeManager().byKey(net.minecraft.resources.Identifier.fromNamespaceAndPath("crafttweaker", "port_test_enriching"));
-        helper.assertTrue(recipe.isPresent(), "CraftTweaker script recipe crafttweaker:port_test_enriching not found");
-        helper.assertTrue(recipe.get().value().getType() == mekanism.common.recipe.MekanismRecipeType.ENRICHING.get(), "Recipe has type " + recipe.get().value().getType());
-        helper.succeed();
-    }
-
-    /** Wildfire's Female Gender Mod (only when installed, -Pgender=true): Mekanism and Tools armor settings are registered through WildfireAPI. */
-    @GameTest(template = EMPTY_STRUCTURE)
-    public void genderArmorRegistered(GameTestHelper helper) {
-        if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("wildfire_gender")) {
-            helper.succeed();
-            return;
-        }
-        var armors = com.wildfire.api.WildfireAPI.getGenderArmors();
-        helper.assertTrue(armors.get(mekanism.common.registries.MekanismItems.HAZMAT_GOWN.asItem()) == mekanism.common.integration.gender.MekanismGenderArmor.HAZMAT,
-              "Hazmat gown gender armor settings not registered");
-        helper.assertTrue(armors.containsKey(mekanism.common.registries.MekanismItems.MEKASUIT_BODYARMOR.asItem()), "MekaSuit body armor not registered");
-        var bronze = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(net.minecraft.resources.Identifier.fromNamespaceAndPath("mekanismtools", "bronze_chestplate"));
-        helper.assertTrue(armors.containsKey(bronze), "Tools bronze chestplate not registered");
+        IEnergyContainer container = EnergyUtils.getEnergyContainer(
+              Capabilities.Energy.ITEM.getCapability(inventory.getItem(1), ItemAccess.forStack(inventory.getItem(1))));
+        helper.assertTrue(container != null && container.getAmountAsLong() > 0, "Energy tablet has no energy after the exchange");
         helper.succeed();
     }
 }

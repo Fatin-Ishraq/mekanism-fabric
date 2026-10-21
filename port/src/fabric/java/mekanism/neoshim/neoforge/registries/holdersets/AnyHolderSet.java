@@ -35,6 +35,11 @@ public record AnyHolderSet<T>(HolderLookup.RegistryLookup<T> registryLookup) imp
     }
 
     @Override
+    public boolean isBound() {
+        return true;
+    }
+
+    @Override
     public Either<TagKey<T>, List<Holder<T>>> unwrap() {
         return Either.right(list());
     }

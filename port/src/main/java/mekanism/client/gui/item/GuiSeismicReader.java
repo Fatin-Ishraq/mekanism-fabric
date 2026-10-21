@@ -61,8 +61,8 @@ public class GuiSeismicReader extends GuiMekanism<SeismicReaderContainer> {
             ItemStack stack = state.getCloneItemStack(p, level, false, player);
             if (stack.isEmpty()) {
                 Fluid fluid = Fluids.EMPTY;
-                if (block instanceof LiquidBlock liquidBlock) {
-                    fluid = liquidBlock.fluid;
+                if (block instanceof LiquidBlock) {
+                    fluid = level.getFluidState(p).getType();//FABRIC: LiquidBlock.fluid is protected in vanilla
                 } else if (block instanceof BubbleColumnBlock) {
                     fluid = level.getFluidState(p).getType();
                 }

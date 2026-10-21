@@ -16,7 +16,7 @@ public class PlaySoundEvent extends Event {
     public PlaySoundEvent(SoundEngine manager, SoundInstance sound) {
         this.engine = manager;
         this.source = sound;
-        this.name = sound.getLocation().getPath();
+        this.name = sound.getIdentifier().getPath();
         this.sound = sound;
     }
 

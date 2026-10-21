@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -168,7 +169,7 @@ public class TileEntityTypeDeferredRegister extends MekanismDeferredRegister<Blo
         @SuppressWarnings("ConstantConditions")
         public TileEntityTypeRegistryObject<BE> build() {
             //Note: There is no data fixer type as forge does not currently have a way exposing data fixers to mods yet
-            TileEntityTypeRegistryObject<BE> holder = registerMek(block.getId().getPath(), () -> new BlockEntityType<>(factory, block.value()));
+            TileEntityTypeRegistryObject<BE> holder = registerMek(block.getId().getPath(), () -> new BlockEntityType<>(factory, Set.of(block.value())));
             holder.tickers(clientTicker, serverTicker);
             holder.capabilities(capabilityProviders.isEmpty() ? null : capabilityProviders);
             return holder;

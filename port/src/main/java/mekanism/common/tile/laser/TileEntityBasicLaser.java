@@ -404,7 +404,11 @@ public abstract class TileEntityBasicLaser extends TileEntityMekanism {
         int shieldDamage = event.shieldDamage();
         if (shieldDamage > 0) {
             //Only damage the shield if the shield isn't setup to block damage for free
-            blocksAttacks.hurtBlockingItem(level, blockingWith, livingEntity, livingEntity.getUsedItemHand(), damageBlocked, shieldDamage);
+            //FABRIC: NeoForge's 6-arg hurtBlockingItem overload doesn't exist in vanilla; replicate its behavior (damage by the event's shield amount)
+            if (livingEntity instanceof Player player && !level.isClientSide()) {
+                player.awardStat(Stats.ITEM_USED.get(blockingWith.getItem()));
+            }
+            blockingWith.hurtAndBreak(shieldDamage, livingEntity, livingEntity.getUsedItemHand().asEquipmentSlot());
         }
         damageBlocked = event.getBlockedDamage();
         if (livingEntity instanceof Player player && damageBlocked > 0 && damageBlocked < 3.4028235E37F) {

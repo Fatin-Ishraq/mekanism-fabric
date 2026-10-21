@@ -67,7 +67,7 @@ public final class ConditionBridge {
         }
 
         @Override
-        public boolean test(@Nullable net.minecraft.core.HolderLookup.Provider registryLookup) {
+        public boolean test(net.minecraft.resources.RegistryOps.RegistryInfoLookup registryLookup) {
             return condition.test(ICondition.IContext.EMPTY);
         }
     }
@@ -94,7 +94,7 @@ public final class ConditionBridge {
 
         @Override
         public MapCodec<? extends ICondition> codec() {
-            return NeoForgeRegistries.CONDITION_SERIALIZERS.get(Identifier.fromNamespaceAndPath("neoforge", "mod_loaded"));
+            return NeoForgeRegistries.CONDITION_SERIALIZERS.getValue(Identifier.fromNamespaceAndPath("neoforge", "mod_loaded"));
         }
     }
 
@@ -107,7 +107,7 @@ public final class ConditionBridge {
 
         @Override
         public MapCodec<? extends ICondition> codec() {
-            return NeoForgeRegistries.CONDITION_SERIALIZERS.get(Identifier.fromNamespaceAndPath("neoforge", "not"));
+            return NeoForgeRegistries.CONDITION_SERIALIZERS.getValue(Identifier.fromNamespaceAndPath("neoforge", "not"));
         }
     }
 
@@ -120,7 +120,7 @@ public final class ConditionBridge {
 
         @Override
         public MapCodec<? extends ICondition> codec() {
-            return NeoForgeRegistries.CONDITION_SERIALIZERS.get(Identifier.fromNamespaceAndPath("neoforge", "and"));
+            return NeoForgeRegistries.CONDITION_SERIALIZERS.getValue(Identifier.fromNamespaceAndPath("neoforge", "and"));
         }
     }
 
@@ -133,7 +133,7 @@ public final class ConditionBridge {
 
         @Override
         public MapCodec<? extends ICondition> codec() {
-            return NeoForgeRegistries.CONDITION_SERIALIZERS.get(Identifier.fromNamespaceAndPath("neoforge", "or"));
+            return NeoForgeRegistries.CONDITION_SERIALIZERS.getValue(Identifier.fromNamespaceAndPath("neoforge", "or"));
         }
     }
 
@@ -146,7 +146,7 @@ public final class ConditionBridge {
 
         @Override
         public MapCodec<? extends ICondition> codec() {
-            return NeoForgeRegistries.CONDITION_SERIALIZERS.get(Identifier.fromNamespaceAndPath("neoforge", "item_exists"));
+            return NeoForgeRegistries.CONDITION_SERIALIZERS.getValue(Identifier.fromNamespaceAndPath("neoforge", "item_exists"));
         }
     }
 }

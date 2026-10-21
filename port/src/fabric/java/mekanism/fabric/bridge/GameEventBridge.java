@@ -11,7 +11,7 @@ import mekanism.neoshim.neoforge.event.entity.EntityJoinLevelEvent;
 import mekanism.neoshim.neoforge.event.entity.living.LivingDeathEvent;
 import mekanism.neoshim.neoforge.event.entity.player.PlayerEvent;
 import mekanism.neoshim.neoforge.event.entity.player.PlayerInteractEvent;
-import mekanism.neoshim.neoforge.event.level.BlockEvent;
+import mekanism.neoshim.neoforge.event.level.block.BreakBlockEvent;
 import mekanism.neoshim.neoforge.event.level.ChunkEvent;
 import mekanism.neoshim.neoforge.event.level.LevelEvent;
 import mekanism.neoshim.neoforge.event.server.ServerStartedEvent;
@@ -23,7 +23,7 @@ import mekanism.neoshim.neoforge.event.tick.ServerTickEvent;
 import mekanism.neoshim.neoforge.server.ServerLifecycleHooks;
 import mekanism.neoshim.neoforge.server.permission.events.PermissionGatherEvent;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.entity.event.v1.ServerEntityWorldChangeEvents;
+import net.fabricmc.fabric.api.entity.event.v1.ServerEntityLevelChangeEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.CommonLifecycleEvents;
@@ -32,7 +32,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLevelEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.networking.v1.EntityTrackingEvents;
@@ -71,16 +71,16 @@ public final class GameEventBridge {
         // Ticks
         ServerTickEvents.START_SERVER_TICK.register(server -> bus.post(new ServerTickEvent.Pre(() -> true, server)));
         ServerTickEvents.END_SERVER_TICK.register(server -> bus.post(new ServerTickEvent.Post(() -> true, server)));
-        ServerTickEvents.START_WORLD_TICK.register(level -> bus.post(new LevelTickEvent.Pre(() -> true, level)));
-        ServerTickEvents.END_WORLD_TICK.register(level -> bus.post(new LevelTickEvent.Post(() -> true, level)));
+        ServerTickEvents.START_LEVEL_TICK.register(level -> bus.post(new LevelTickEvent.Pre(() -> true, level)));
+        ServerTickEvents.END_LEVEL_TICK.register(level -> bus.post(new LevelTickEvent.Post(() -> true, level)));
 
         // Levels / chunks / block entities
-        ServerWorldEvents.LOAD.register((server, level) -> bus.post(new LevelEvent.Load(level)));
-        ServerWorldEvents.UNLOAD.register((server, level) -> {
+        ServerLevelEvents.LOAD.register((server, level) -> bus.post(new LevelEvent.Load(level)));
+        ServerLevelEvents.UNLOAD.register((server, level) -> {
             bus.post(new LevelEvent.Unload(level));
             CapabilityInvalidation.clear(level);
         });
-        ServerChunkEvents.CHUNK_LOAD.register((level, chunk) -> {
+        ServerChunkEvents.CHUNK_LOAD.register((level, chunk, generated) -> {
             bus.post(new ChunkEvent.Load(chunk, false));
             CapabilityInvalidation.invalidate(level, chunk.getPos());
         });
@@ -104,7 +104,7 @@ public final class GameEventBridge {
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> bus.post(new PlayerEvent.PlayerLoggedOutEvent(handler.player)));
         ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> bus.post(new PlayerEvent.PlayerRespawnEvent(newPlayer, alive)));
         ServerPlayerEvents.COPY_FROM.register((oldPlayer, newPlayer, alive) -> bus.post(new PlayerEvent.Clone(newPlayer, oldPlayer, !alive)));
-        ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register((player, origin, destination) ->
+        ServerEntityLevelChangeEvents.AFTER_PLAYER_CHANGE_LEVEL.register((player, origin, destination) ->
               bus.post(new PlayerEvent.PlayerChangedDimensionEvent(player, origin.dimension(), destination.dimension())));
         EntityTrackingEvents.START_TRACKING.register((target, player) -> bus.post(new PlayerEvent.StartTracking(player, target)));
         EntityTrackingEvents.STOP_TRACKING.register((target, player) -> bus.post(new PlayerEvent.StopTracking(player, target)));
@@ -112,7 +112,7 @@ public final class GameEventBridge {
 
         // Interaction
         PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) ->
-              !bus.post(new BlockEvent.BreakEvent(level, pos, state, player)).isCanceled());
+              !bus.post(new BreakBlockEvent(level, pos, state, player)).isCanceled());
         UseBlockCallback.EVENT.register((player, level, hand, hitResult) -> {
             PlayerInteractEvent.RightClickBlock event = bus.post(new PlayerInteractEvent.RightClickBlock(player, hand, hitResult.getBlockPos(), hitResult));
             if (event.isCanceled()) {

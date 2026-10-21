@@ -21,6 +21,7 @@ import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.SingleRecipeInput;
 import net.minecraft.world.item.crafting.SmeltingRecipe;
 import net.minecraft.world.item.crafting.display.RecipeDisplay;
+import mekanism.neoshim.neoforge.util.ContextMaps;
 
 public class WrappedSmelterRecipe extends ItemStackToItemStackRecipe {
     public static ItemStackToItemStackRecipe tryUnwrap(SmeltingRecipe original) {
@@ -59,7 +60,7 @@ public class WrappedSmelterRecipe extends ItemStackToItemStackRecipe {
         List<ItemStackTemplate> list = new ArrayList<>();
         for (RecipeDisplay display : wrapped.display()) {
             //TODO - 26.1 can we get a level here and use SlotDisplayContext.fromLevel()?
-            for (ItemStack stack : display.result().resolveForStacks(ContextMap.EMPTY)) {
+            for (ItemStack stack : display.result().resolveForStacks(ContextMaps.EMPTY)) {
                 if (!stack.isEmpty()) {//TODO - 26.1: Can resolved stacks ever be empty?
                     list.add(ItemStackTemplate.fromNonEmptyStack(stack));
                 }

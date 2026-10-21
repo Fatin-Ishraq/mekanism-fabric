@@ -42,6 +42,7 @@ import net.minecraft.util.context.ContextMap;
 import mekanism.neoshim.bus.api.SubscribeEvent;
 import mekanism.neoshim.neoforge.client.event.AddClientReloadListenersEvent;
 import mekanism.neoshim.neoforge.client.event.ModelEvent;
+import mekanism.neoshim.neoforge.client.model.NeoForgeModelProperties;
 import mekanism.neoshim.neoforge.client.model.standalone.StandaloneModelKey;
 import mekanism.neoshim.neoforge.client.model.standalone.UnbakedStandaloneModel;
 import org.jspecify.annotations.Nullable;
@@ -119,7 +120,8 @@ public class RobitSkinManager {
         }
         try {
             //nb: can't use bakeTopGeometry as that is the vanilla-baked one
-            QuadCollection quadCollection = resolved.getTopGeometry().bake(makeTextureSlots(resolved, activeTexture), modelBaker, BlockModelRotation.IDENTITY, resolved, ContextMap.EMPTY);
+            QuadCollection quadCollection = resolved.getTopGeometry().bake(makeTextureSlots(resolved, activeTexture), modelBaker, BlockModelRotation.IDENTITY, resolved,
+                  NeoForgeModelProperties.create(new ContextMap.Builder()));
             BlockStateModelPart bakedModel = new SimpleModelWrapper(
                   quadCollection,
                   resolved.getTopAmbientOcclusion(),

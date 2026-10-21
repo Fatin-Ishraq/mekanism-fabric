@@ -89,8 +89,7 @@ public class EnergyCubeBaseGeometry implements ExtendedUnbakedGeometry {
                         remapLedUVs(unlit, ledUShift, ledVShift),
                         unlit.rotation(),
                         false,
-                        15,
-                        unlit.faceData()
+                        15
                   ))
                   .toList();
             ledsLit.put(entry.getKey(), new UnbakedCuboidGeometry(litElements));
@@ -115,14 +114,13 @@ public class EnergyCubeBaseGeometry implements ExtendedUnbakedGeometry {
                         origUvs.maxV() + ledVShift
                   );
                   //attach them to a new face instance
+                  //FABRIC: 26.1 Fabric has no NeoForge faceData/parent components on CuboidFace
                   CuboidFace newFace = new CuboidFace(
                         origFace.cullForDirection(),
                         origFace.tintIndex(),
                         origFace.texture(),
                         newUVs,
-                        origFace.rotation(),
-                        origFace.faceData(),
-                        origFace.parent()
+                        origFace.rotation()
                   );
                   //zip it back up
                   return Map.entry(faceEntry.getKey(), newFace);
@@ -168,11 +166,6 @@ public class EnergyCubeBaseGeometry implements ExtendedUnbakedGeometry {
         @Override
         public Matrix4fc inverseFaceTransformation(Direction face) {
             return parent.inverseFaceTransformation(face);
-        }
-
-        @Override
-        public boolean mayApplyArbitraryRotation() {
-            return parent.mayApplyArbitraryRotation();
         }
     }
 }

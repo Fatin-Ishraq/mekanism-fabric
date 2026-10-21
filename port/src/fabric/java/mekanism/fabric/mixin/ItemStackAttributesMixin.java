@@ -12,6 +12,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import org.apache.commons.lang3.function.TriConsumer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -30,7 +31,7 @@ public abstract class ItemStackAttributesMixin {
         ItemStack self = (ItemStack) (Object) this;
         ItemAttributeModifiers modifiers = self.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.EMPTY);
         if (modifiers.modifiers().isEmpty()) {
-            modifiers = self.getItem().getDefaultAttributeModifiers();
+            modifiers = self.getItem().getDefaultAttributeModifiers(self);
         }
         if (self.isEmpty()) {
             return modifiers;
@@ -38,10 +39,11 @@ public abstract class ItemStackAttributesMixin {
         return NeoForge.EVENT_BUS.post(new ItemAttributeModifierEvent(self, modifiers)).build();
     }
 
-    @Inject(method = "forEachModifier(Lnet/minecraft/world/entity/EquipmentSlotGroup;Ljava/util/function/BiConsumer;)V", at = @At("HEAD"), cancellable = true)
-    private void mekanism$forEachModifier(EquipmentSlotGroup slotGroup, BiConsumer<Holder<Attribute>, AttributeModifier> action, CallbackInfo ci) {
+    @Inject(method = "forEachModifier(Lnet/minecraft/world/entity/EquipmentSlotGroup;Lorg/apache/commons/lang3/function/TriConsumer;)V", at = @At("HEAD"), cancellable = true)
+    private void mekanism$forEachModifier(EquipmentSlotGroup slotGroup, TriConsumer<Holder<Attribute>, AttributeModifier, ItemAttributeModifiers.Display> action, CallbackInfo ci) {
         mekanism$attributeModifiers().forEach(slotGroup, action);
-        EnchantmentHelper.forEachModifier((ItemStack) (Object) this, slotGroup, action);
+        EnchantmentHelper.forEachModifier((ItemStack) (Object) this, slotGroup,
+              (attribute, modifier) -> action.accept(attribute, modifier, ItemAttributeModifiers.Display.attributeModifiers()));
         ci.cancel();
     }
 

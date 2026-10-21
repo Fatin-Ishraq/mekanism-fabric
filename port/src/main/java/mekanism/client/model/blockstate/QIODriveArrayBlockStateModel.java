@@ -11,7 +11,6 @@ import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.block.dispatch.ModelState;
 import net.minecraft.client.renderer.block.dispatch.Variant;
 import net.minecraft.client.resources.model.ModelBaker;
-import net.minecraft.client.resources.model.ResolvedModel;
 import net.minecraft.client.resources.model.SimpleModelWrapper;
 import net.minecraft.client.resources.model.geometry.BakedQuad.MaterialFlags;
 import net.minecraft.client.resources.model.sprite.Material.Baked;
@@ -91,8 +90,7 @@ public record QIODriveArrayBlockStateModel(BlockStateModelPart basePart, BlockSt
         @Override
         public QIODriveArrayBlockStateModel bake(ModelBaker baker) {
             ModelState baseTransforms = baseModel.modelState().asModelState();
-            ResolvedModel model = baker.getModel(baseModel.modelLocation());
-            BlockStateModelPart bakedBase = SimpleModelWrapper.bake(baker, model, baseTransforms);
+            BlockStateModelPart bakedBase = SimpleModelWrapper.bake(baker, baseModel.modelLocation(), baseTransforms);
             BlockStateModelPart[][] slotToBakedDrive = new BlockStateModelPart[TileEntityQIODriveArray.DRIVE_SLOTS][];
             for (int slot = 0; slot < TileEntityQIODriveArray.DRIVE_SLOTS; slot++) {
                 BlockStateModelPart[] slotBakedParts = new BlockStateModelPart[DriveStatus.VALUES.length];

@@ -56,7 +56,8 @@ public class QIOGlobalItemLookup {
     static final SavedDataType<QIOGlobalItemLookupDataHandler> TYPE = new SavedDataType<>(
           Mekanism.rl("qio_type_cache"),
           QIOGlobalItemLookupDataHandler::new,
-          CODEC
+          CODEC,
+          net.minecraft.util.datafix.DataFixTypes.LEVEL
     );
 
     public static class QIOGlobalItemLookupDataHandler extends SavedData {

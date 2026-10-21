@@ -11,7 +11,7 @@ public class MekanismFabricClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        new MekanismClient(MekanismFabric.container());
+        new MekanismClient(MekanismFabric.container(), MekanismFabric.container().getEventBus());
         EventBusSubscribers.registerClient(MekanismFabric.container().getEventBus());
         mekanism.fabric.ModuleLoader.constructClientModules();
         ClientBridge.init(MekanismFabric.container());

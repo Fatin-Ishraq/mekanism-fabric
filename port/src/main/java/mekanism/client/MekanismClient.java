@@ -46,7 +46,7 @@ public class MekanismClient {
     private static RecipeMap clientRecipeMap = RecipeMap.EMPTY;
 
     public MekanismClient(ModContainer container, IEventBus modEventBus) {
-        container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
+        container.registerExtensionPoint(IConfigScreenFactory.class, () -> (c, parent) -> new ConfigurationScreen(c.getModId(), parent));//FABRIC: FCAP screen ctor takes a mod id
         modEventBus.register(RobitSpriteUploader.class);
         modEventBus.register(RobitSkinManager.class);
     }

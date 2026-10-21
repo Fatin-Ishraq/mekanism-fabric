@@ -68,6 +68,6 @@ public class ItemAttributeModifierEvent extends Event {
     }
 
     public ItemAttributeModifiers build() {
-        return new ItemAttributeModifiers(List.copyOf(entries), defaultModifiers.showInTooltip());
+        return new ItemAttributeModifiers(List.copyOf(entries));
     }
 }

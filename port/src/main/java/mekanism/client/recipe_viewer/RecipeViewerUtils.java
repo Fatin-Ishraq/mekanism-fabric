@@ -157,7 +157,7 @@ public class RecipeViewerUtils {
     public static List<ItemStack> getDisplayItems(ChemicalStackIngredient ingredient) {
         SequencedSet<Named<Item>> tags = new LinkedHashSet<>();
         for (ChemicalStack chemicalStack : ingredient.getRepresentations(getSlotDisplayContext())) {
-            ChemicalSolidTag tag = chemicalStack.getData(IMekanismDataMapTypes.INSTANCE.chemicalSolidTag());
+            ChemicalSolidTag tag = chemicalStack.typeHolder().getData(IMekanismDataMapTypes.INSTANCE.chemicalSolidTag());//FABRIC: NeoForge's ChemicalStack.getData extension goes through the type holder
             if (tag != null) {
                 tag.lookupTag().ifPresent(tags::add);
             }

@@ -96,3 +96,54 @@ extendable method net/minecraft/world/entity/monster/Creeper spawnLingeringCloud
 accessible field net/minecraft/world/entity/projectile/arrow/AbstractArrow baseDamage D
 # ---- Hand-written additions (Fabric port) ----
 accessible field net/minecraft/world/item/crafting/Ingredient values Lnet/minecraft/core/HolderSet;
+# 26.1 made closeContainer protected; NeoForge's patched Player exposes it and upstream calls it from outside the class
+accessible method net/minecraft/world/entity/player/Player closeContainer ()V
+# NeoForge's access transformer exposes these to mods
+accessible field net/minecraft/world/level/Level isClientSide Z
+# 26.1 made these private/protected; NeoForge exposes them for mod GUIs
+accessible field net/minecraft/client/gui/screens/Screen renderables Ljava/util/List;
+accessible field net/minecraft/client/gui/screens/Screen minecraft Lnet/minecraft/client/Minecraft;
+accessible field net/minecraft/client/gui/screens/inventory/AbstractContainerScreen imageWidth I
+accessible field net/minecraft/client/gui/screens/inventory/AbstractContainerScreen imageHeight I
+accessible field net/minecraft/client/gui/screens/inventory/AbstractContainerScreen hoveredSlot Lnet/minecraft/world/inventory/Slot;
+accessible field net/minecraft/client/gui/screens/inventory/AbstractContainerScreen leftPos I
+accessible field net/minecraft/client/gui/screens/inventory/AbstractContainerScreen topPos I
+# NeoForge exposes the cauldron interaction dispatcher to mods
+accessible method net/minecraft/core/cauldron/CauldronInteraction$Dispatcher put (Lnet/minecraft/world/item/Item;Lnet/minecraft/core/cauldron/CauldronInteraction;)V
+accessible class net/minecraft/world/level/block/entity/BlockEntityType$BlockEntitySupplier
+accessible field net/minecraft/server/level/ServerPlayer server Lnet/minecraft/server/MinecraftServer;
+# NeoForge's access transformer makes SimpleParticleType constructible
+accessible method net/minecraft/core/particles/SimpleParticleType <init> (Z)V
+# NeoForge exposes the fluid a bucket places
+accessible field net/minecraft/world/item/BucketItem content Lnet/minecraft/world/level/material/Fluid;
+# NeoForge exposes biome climate settings to biome modifiers
+accessible class net/minecraft/world/level/biome/Biome$ClimateSettings
+accessible field net/minecraft/world/level/biome/Biome climateSettings Lnet/minecraft/world/level/biome/Biome$ClimateSettings;
+# NeoForge exposes shaped recipe internals to recipe wrappers
+accessible field net/minecraft/world/item/crafting/ShapedRecipe pattern Lnet/minecraft/world/item/crafting/ShapedRecipePattern;
+# NeoForge's ARM exposes renderer layer registration
+accessible method net/minecraft/client/renderer/entity/LivingEntityRenderer addLayer (Lnet/minecraft/client/renderer/entity/layers/RenderLayer;)Z
+# NeoForge's ARM exposes the level renderer tick counter
+accessible field net/minecraft/client/renderer/LevelRenderer ticks I
+# NeoForge exposes fire spread odds to block extensions
+accessible method net/minecraft/world/level/block/FireBlock getBurnOdds (Lnet/minecraft/world/level/block/state/BlockState;)I
+accessible method net/minecraft/world/level/block/FireBlock getIgniteOdds (Lnet/minecraft/world/level/block/state/BlockState;)I
+# NeoForge lets mods subclass the vanilla flame and bubble particles
+accessible method net/minecraft/client/particle/FlameParticle <init> (Lnet/minecraft/client/multiplayer/ClientLevel;DDDDDDLnet/minecraft/client/renderer/texture/TextureAtlasSprite;)V
+accessible method net/minecraft/client/particle/BubbleParticle <init> (Lnet/minecraft/client/multiplayer/ClientLevel;DDDDDDLnet/minecraft/client/renderer/texture/TextureAtlasSprite;)V
+# NeoForge exposes the identifier namespace validator to mods
+accessible method net/minecraft/resources/Identifier validNamespaceChar (C)Z
+accessible field net/minecraft/client/renderer/blockentity/ChestRenderer models Lnet/minecraft/client/renderer/MultiblockChestResources;
+accessible field net/minecraft/client/renderer/blockentity/ChestRenderer sprites Lnet/minecraft/client/resources/model/sprite/SpriteGetter;
+# NeoForge exposes ServerExplosion internals so Mekanism's meltdown explosion can reuse the explode pipeline
+accessible method net/minecraft/world/level/ServerExplosion calculateExplodedPositions ()Ljava/util/List;
+accessible method net/minecraft/world/level/ServerExplosion hurtEntities ()V
+accessible method net/minecraft/world/level/ServerExplosion interactWithBlocks (Ljava/util/List;)V
+accessible method net/minecraft/world/level/ServerExplosion createFire (Ljava/util/List;)V
+accessible method net/minecraft/world/level/ServerExplosion interactsWithBlocks ()Z
+accessible field net/minecraft/world/level/ServerExplosion fire Z
+# NeoForge lets mods finish configuration tasks from their own task implementations
+accessible method net/minecraft/server/network/ServerConfigurationPacketListenerImpl finishCurrentTask (Lnet/minecraft/server/network/ConfigurationTask$Type;)V
+accessible field net/minecraft/client/particle/SingleQuadParticle sprite Lnet/minecraft/client/renderer/texture/TextureAtlasSprite;
+# 26.1 made the BlockEntityType constructor private; NeoForge keeps it available to mods
+accessible method net/minecraft/world/level/block/entity/BlockEntityType <init> (Lnet/minecraft/world/level/block/entity/BlockEntityType$BlockEntitySupplier;Ljava/util/Set;)V
